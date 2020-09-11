@@ -6,9 +6,15 @@ function main_Bifrost()
 
     # 
     max_scatterings = 10_000_000_000 
-    scale_emission = 1e9
-    tau_max = 1e-4
+    scale_emission = 1e4 * 2
+    tau_max = 20
 
+    # 2-4 minutes runtime
+    #1e7, 1e-3
+    #1e6, 1e-2
+    #1e5, 1e-1
+    #1e4, 1e0
+    
     atmosphere = Bifrost
 
     hits, destroyed, escaped, total_packets, avg_scatterings = MCRT.simulate(atmosphere, max_scatterings, scale_emission, tau_max)
@@ -19,10 +25,8 @@ function main_Bifrost()
     println("Escaped: ", escaped/total_packets)
     println("Total hits:", sum(hits))
 
-    heatmap(1:size(hits,1),
-        1:size(hits,2), hits,
-        c=:grays)
-    savefig("Plots/Bifrost_hits.png")
+    heatmap(1:size(hits,1), 1:size(hits,2), hits, c=:grays)
+    savefig("/mn/stornext/u3/idarhan/SolarMCRT/Plots/Bifrost_hits.png")
 end
 
 import Bifrost
@@ -43,10 +47,8 @@ function main_FALC()
     println("Escaped: ", escaped/total_packets)
     println("Total hits:", sum(hits))
 
-    heatmap(1:size(hits,1),
-        1:size(hits,2), hits,
-        c=:grays)
-    savefig("Plots/FALC_hits.png")
+    heatmap(1:size(hits,1), 1:size(hits,2), hits, c=:grays)
+    savefig("/mn/stornext/u3/idarhan/SolarMCRT/Plots/FALC_hits.png")
 end
 
 #import FALC
