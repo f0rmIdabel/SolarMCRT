@@ -6,7 +6,7 @@ using Unitful
 PATH = "/mn/stornext/d18/RoCS/idarhan/MScProject/Renditions/R1/data/FALC/"
 
 dim = [5, 5, 68]
-wavelength = 500e-9u"m"
+wavelength = 500u"nm"
 
 
 # Atmosphere dimension
@@ -16,7 +16,8 @@ x = push!(x_, 2*x_[dim[1]] - x_[dim[1]-1]) # Add enddpoint
 y_ = IOLib.read_parameter(PATH*"y_FALC.txt")u"m" * 100_000
 y = push!(y_, 2*y_[dim[2]] - y_[dim[2]-1]) # Add enddpoint
 
-edge = [[x[1], x[end]], [y[1], y[end]]]
+edge = [x[1] x[end]
+        y[1] y[end]]
 
 height_ = IOLib.read_parameter(PATH*"height_FALC.txt")u"m"
 height = push!(height_, 2*height_[dim[3]] - height_[dim[3]-1]) # Add enddpoint

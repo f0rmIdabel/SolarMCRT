@@ -4,7 +4,7 @@ module IOLib
 """
     read_parameter(textfile::AbstractString)
 
-Reads 1D, 2D or 3D spatial data into Arrays. 
+Reads 1D, 2D or 3D spatial data into julia Arrays. 
 Assumes 
 """
 function read_parameter(textfile::AbstractString)
@@ -49,4 +49,5 @@ function read_parameter(textfile::AbstractString)
     return array
 end
 
+# End of module
 end

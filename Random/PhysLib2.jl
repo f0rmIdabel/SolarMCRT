@@ -1,4 +1,4 @@
-module PhysLib
+module PhysLib2
 
 using Unitful
 using Markdown
@@ -13,14 +13,15 @@ Returns monochromatic intensity (energy per time per area per steradian per wave
 
 (Copied from Tiago, SSB)
 """
-function blackbody_lambda(λ::Unitful.Length, temperature::Unitful.Temperature)
+function blackbody_lambda(λ::Unitful.Length, temperature::Unitful.Quantity)
     (2h * c_0^2) / (λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1)) |> u"kW / m^2 / sr / nm"
 end
 
-"""
-2D array  of indices of 
-"""
-function optical_depth_boundary(chi::Array{<:Unitful.Quantity, 3}, height::Array{<:Unitful.Length, 1}, tau_max::Real)
+
+function optical_depth_boundary(Atmosphere::Module, tau_max::Real)
+    
+    chi = Atmosphere.chi_continuum
+    height = Atmosphere.height
     
     dim = size(chi)
     columns = dim[1]*dim[2]
@@ -45,12 +46,16 @@ function optical_depth_boundary(chi::Array{<:Unitful.Quantity, 3}, height::Array
     return boundary
 end
 
-"""
-The total emission above the optical depth boundary
-"""
 
-function total_emission(chi::Array{<:Unitful.Quantity, 3}, temperature::Array{<:Unitful.Temperature, 3}, x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1},
-        z::Array{<:Unitful.Length, 1}, boundary::Array{Int,2}, wavelength::Unitful.Length)
+function total_emission(Atmosphere::Module, boundary::Array{Int,2}, wavelength::Unitful.Length)
+    
+    x = Atmosphere.x
+    y = Atmosphere.y
+    z = Atmosphere.height
+    
+    chi = Atmosphere.chi_continuum
+    temperature = Atmosphere.temperature
+    
     
     total_emission = 0.0u"kW / sr / nm"
     
