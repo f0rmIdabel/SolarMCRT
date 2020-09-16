@@ -1,17 +1,13 @@
 using Plots
 using Random
 using Dates
-using Printf
-using TickTock
 
 import MCRT
 import Bifrost
+import MyPlots
+import IOLib
 
-
-function main(atmosphere::Module)
-    
-    #atmosphere = Bifrost
-    max_scatterings = 10_000_000_000 
+function main(atmosphere::Module, max_scatterings = 10_000_000_000 )
     
     # Get user input 
     println("Choose maximum optical depth:")
@@ -27,13 +23,11 @@ function main(atmosphere::Module)
     seed = Int(floor(datetime2unix(current_time)))
     rng = MersenneTwister(seed)
     
-    # Time function -- but use something else like @time 
-    tick()
-    # Run simulation
-    surface, destroyed, escaped, scatterings, J = MCRT.simulate(atmosphere, max_scatterings, 
-                                                             tau_max, packets, rng)
+    # Run and time simulation
+    simulation = @timed MCRT.simulate(atmosphere, max_scatterings, tau_max, packets, rng)
+    surface, destroyed, escaped, scatterings, J = simulation.value
+    elapsed_time = simulation.time
 
-    elapsed_time = tok()
     # Print results
     println("Packets: ", packets) 
     println("Destroyed: ", destroyed)
@@ -41,16 +35,11 @@ function main(atmosphere::Module)
     println("Scatterings: ", scatterings)
     
     # Append results to file
-    f = open("/mn/stornext/u3/idarhan/SolarMCRT/Results/Results.txt", "a")
-    results = string(current_time)*(@sprintf("%13.1f%13.1e%20g%18g%22g%22.1f\n", tau_max, packets, destroyed, escaped, scatterings, elapsed_time))
-    write(f, results)
+    IOLib.write_results_to_file(current_time, tau_max, packets, destroyed, escaped, scatterings, elapsed_time)
     
-    # To avoid ssh display problems 
-    ENV["GKSwstype"]="nul"
-
-    heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, title = "")
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Surface/bf_%.1f_%.0e", tau_max, packets)
-    png(fig)
+    # Plot surface intensity
+    MyPlots.surface_intensity(surface, tau_max, packets)
+    
     
 end
 

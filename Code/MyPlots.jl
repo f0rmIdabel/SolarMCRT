@@ -11,7 +11,7 @@ function surface_plot(Atmosphere::Module, tau_max::Real, camera_tilt::Real)
 
 """
 
-function surface_plot(Atmosphere::Module, tau_max::Real, camera_tilt::Real) 
+function boundary_height(Atmosphere::Module, tau_max::Real, camera_tilt::Real) 
 
     #Plots.pyplot()
 
@@ -36,9 +36,16 @@ function surface_plot(Atmosphere::Module, tau_max::Real, camera_tilt::Real)
 end
 
 
-#surface_plot(Bifrost, 5, 30)
 
+function surface_intensity(surface::Array{Int, 2}, tau_max::Real, total_packets::Real)
+    
+    # To avoid ssh display problems 
+    ENV["GKSwstype"]="nul"
 
+    heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, title = "", aspect_ratio=:equal)
+    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Surface/bf_%.1f_%.0e", tau_max, total_packets)
+    png(fig)
 
+end
 
 end
