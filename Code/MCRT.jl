@@ -42,13 +42,15 @@ function simulate(Atmosphere::Module, max_scatterings::Real, tau_max::Real, tota
     surface = zeros(Int, nx, ny)
     J = zeros(Int, nx, ny, nz)
 
+    nynz = ny*nz
+    
     # Go through all boxes
     for box in ProgressBar(1:total_boxes)
 
         # Find (x,y,z) indices of box
-        i = 1 + box ÷ (ny*nz + 1)
-        j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
-        k = 1 + (box - (i-1)*ny*nz - 1) % (nz)
+        i = 1 + box ÷ (nynz + 1)
+        j = 1 + (box - (i-1)*nynz) ÷ (nz + 1)
+        k = 1 + (box - (i-1)*nynz - 1) % (nz)
 
         # Skip boxes beneath boundary 
         if k > boundary[i,j]
@@ -104,7 +106,7 @@ function simulate(Atmosphere::Module, max_scatterings::Real, tau_max::Real, tota
                     total_destroyed += 1
                     break
                 # Check if destroyed in next particle interaction
-                elseif rand() < epsilon[box_id...]
+                elseif rand(rng) < epsilon[box_id...]
                     total_destroyed += 1
                     break
 
@@ -142,7 +144,7 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     θ = 2π * rand(rng)
 
     unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
-    
+        
     # Find distance to closest face
     ds, face = next_edge(x, y, z, r, unit_vector, box_id)
     
