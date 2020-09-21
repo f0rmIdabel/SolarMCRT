@@ -24,7 +24,8 @@ intensity = IOLib.read_parameter(PATH*"intensity_Bifrost.txt")u"kW / m^2 / sr / 
 temperature = IOLib.read_parameter(PATH*"temperature_Bifrost.txt")u"K"
 epsilon_continuum = IOLib.read_parameter(PATH*"epsilon_continuum_Bifrost.txt")
 chi_continuum = IOLib.read_parameter(PATH*"chi_continuum_Bifrost.txt")u"m^-1"
-velocity_z = IOLib.read_parameter(PATH*"velocity_z_Bifrost.txt")u"ms^-1"
-electron_density = IOLib.read_parameter(PATH*"electron_density_Bifrost.txt")u"m^-3"
+
+#electron_density = IOLib.read_parameter(PATH*"electron_density_Bifrost.txt")u"m^-3"
+#velocity_z = IOLib.read_parameter(PATH*"velocity_z_Bifrost.txt")u"m / s^1"
 
 end

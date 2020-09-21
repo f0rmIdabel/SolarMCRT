@@ -1,11 +1,16 @@
 module IOLib
 
 using Printf
+"""
+"""
 
-
-function write_results_to_file(current_time, tau_max, packets, destroyed, escaped, scatterings, elapsed_time, filename="Results.txt")
+function write_results_to_file(current_time, tau_max, packets, destroyed, escaped, scatterings, 
+                               elapsed_time, meanJ,  medJ, minJ, maxJ, filename="Results.txt")
+    
     f = open("/mn/stornext/u3/idarhan/SolarMCRT/Results/"*filename, "a")
-    results = string(current_time)*(@sprintf("%13.1f%13.1e%20g%18g%22g%22.1f\n", tau_max, packets, destroyed, escaped, scatterings, elapsed_time))
+    results = string(current_time)*(@sprintf("%13.1f%13.1e%20.5e%18g%22g%22.1f%22.1f%20g%17g%17g\n", 
+                                             tau_max, packets, destroyed, escaped, scatterings, 
+                                             elapsed_time, meanJ,  medJ, minJ, maxJ))
     write(f, results)
 end
 

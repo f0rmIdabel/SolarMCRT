@@ -27,8 +27,9 @@ intensity = IOLib.read_parameter(PATH*"intensity_FALC.txt")u"kW / m^2 / sr / nm"
 temperature = IOLib.read_parameter(PATH*"temperature_FALC.txt")u"K"
 epsilon_continuum = IOLib.read_parameter(PATH*"epsilon_continuum_FALC.txt")
 chi_continuum = IOLib.read_parameter(PATH*"chi_continuum_FALC.txt")u"m^-1"
-velocity_z = IOLib.read_parameter(PATH*"velocity_z_FALC.txt")u"ms^-1"
-electron_density = IOLib.read_parameter(PATH*"electron_density_FALC.txt")u"m^-3"
+
+#velocity_z = IOLib.read_parameter(PATH*"velocity_z_FALC.txt")u"ms^-1"
+#electron_density = IOLib.read_parameter(PATH*"electron_density_FALC.txt")u"m^-3"
 
 
 end
