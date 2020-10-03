@@ -1,5 +1,5 @@
 include("MCRT.jl")
-include("Atmos.jl")
+include("atmos.jl")
 include("MyLibs/IOLib.jl")
 include("MyLibs/plotLib.jl")
 include("MyLibs/physLib.jl")

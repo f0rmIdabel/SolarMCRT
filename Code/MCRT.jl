@@ -1,10 +1,8 @@
 include("MyLibs/physLib.jl")
-include("Atmos.jl")
-
+include("atmos.jl")
 using Random
 using ProgressBars
 using Unitful
-#using LinearAlgebra # Where do I use this?
 
 """
     simulate(Atmosphere::Module, max_scatterings::Real,
@@ -38,7 +36,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
             y[1] y[end]]
 
     # Initialise variables
-    total_destroyed = Threads.Atomic{Int64}(0) #Remove Base. ?
+    total_destroyed = Threads.Atomic{Int64}(0)
     total_escaped = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
