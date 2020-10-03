@@ -1,11 +1,10 @@
-module MCRT
+include("MyLibs/physLib.jl")
+include("Atmos.jl")
 
-import PhysLib
 using Random
-using LinearAlgebra
 using ProgressBars
-using Markdown
 using Unitful
+#using LinearAlgebra # Where do I use this?
 
 """
     simulate(Atmosphere::Module, max_scatterings::Real,
@@ -14,41 +13,49 @@ using Unitful
 Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by tau_max.
 """
-function simulate(Atmosphere::Module, max_scatterings::Real, τ_max::Real, total_packets::Real, rng::MersenneTwister, bins = [4,2])
+function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
+                  max_scatterings::Real, τ_max::Real,
+                  total_packets::Real, num_bins = [4,2])
 
-    # Import relevant atmosphere data
-    x = Atmosphere.x
-    y = Atmosphere.y
-    z = Atmosphere.height
+    # Atmosphere data
+    x = atmosphere.x
+    y = atmosphere.y
+    z = atmosphere.z
 
-    temperature = Atmosphere.temperature
-    ϵ = Atmosphere.epsilon_continuum
-    χ = Atmosphere.chi_continuum
-    λ = Atmosphere.wavelength
+    temperature = atmosphere.temperature
+    ε = atmosphere.ε_continuum
+    χ = atmosphere.χ_continuum
 
-    edge = Atmosphere.edge
-    nx, ny, nz = Atmosphere.dim
+    λ = wavelength
+
+    # Useful quantities
+    nx = length(x)
+    ny = length(y)
+    nz = length(z)
     total_boxes = nx*ny*nz
 
-    # Initialise variables
-    total_destroyed = 0
-    total_escaped = 0
-    total_scatterings = 0
+    edge = [x[1] x[end]
+            y[1] y[end]]
 
-    boundary = PhysLib.optical_depth_boundary(χ, z, τ_max)
-    total_emission = PhysLib.total_emission(χ, temperature, x, y, z, boundary, λ)
-    scale_emission = total_packets/total_emission
+    # Initialise variables
+    total_destroyed = Threads.Atomic{Int64}(0) #Remove Base. ?
+    total_escaped = Threads.Atomic{Int64}(0)
+    total_scatterings = Threads.Atomic{Int64}(0)
+
+    boundary = optical_depth_boundary(χ, z, τ_max)
+    total_emission_ = total_emission(χ, temperature, x, y, z, boundary, λ)
+    scale_emission = total_packets/total_emission_
 
     # Bin escape angles
-    ϕ_bins, θ_bins = bins
+    ϕ_bins, θ_bins = num_bins
 
-    surface = zeros(Int, nx, ny, ϕ_bins, θ_bins)
-    J = zeros(Int, nx, ny, nz)
+    surface = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
+    J = zeros(Int64, nz, nx, ny)
 
     nynz = ny*nz
 
     # Go through all boxes
-    for box in ProgressBar(1:total_boxes)
+    Threads.@threads for box in ProgressBar(1:total_boxes)
 
         # Find (x,y,z) indices of box
         i = 1 + box ÷ (nynz + 1)
@@ -60,61 +67,56 @@ function simulate(Atmosphere::Module, max_scatterings::Real, τ_max::Real, total
             continue
         end
 
-        box_id = [i, j, k]
+        box_id = [k, i, j]
 
         # Find dimensions of box
         corner = [x[i], y[j], z[k]]
-        box_dim = ([x[i+1], y[j+1], z[k+1]] .- corner)
+        box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
         box_volume = box_dim[1]*box_dim[2]*(-box_dim[3])
+
 
         # Based on condition in box,
         # create certain number of photons packets
-        B = PhysLib.blackbody_lambda(λ, temperature[box_id...])
+        B = blackbody_lambda(λ, temperature[box_id...])
         box_emission = B*χ[box_id...]*box_volume
         packets = Int(round(box_emission*scale_emission))
 
         # Add to local field
-        J[i,j,k] += packets
-
-        # Draw random numbers for initial position
-        if packets > 0
-            rn = rand(rng, packets, 3)
-        end
+        J[k,i,j] += packets
 
         for packet=1:packets
 
             # Initial position uniformely drawn from box
-            r = corner .+ (box_dim .* rn[packet,:])
+            r = corner .+ (box_dim .* rand(3))
 
             # Initial box
-            box_id = [i, j, k]
+            box_id = [k, i, j]
 
             # Scatter each packet until destroyed,
             # escape or reach max_scatterings
             for s=1:Int(max_scatterings)
 
-                total_scatterings += 1
+                Threads.atomic_add!(total_scatterings, 1)
 
                 # Scatter packet once
-                r, box_id, escape, escape_angle, destroyed, J = scatter_packet!(x, y, z, χ, edge, box_id, r, J, boundary, rng)
+                r, box_id, escape, escape_angle, destroyed, J = scatter_packet!(x, y, z, χ, edge, box_id, r, J, boundary)
 
                 # Check if escaped
                 if escape
                     ϕ, θ  = escape_angle
-                    #surface[box_id[1], box_id[2], 1 + Int(ϕ÷(2π/ϕ_bins)), 1 + Int(θ>(π/8))] += 1
-                    surface[box_id[1], box_id[2], 1 + Int(ϕ÷(2π/ϕ_bins)), 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))] += 1
-                    total_escaped += 1
-
+                    ϕ_bin = 1 + Int(ϕ÷(2π/ϕ_bins))
+                    θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))
+                    surface[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
+                    Threads.atomic_add!(total_escaped, 1)
                     break
                 # Check if destroyed in bottom
                 elseif destroyed
-                    total_destroyed += 1
+                    Threads.atomic_add!(total_destroyed, 1)
                     break
                 # Check if destroyed in next particle interaction
-            elseif rand(rng) < ϵ[box_id...]
-                    total_destroyed += 1
+                elseif rand() < ε[box_id...]
+                    Threads.atomic_add!(total_destroyed, 1)
                     break
-
                 end
             end
         end
@@ -133,7 +135,7 @@ escape/destroyed-status and an updated mean radiation field J.
 """
 function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
                          χ::Array{<:Unitful.Quantity, 3}, edge::Array{<:Unitful.Length, 2}, box_id::Array{Int,1},
-                         r::Array{<:Unitful.Length, 1}, J::Array{Int, 3}, boundary::Array{Int, 2}, rng::MersenneTwister)
+                         r::Array{<:Unitful.Length, 1}, J::Array{Int, 3}, boundary::Array{Int, 2})
 
     # Import relevant atmosphere data
     dim = size(χ) #Atmosphere.dim
@@ -144,11 +146,11 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     destroyed = false
 
     # Draw scattering depth and direction
-    τ = -log(rand(rng))
-    ϕ = 2π * rand(rng)
-    θ =  π * rand(rng)
+    τ = -log(rand())
+    ϕ = 2π * rand()
+    θ =  π * rand()
 
-    unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
+    unit_vector = [cos(θ), sin(θ)*cos(ϕ), sin(θ)*sin(ϕ)]
 
     # Find distance to closest face
     ds, face = next_edge(x, y, z, r, unit_vector, box_id)
@@ -163,18 +165,18 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     # traverse boxes until target is reached
     while τ > τ_cum
 
-        # Switch to new box
-        if face == 3
-            box_id[3] -= direction[3] # Consequence of height array up->down
+        # Switch to new box                    # Find bins
+        if face == 1
+            box_id[1] -= direction[1] # Consequence of height array up->down
 
             # Top escape
-            if box_id[3] == 0
+            if box_id[1] == 0
                 escape = true
                 escape_angle = [ϕ, θ]
                 break
 
             # Bottom destruction, Here they will very likely get destroyed anyway, so might not need this
-            elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
+        elseif box_id[1] == boundary[box_id[2], box_id[3]] + 1
                 destroyed = true
                 break
             end
@@ -195,7 +197,7 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
         end
 
         # Add to radiation field
-        J[box_id...] += 1
+        J[box_id...]+= 1
 
         # Find distance to closest face
         ds, face = next_edge(x, y, z, r, unit_vector, box_id)
@@ -239,8 +241,4 @@ function next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1},
     ds = distance[face]
 
     return ds, face
-end
-
-
-# End module
 end
