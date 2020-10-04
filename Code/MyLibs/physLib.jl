@@ -69,7 +69,6 @@ function total_emission(χ::Array{<:Unitful.Quantity, 3}, temperature::Array{<:U
     return total_emission
 end
 
-
 function extract_surface_bin(surface::Array{Int, 4}, bin = :[:,:])
 
     # Pick out bin

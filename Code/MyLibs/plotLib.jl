@@ -25,8 +25,7 @@ function boundary_height(z::Array{<:Unitful.Length, 1},
     surface(x, y, f, zlim = [ustrip(z[end]),
             ustrip(z[1])], camera=(-45,camera_tilt))
 
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results
-                    /Plots/Boundary/boundary_%.1f_%g",
+    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Boundary/boundary_%.1f_%g",
                     τ_max, camera_tilt)
     png(fig)
 end

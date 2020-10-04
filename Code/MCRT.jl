@@ -28,13 +28,10 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     λ = wavelength
 
     # Useful quantities
-    nx = length(x)
-    ny = length(y)
-    nz = length(z)
+    nx = length(x)-1
+    ny = length(y)-1
+    nz = length(z)-1
     total_boxes = nx*ny*nz
-
-    edge = [x[1] x[end]
-            y[1] y[end]]
 
     # Initialise variables
     total_destroyed = Threads.Atomic{Int64}(0)
@@ -48,9 +45,11 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     # Bin escape angles
     ϕ_bins, θ_bins = num_bins
 
+    # Allocate
     surface = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
-    J = zeros(Int64, nz, nx, ny)
+    J = zeros(Int64, nx, ny, nz)
 
+    # To save flops in loop
     nynz = ny*nz
 
     # Go through all boxes
@@ -97,7 +96,8 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                 Threads.atomic_add!(total_scatterings, 1)
 
                 # Scatter packet once
-                r, box_id, escape, escape_angle, destroyed, J = scatter_packet!(x, y, z, χ, edge, box_id, r, J, boundary)
+                r, box_id, escape, escape_angle, destroyed = scatter_packet(x, y, z, χ, boundary,
+                                                                            box_id, r, J)
 
                 # Check if escaped
                 if escape
@@ -131,12 +131,14 @@ end
 Scatters photon packet once. Returns new position, box_id,
 escape/destroyed-status and an updated mean radiation field J.
 """
-function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                         χ::Array{<:Unitful.Quantity, 3}, edge::Array{<:Unitful.Length, 2}, box_id::Array{Int,1},
-                         r::Array{<:Unitful.Length, 1}, J::Array{Int, 3}, boundary::Array{Int, 2})
+function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
+                        χ::Array{<:Unitful.Quantity, 3}, boundary::Array{Int, 2},
+                        box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
 
-    # Import relevant atmosphere data
-    dim = size(χ) #Atmosphere.dim
+    # Usefule quantities
+    dim = size(χ)
+    edge = [x[1] x[end]
+            y[1] y[end]]
 
     # Keep track of status
     escape = false
@@ -163,7 +165,7 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     # traverse boxes until target is reached
     while τ > τ_cum
 
-        # Switch to new box                    # Find bins
+        # Switch to new box
         if face == 3
             box_id[3] -= direction[3] # Consequence of height array up->down
 
@@ -173,7 +175,8 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
                 escape_angle = [ϕ, θ]
                 break
 
-            # Bottom destruction, Here they will very likely get destroyed anyway, so might not need this
+            # Bottom destruction,
+            #Here they will very likely get destroyed anyway, so might not need this
             elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
@@ -209,10 +212,10 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
         r = nothing
     else
         # Correct for overshoot in final box
-        r -= unit_vector * (τ_cum - τ)/χ[box_id...]
+        r -= unit_vector*(τ_cum - τ)/χ[box_id...]
     end
 
-    return r, box_id, escape, escape_angle, destroyed, J
+    return r, box_id, escape, escape_angle, destroyed
 end
 
 
