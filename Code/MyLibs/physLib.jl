@@ -19,13 +19,13 @@ end
 function optical_depth_boundary(χ::Array{<:Unitful.Quantity, 3}, z::Array{<:Unitful.Length, 1}, τ_max::Real)
 
     dim = size(χ)
-    columns = dim[2]*dim[3]
-    boundary = Array{Int, 2}(undef, dim[2], dim[3])
+    columns = dim[1]*dim[2]
+    boundary = Array{Int, 2}(undef, dim[1], dim[2])
 
     # Calculate vertical optical depth for each column
     for col=1:columns
-        i = 1 + (col - 1)÷dim[3]
-        j = col - (i - 1)*dim[3]
+        i = 1 + (col-1)÷dim[2]
+        j = col - (i-1)*dim[2]
 
         τ = 0
         k = 0
@@ -33,7 +33,7 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity, 3}, z::Array{<:Uni
         while τ < τ_max
             k += 1
             # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (χ[k,i,j] + χ[k+1,i,j])
+            τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
         end
         boundary[i,j] = k
 
@@ -51,18 +51,18 @@ function total_emission(χ::Array{<:Unitful.Quantity, 3}, temperature::Array{<:U
     total_emission = 0.0u"kW / sr / nm"
 
     dim = size(χ)
-    columns = dim[2]*dim[3]
+    columns = dim[1]*dim[2]
 
     # Calculate vertical optical depth for each column
     for col=1:columns
 
-        i = 1 + (col - 1)÷dim[3]
-        j = col - (i - 1)*dim[3]
+        i = 1 + (col - 1)÷dim[2]
+        j = col - (i - 1)*dim[2]
 
         for k=1:boundary[i,j]
             box_volume = (x[i+1] - x[i])*(y[j+1] - y[j])*(z[k] - z[k+1])
-            B = blackbody_lambda(λ, temperature[k,i,j])
-            total_emission += B*χ[k,i,j]*box_volume
+            B = blackbody_lambda(λ, temperature[i,j,k])
+            total_emission += B*χ[i,j,k]*box_volume
         end
     end
 
@@ -98,7 +98,7 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
     boundary = optical_depth_boundary(χ, z, τ_max)
 
     dim = size(χ)
-    columns = dim[2]*dim[3]
+    columns = dim[1]*dim[2]
 
     # Initialize variables
     meanJ = 0.0
@@ -110,17 +110,17 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
     # Calculate mean, min and max J above boundary
     for col=1:columns
 
-        i = 1 + (col - 1)÷dim[3]
-        j = col - (i - 1)*dim[3]
+        i = 1 + (col - 1)÷dim[2]
+        j = col - (i - 1)*dim[2]
 
         for k=1:boundary[i,j]
-            meanJ += J[k,i,j]
+            meanJ += J[i,j,k]
             total_boxes += 1
 
-            if J[k,i,j] > maxJ
-                maxJ = J[k,i,j]
-            elseif J[k,i,j] < minJ
-                minJ = J[k,i,j]
+            if J[i,j,k] > maxJ
+                maxJ = J[i,j,k]
+            elseif J[i,j,k] < minJ
+                minJ = J[i,j,k]
             end
         end
     end

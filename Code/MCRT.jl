@@ -1,5 +1,6 @@
-include("MyLibs/physLib.jl")
 include("atmos.jl")
+include("MyLibs/physLib.jl")
+
 using Random
 using ProgressBars
 using Unitful
@@ -65,13 +66,12 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
             continue
         end
 
-        box_id = [k, i, j]
+        box_id = [i,j,k]
 
         # Find dimensions of box
         corner = [x[i], y[j], z[k]]
         box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
         box_volume = box_dim[1]*box_dim[2]*(-box_dim[3])
-
 
         # Based on condition in box,
         # create certain number of photons packets
@@ -80,7 +80,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
         packets = Int(round(box_emission*scale_emission))
 
         # Add to local field
-        J[k,i,j] += packets
+        J[i,j,k] += packets
 
         for packet=1:packets
 
@@ -88,7 +88,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
             r = corner .+ (box_dim .* rand(3))
 
             # Initial box
-            box_id = [k, i, j]
+            box_id = [i,j,k]
 
             # Scatter each packet until destroyed,
             # escape or reach max_scatterings
@@ -164,17 +164,17 @@ function scatter_packet!(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     while τ > τ_cum
 
         # Switch to new box                    # Find bins
-        if face == 1
-            box_id[1] -= direction[1] # Consequence of height array up->down
+        if face == 3
+            box_id[3] -= direction[3] # Consequence of height array up->down
 
             # Top escape
-            if box_id[1] == 0
+            if box_id[3] == 0
                 escape = true
                 escape_angle = [ϕ, θ]
                 break
 
             # Bottom destruction, Here they will very likely get destroyed anyway, so might not need this
-        elseif box_id[1] == boundary[box_id[2], box_id[3]] + 1
+            elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
             end
@@ -230,9 +230,9 @@ function next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1},
     direction = unit_vector .> 0.0
 
     # Find distance to box crossings in all dimensions
-    distance = ([x[box_id[1] + direction[1]],
-                y[box_id[2] + direction[2]],
-                z[box_id[3] + !direction[3]]] .- r) ./unit_vector
+    distance = ([x[box_id[1] +  direction[1]],
+                 y[box_id[2] +  direction[2]],
+                 z[box_id[3] + !direction[3]]] .- r) ./unit_vector
 
     # Closest face
     face = argmin(distance)

@@ -4,6 +4,7 @@ using Unitful
 import PhysicalConstants.CODATA2018: σ_e
 # @derived_dimension PerLength Unitful.𝐋^-1 # can't make this work
 
+include("../atmos.jl")
 
 function get_atmosphere_data(path_atmos, path_RH)
 
@@ -22,24 +23,47 @@ function get_atmosphere_data(path_atmos, path_RH)
 
     # Read RH output
     #---------------------------------------------------------------
-    χ_absorption = h5read(path_RH, "chi_continuum")[1,:,:,:]u"m^-1"
+    χ_absorption = h5read(path_RH, "chi_continuum")[1,:,:,:]u"m^-1"  #WL
 
     # Re-work parameters
     #---------------------------------------------------------------
 
-    # Add endpoints
+    # Add endpoints for box calculations
     x = push!(x, 2*x[end] - x[end-1])
     y = push!(y, 2*y[end] - y[end-1])
     z = push!(z, 2*z[end] - z[end-1])
 
-    # Calculate epsilon and chi
+    # Calculate epsilon and chi                                       #WL
     χ_thomson = σ_e*electron_density
     χ_continuum = χ_absorption .+ χ_thomson
     ε_continuum = χ_absorption ./ χ_continuum
 
+    # Transpose all 3D-space arrays,(k,i,j) -> (i,j,k)
+    velocity_x = permutedims(velocity_x, [2,3,1])
+    velocity_y = permutedims(velocity_y, [2,3,1])
+    velocity_z = permutedims(velocity_z, [2,3,1])
+    temperature = permutedims(temperature, [2,3,1])
+    χ_continuum = permutedims(χ_continuum, [2,3,1])
+    ε_continuum = permutedims(ε_continuum, [2,3,1])
+
     return x, y, z, velocity_x, velocity_y, velocity_z,
            temperature, χ_continuum, ε_continuum
 end
+
+
+parameters = get_atmosphere_data("/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_cb24bih_s385_fullv.ncdf",
+                                 "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/output_ray.hdf5")
+x, y, z, velocity_x, velocity_y, velocity_z, temperature, χ_continuum, ε_continuum = parameters
+println(size(x))
+println(size(y))
+println(size(z))
+println(size(velocity_x))
+println(size(velocity_y))
+println(size(velocity_z))
+println(size(temperature))
+println(size(χ_continuum))
+println(size(ε_continuum))
+
 
 
 function write_results_to_file(current_time, τ_max, packets, destroyed, escaped, scatterings,
