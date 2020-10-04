@@ -1,9 +1,7 @@
 include("atmos.jl")
 include("MyLibs/physLib.jl")
-
 using Random
 using ProgressBars
-using Unitful
 
 """
     simulate(Atmosphere::Module, max_scatterings::Real,
@@ -132,7 +130,7 @@ Scatters photon packet once. Returns new position, box_id,
 escape/destroyed-status and an updated mean radiation field J.
 """
 function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                        χ::Array{<:Unitful.Quantity, 3}, boundary::Array{Int, 2},
+                        χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, boundary::Array{Int, 2},
                         box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
 
     # Usefule quantities

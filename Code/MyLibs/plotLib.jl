@@ -1,13 +1,10 @@
 include("physLib.jl")
-
-using Plots
-using Unitful
-using UnitfulRecipes
 using Printf
-
+using Plots
+using UnitfulRecipes
 
 function boundary_height(z::Array{<:Unitful.Length, 1},
-                         χ::Array{<:Unitful.Quantity, 3},
+                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
                          τ_max::Real, camera_tilt::Real)
 
     #Plots.pyplot()

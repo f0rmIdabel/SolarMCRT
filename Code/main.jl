@@ -2,12 +2,11 @@ include("MCRT.jl")
 include("atmos.jl")
 include("MyLibs/plotLib.jl")
 include("MyLibs/physLib.jl")
-
 using Dates
-using Printf
 
 function main(max_scatterings = 1e10)
 
+    println("Loading atmosphere...\n")
     # Get atmosphere data
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")

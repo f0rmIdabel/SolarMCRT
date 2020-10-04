@@ -16,7 +16,7 @@ end
 """
 2D array  of indices of
 """
-function optical_depth_boundary(χ::Array{<:Unitful.Quantity, 3}, z::Array{<:Unitful.Length, 1}, τ_max::Real)
+function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, z::Array{<:Unitful.Length, 1}, τ_max::Real)
 
     dim = size(χ)
     columns = dim[1]*dim[2]
@@ -44,7 +44,7 @@ end
 """
 The total emission above the optical depth boundary
 """
-function total_emission(χ::Array{<:Unitful.Quantity, 3}, temperature::Array{<:Unitful.Temperature, 3},
+function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, temperature::Array{<:Unitful.Temperature, 3},
                         x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
                         boundary::Array{Int,2}, λ::Unitful.Length)
 
@@ -91,7 +91,7 @@ function extract_surface_bin(surface::Array{Int, 4}, bin = :[:,:])
 end
 
 function field_above_boundary(z::Array{<:Unitful.Length, 1},
-                              χ::Array{<:Unitful.Quantity, 3},
+                              χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
                               J::Array{Int, 3}, τ_max::Real)
 
     boundary = optical_depth_boundary(χ, z, τ_max)

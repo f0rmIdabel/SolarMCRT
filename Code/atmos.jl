@@ -1,7 +1,6 @@
 using HDF5
 using Unitful
 import PhysicalConstants.CODATA2018: σ_e
-# @derived_dimension PerLength Unitful.𝐋^-1 # can't make this work
 
 struct Atmosphere
    # Dimensions
@@ -14,7 +13,7 @@ struct Atmosphere
    velocity_y::Array{<:Unitful.Velocity, 3}
    velocity_z::Array{<:Unitful.Velocity, 3}
    temperature::Array{<:Unitful.Temperature, 3}
-   χ_continuum::Array{<:Unitful.Quantity, 3}
+   χ_continuum::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}
    ε_continuum::Array{Real, 3}
 end
 
@@ -27,11 +26,11 @@ function get_atmosphere_data(atmos_data, rh_output)
     # Read atmosphere file
     #------------------------------------------------------------
     x = h5read(path_atmos, "x")u"m"
-    y = h5read(path_atmos, "y")u"m" # !Beware of negative values!
+    y = -h5read(path_atmos, "y")u"m" # !Beware of negative values!
     z = h5read(path_atmos, "z")[:,1]u"m"
 
     velocity_x = h5read(path_atmos, "velocity_x")[:,:,:,1]u"m/s"
-    velocity_y = -h5read(path_atmos, "velocity_y")[:,:,:,1]u"m/s"
+    velocity_y = h5read(path_atmos, "velocity_y")[:,:,:,1]u"m/s"
     velocity_z = h5read(path_atmos, "velocity_z")[:,:,:,1]u"m/s"
 
     temperature = h5read(path_atmos, "temperature")[:,:,:,1]u"K"
