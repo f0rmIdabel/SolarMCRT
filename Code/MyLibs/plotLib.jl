@@ -22,7 +22,7 @@ function boundary_height(z::Array{<:Unitful.Length, 1},
     surface(x, y, f, zlim = [ustrip(z[end]),
             ustrip(z[1])], camera=(-45,camera_tilt))
 
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Boundary/boundary_%.1f_%g",
+    fig = @sprintf("../../Results/Plots/Boundary/boundary_%.1f_%g",
                     τ_max, camera_tilt)
     png(fig)
 end
@@ -38,8 +38,7 @@ function surface_intensity(surface::Array{Int, 4}, τ_max::Real,
 
     heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
     plot!(size=(410,400))
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results
-                    /Plots/Surface/bf_tau%.1f_pcts%.0e_bin%s",
+    fig = @sprintf("../../Results/Plots/Surface/bf_tau%.1f_pcts%.0e_bin%s",
                    τ_max, total_packets, string(bin))
     png(fig)
 end
@@ -70,8 +69,7 @@ function escape_direction(surface::Array{Int, 4}, τ_max::Real, total_packets::R
 
     plot(h1, h2, layout = (1, 2), legend = false)
 
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/
-                    Plots/EscapeDirections/escapes_tau%.1f_pcts%.0e",
+    fig = @sprintf("../../Results/Plots/EscapeDirections/escapes_tau%.1f_pcts%.0e",
                    τ_max, total_packets)
     png(fig)
 end

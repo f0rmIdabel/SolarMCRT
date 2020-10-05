@@ -12,51 +12,50 @@ a lower optical depth boundary given by tau_max.
 """
 function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                   max_scatterings::Real, τ_max::Real,
-                  total_packets::Real, num_bins = [4,2])
+                  target_packets::Real, num_bins = [4,2])
 
+    println("Loading atmosphere...")
     # Atmosphere data
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
-
-    temperature = atmosphere.temperature
     ε = atmosphere.ε_continuum
     χ = atmosphere.χ_continuum
+    temperature = atmosphere.temperature
 
+    # Chosen wavelengths
     λ = wavelength
 
-    # Useful quantities
-    nx = length(x)-1
-    ny = length(y)-1
-    nz = length(z)-1
+    println("Doing pre-calculations...")
+    # Pre-calculations
+    boundary = optical_depth_boundary(χ, z, τ_max)
+    box_packets = packets_per_box(x,y,z,χ,temperature,
+                                  λ,target_packets,boundary)
+
+    # Number of boxes
+    nx, ny = size(boundary)
+    nz = maximum(boundary)
     total_boxes = nx*ny*nz
 
-    # Initialise variables
-    total_destroyed = Threads.Atomic{Int64}(0)
-    total_escaped = Threads.Atomic{Int64}(0)
-    total_scatterings = Threads.Atomic{Int64}(0)
-
-    boundary = optical_depth_boundary(χ, z, τ_max)
-    total_emission_ = total_emission(χ, temperature, x, y, z, boundary, λ)
-    scale_emission = total_packets/total_emission_
-
-    # Bin escape angles
+    # Number of escape bins
     ϕ_bins, θ_bins = num_bins
 
-    # Allocate
+    # Initialise variables
     surface = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
     J = zeros(Int64, nx, ny, nz)
 
-    # To save flops in loop
-    nynz = ny*nz
+    total_packets = Threads.Atomic{Int64}(0)
+    total_destroyed = Threads.Atomic{Int64}(0)
+    total_escaped = Threads.Atomic{Int64}(0)
+    total_scatterings = Threads.Atomic{Int64}(0)
 
     # Go through all boxes
     Threads.@threads for box in ProgressBar(1:total_boxes)
 
         # Find (x,y,z) indices of box
-        i = 1 + box ÷ (nynz + 1)
-        j = 1 + (box - (i-1)*nynz) ÷ (nz + 1)
-        k = 1 + (box - (i-1)*nynz - 1) % (nz)
+        i = 1 + box ÷ (ny*nz + 1)
+        j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
+        k = 1 + (box - (i-1)*ny*nz - 1) % (nz)
 
         # Skip boxes beneath boundary
         if k > boundary[i,j]
@@ -68,16 +67,11 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
         # Find dimensions of box
         corner = [x[i], y[j], z[k]]
         box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
-        box_volume = box_dim[1]*box_dim[2]*(-box_dim[3])
-
-        # Based on condition in box,
-        # create certain number of photons packets
-        B = blackbody_lambda(λ, temperature[box_id...])
-        box_emission = B*χ[box_id...]*box_volume
-        packets = Int(round(box_emission*scale_emission))
 
         # Add to local field
-        J[i,j,k] += packets
+        packets = box_packets[box_id...]
+        J[box_id...] += packets
+        Threads.atomic_add!(total_packets, packets)
 
         for packet=1:packets
 
@@ -94,12 +88,12 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                 Threads.atomic_add!(total_scatterings, 1)
 
                 # Scatter packet once
-                r, box_id, escape, escape_angle, destroyed = scatter_packet(x, y, z, χ, boundary,
-                                                                            box_id, r, J)
+                box_id, r, escaped, destroyed = scatter_packet(x, y, z, χ, boundary,
+                                                               box_id, r, J)
 
                 # Check if escaped
-                if escape
-                    ϕ, θ  = escape_angle
+                if escaped[1]
+                    ϕ, θ  = escaped[2]
                     ϕ_bin = 1 + Int(ϕ÷(2π/ϕ_bins))
                     θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))
                     surface[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
@@ -134,12 +128,12 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
                         box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
 
     # Usefule quantities
-    dim = size(χ)
+    side_dim = size(boundary)
     edge = [x[1] x[end]
             y[1] y[end]]
 
     # Keep track of status
-    escape = false
+    escaped = false
     escape_angle = nothing
     destroyed = false
 
@@ -151,13 +145,13 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
     unit_vector = [cos(θ), sin(θ)*cos(ϕ), sin(θ)*sin(ϕ)]
 
     # Find distance to closest face
-    ds, face = next_edge(x, y, z, r, unit_vector, box_id)
+    face, ds = next_edge(x, y, z, box_id, r, unit_vector)
 
     direction = sign.(unit_vector)
 
     # Add optical depth and update position
     τ_cum = ds * χ[box_id...]
-    r += ds*unit_vector
+    r += ds * unit_vector
 
     # If depth target not reached in current box,
     # traverse boxes until target is reached
@@ -169,12 +163,10 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
 
             # Top escape
             if box_id[3] == 0
-                escape = true
-                escape_angle = [ϕ, θ]
+                escaped = [true, [ϕ, θ]]
                 break
 
-            # Bottom destruction,
-            #Here they will very likely get destroyed anyway, so might not need this
+            # Bottom destruction
             elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
@@ -185,10 +177,10 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
 
             # Handle side escapes with periodic boundary
             if box_id[face] == 0
-                box_id[face] = dim[face]
+                box_id[face] = side_dim[face]
                 r[face] = edge[face,2]
 
-            elseif  box_id[face] == dim[face] + 1
+            elseif  box_id[face] == side_dim[face] + 1
                 box_id[face] = 1
                 r[face] = edge[face,1]
             end
@@ -196,24 +188,24 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
         end
 
         # Add to radiation field
-        J[box_id...]+= 1
+        J[box_id...] += 1
 
         # Find distance to closest face
-        ds, face = next_edge(x, y, z, r, unit_vector, box_id)
+        face, ds = next_edge(x, y, z, box_id, r, unit_vector)
 
         # Update optical depth and position
         τ_cum += ds*χ[box_id...]
         r += ds*unit_vector
     end
 
-    if escape || destroyed
+    if escaped[1] || destroyed
         r = nothing
     else
         # Correct for overshoot in final box
         r -= unit_vector*(τ_cum - τ)/χ[box_id...]
     end
 
-    return r, box_id, escape, escape_angle, destroyed
+    return box_id, r, escaped, destroyed
 end
 
 
@@ -226,7 +218,7 @@ Calculates the distance to the next box and the face that it crosses,
 given an initial position and direction of travel.
 """
 function next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                   r::Array{<:Unitful.Length, 1}, unit_vector::Array{Float64, 1}, box_id::Array{Int,1})
+                   box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, unit_vector::Array{Float64, 1})
 
     direction = unit_vector .> 0.0
 
@@ -239,5 +231,5 @@ function next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1},
     face = argmin(distance)
     ds = distance[face]
 
-    return ds, face
+    return face, ds
 end

@@ -127,3 +127,39 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
     meanJ = meanJ/total_boxes
     return meanJ, minJ, maxJ
 end
+
+function packets_per_box(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
+                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, temperature::Array{<:Unitful.Temperature, 3},
+                         λ::Unitful.Length, target_packets::Real, boundary::Array{Int,2})
+
+    nx,ny = size(boundary)
+    nz = maximum(boundary)
+    total_boxes = nx*ny*nz
+
+    total_emission_ = total_emission(χ, temperature, x, y, z, boundary, λ)
+    scale_emission = target_packets/total_emission_
+
+    packets = zeros(Int64,nx,ny,nz)
+
+    for box=1:total_boxes
+        # Find (x,y,z) indices of box
+        i = 1 + box ÷ (ny*nz + 1)
+        j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
+        k = 1 + (box - (i-1)*ny*nz - 1) % (nz)
+
+        # Skip boxes beneath boundary
+        if k > boundary[i,j]
+            continue
+        end
+
+        box_dim = [x[i+1], y[j+1], z[k+1]] .- [x[i], y[j], z[k]]
+        box_volume = box_dim[1]*box_dim[2]*(-box_dim[3])
+
+        # Based on condition in box,
+        # create certain number of photons packets
+        B = blackbody_lambda(λ, temperature[i,j,k])
+        box_emission = B*χ[i,j,k]*box_volume
+        packets[i,j,k] = Int(round(box_emission*scale_emission))
+    end
+    return packets
+end

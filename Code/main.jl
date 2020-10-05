@@ -6,8 +6,9 @@ using Dates
 
 function main(max_scatterings = 1e10)
 
-    println("Loading atmosphere...\n")
-    # Get atmosphere data
+    println("Reading atmosphere...")
+
+    # Load atmosphere data
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")
     atmosphere = Atmosphere(parameters...)
