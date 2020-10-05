@@ -2,6 +2,7 @@ include("atmos.jl")
 include("MyLibs/physLib.jl")
 using Random
 using ProgressBars
+using Printf
 
 """
     simulate(Atmosphere::Module, max_scatterings::Real,
@@ -14,7 +15,6 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                   max_scatterings::Real, τ_max::Real,
                   target_packets::Real, num_bins = [4,2])
 
-    println("Loading atmosphere...")
     # Atmosphere data
     x = atmosphere.x
     y = atmosphere.y
@@ -26,8 +26,9 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     # Chosen wavelengths
     λ = wavelength
 
-    println("Doing pre-calculations...")
-    # Pre-calculations
+    println("--Performing pre-calculations...")
+
+    # Pre-calculations: boundary and # packets in each box
     boundary = optical_depth_boundary(χ, z, τ_max)
     box_packets = packets_per_box(x,y,z,χ,temperature,
                                   λ,target_packets,boundary)
@@ -41,13 +42,16 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     ϕ_bins, θ_bins = num_bins
 
     # Initialise variables
-    surface = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
+    surface_intensity = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
     J = zeros(Int64, nx, ny, nz)
 
     total_packets = Threads.Atomic{Int64}(0)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_escaped = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
+
+    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
+            Threads.nthreads()))
 
     # Go through all boxes
     Threads.@threads for box in ProgressBar(1:total_boxes)
@@ -96,7 +100,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                     ϕ, θ  = escaped[2]
                     ϕ_bin = 1 + Int(ϕ÷(2π/ϕ_bins))
                     θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))
-                    surface[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
+                    surface_intensity[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
                     Threads.atomic_add!(total_escaped, 1)
                     break
                 # Check if destroyed in bottom
@@ -112,13 +116,21 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
         end
     end
 
-    return surface, total_destroyed, total_escaped, total_scatterings, J
+    # Collect packet data
+    packet_data = [total_packets.value, total_destroyed.value, total_escaped.value, total_scatterings.value]
+
+    # Evaluate field above boundary
+    mean_J, min_J, max_J = field_above_boundary(z, χ, J, τ_max)
+    J_data = [J, mean_J, min_J, max_J]
+
+    return packet_data, J_data, surface_intensity
 end
 
 
-
 """
-    scatter(Atmos::Module, box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
+    scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
+                   χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, boundary::Array{Int, 2},
+                   box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
 
 Scatters photon packet once. Returns new position, box_id,
 escape/destroyed-status and an updated mean radiation field J.
@@ -211,8 +223,8 @@ end
 
 
 """
-    next_edge(Atmosphere::Module, r::Array{Unitful.Length, 1},
-              vector::Array{Float64, 1}, box_id::Array{Int,1})
+    next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
+              box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, unit_vector::Array{Float64, 1})
 
 Calculates the distance to the next box and the face that it crosses,
 given an initial position and direction of travel.

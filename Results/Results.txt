@@ -1,4 +1,4 @@
-Start of run              Threads     Elapsed time (s)      Tau_max          Packets         Destroyed           Escaped       Scatterings/packet                 Mean J (packets)        Min J (packets)              Max J (packets)
+            Time of run      Threads   Elapsed time (s)      Tau_max             Packets           Destroyed             Escaped         Scatterings                Mean J                 Min J                 Max J          SNR
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-2020-09-15T06:38:15.523         1            222.2             20.0       1.3333e+07          0.990109          0.000002                        1          23333233233.1                     34             1233434244340000
-
+2020-10-05T17:04:38.615           16              284.4          5.0                   0                   0                   0                   0                   0.0                     0                     0          0.0
+2020-10-05T17:22:58.943           16              284.7          5.0                   0                   0                   0                   0                   0.0                     0                     0          0.0

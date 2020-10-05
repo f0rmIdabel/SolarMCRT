@@ -1,12 +1,13 @@
 include("MCRT.jl")
 include("atmos.jl")
 include("MyLibs/plotLib.jl")
-include("MyLibs/physLib.jl")
+include("MyLibs/IOLib.jl")
 using Dates
 
 function main(max_scatterings = 1e10)
-
-    println("Reading atmosphere...")
+    println("\nMCRT calculation in the solar atmosphere")
+    println("----------------------------------------")
+    println("\n--Reading atmosphere...")
 
     # Load atmosphere data
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
@@ -16,55 +17,41 @@ function main(max_scatterings = 1e10)
     # Choose wavelengths
     wavelength = 500u"nm"
 
-    # Get user input: τ_max, packets
-    println("Choose maximum optical depth:")
+    # Get user input: τ_max, # packets
+    print("--Choose maximum optical depth: ")
     τ_max = readline()
     τ_max = parse(Float64, τ_max)
 
-    println("Choose number of photon packets:")
-    packets = readline()
-    packets = parse(Float64, packets)
+    print("--Choose number of photon packets: ")
+    target_packets = readline()
+    target_packets = parse(Float64, target_packets)
 
     # Number of threads used, >export JULIA_NUM_THREADS=4
     threads = Threads.nthreads()
 
     # Current time
-    current_time = now()
+    current_time = string(now())
 
     # Run and time simulation
     simulation = @timed simulate(atmosphere, wavelength,
-                                 max_scatterings, τ_max, packets)
+                                 max_scatterings, τ_max, target_packets)
 
-    surface, destroyed, escaped, scatterings, J = simulation.value
+    packet_data, J_data, surface_intensity = simulation.value
     elapsed_time = simulation.time
 
-    # Evaluate field above boundary
-    meanJ, minJ, maxJ = field_above_boundary(atmosphere.z,
-                                             atmosphere.χ_continuum,
-                                             J, τ_max)
     # Signal to noise ratio
-    SNR = sqrt(maximum(surface))
+    SNR = sqrt(maximum(surface_intensity))
 
     # Print results for quick check
-    println("Sneak peak:\n----------- ")
-    println("Threads: ", threads)
-    println("Packets: ", packets) #check actual value
-    println("Destroyed: ", destroyed)
-    println("Escaped: ", escaped)
-    println("Scatterings: ", scatterings)
-    println(@sprintf("Mean/Med/Min/Max field: %.1f / %d / %d", meanJ,  minJ, maxJ))
-    println("S/N: ", SNR)
+    quick_print(threads, packet_data, J_data[2:4], SNR)
 
-    # Append results to file
-    """f = open("../Results/Results.txt", "a")
-    results = (@sprintf("%23s%13.1f%13.1e%20d%18d%22d%22.1f%22.1f%17d%17d\n",
-                         string(current_time), τ_max, packets, destroyed, escaped, scatterings,
-                         elapsed_time, meanJ, minJ, maxJ))
-    write(f, results)"""
+    # Append data to file
+    write_results_to_file(current_time, threads, elapsed_time,
+                          τ_max, packet_data, J_data[2:4], SNR)
 
-    # Plot surface intensity
-    surface_intensity(surface, τ_max, packets)
-    escape_direction(surface, τ_max, packets)
+    # Plot surface intensity and escape direction distribution
+    plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
+    plot_escape_direction(surface_intensity, τ_max, packet_data[1])
 end
 
 main()
