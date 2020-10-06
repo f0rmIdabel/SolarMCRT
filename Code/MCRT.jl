@@ -117,7 +117,8 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     end
 
     # Collect packet data
-    packet_data = [total_packets.value, total_destroyed.value, total_escaped.value, total_scatterings.value]
+    packet_data = [total_packets.value, total_destroyed.value,
+                   total_escaped.value, total_scatterings.value]
 
     # Evaluate field above boundary
     mean_J, min_J, max_J = field_above_boundary(z, χ, J, τ_max)
@@ -182,7 +183,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
             elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
-            end
+            end+ 1
 
         else
             box_id[face] += direction[face]
@@ -200,7 +201,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
         end
 
         # Add to radiation field
-        J[box_id...] += 1
+        J[box_id...] += 1 #### reaches beyond nx
 
         # Find distance to closest face
         face, ds = next_edge(x, y, z, box_id, r, unit_vector)

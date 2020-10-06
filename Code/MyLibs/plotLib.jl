@@ -11,7 +11,7 @@ function plot_boundary_height(z::Array{<:Unitful.Length, 1},
     #Plots.pyplot()
 
     # To avoid ssh display problems
-    #ENV["GKSwstype"]="nul"
+    ENV["GKSwstype"]="nul"
 
     b = optical_depth_boundary(χ, z, τ_max)
     nx, ny = size(b)
@@ -29,13 +29,13 @@ function plot_boundary_height(z::Array{<:Unitful.Length, 1},
 end
 
 
-function plot_surface_intensity(surface::Array{Int, 4}, τ_max::Real,
+function plot_surface_intensity(surface::Array{Int64, 4}, τ_max::Real,
                            total_packets::Real, bin=:[:,:])
 
     surface = extract_surface_bin(surface, bin)
 
     # To avoid ssh display problems
-    #ENV["GKSwstype"]="nul"
+    ENV["GKSwstype"]="nul"
 
     heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
     plot!(size=(410,400))
@@ -45,7 +45,7 @@ function plot_surface_intensity(surface::Array{Int, 4}, τ_max::Real,
 end
 
 
-function plot_escape_direction(surface::Array{Int, 4}, τ_max::Real, total_packets::Real)
+function plot_escape_direction(surface::Array{Int64, 4}, τ_max::Real, total_packets::Real)
 
     ϕ_bins, θ_bins = size(surface)[3:4]
 
@@ -72,5 +72,12 @@ function plot_escape_direction(surface::Array{Int, 4}, τ_max::Real, total_packe
 
     fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/EscapeDirections/escapes_tau%.1f_pcts%.0e",
                    τ_max, total_packets)
+    png(fig)
+end
+
+
+function plot_time_threads(threads::Array{Int64, 1}, time::Array{Float64, 1})
+    plot(threads, time, legend=false)
+    fig = "/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/time_thread"
     png(fig)
 end
