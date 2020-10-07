@@ -78,6 +78,12 @@ end
 
 function plot_time_threads(threads::Array{Int64, 1}, time::Array{Float64, 1})
     plot(threads, time, legend=false)
+    xlabel!("Threads")
+    ylabel!("Time [s]")
     fig = "/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/time_thread"
     png(fig)
 end
+
+threads = [1,2,3,4,5,6,7,8,9,10]
+time = rand(10)
+plot_time_threads(threads,time)
