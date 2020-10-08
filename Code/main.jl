@@ -1,4 +1,4 @@
-include("MCRT.jl")
+include("MCRTp.jl")
 include("atmos.jl")
 include("MyLibs/plotLib.jl")
 include("MyLibs/IOLib.jl")
@@ -43,13 +43,13 @@ function main(max_scatterings = 1e10)
     SNR = sqrt(maximum(surface_intensity))
 
     # Print results for quick check
-    quick_print(threads, packet_data, J_data[2:4], SNR)
+    quick_print(threads, packet_data, J_data[3:5], SNR)
 
     # Append data to file
     write_results_to_file(current_time, threads, elapsed_time,
-                          τ_max, packet_data, J_data[2:4], SNR)
+                          τ_max, packet_data, J_data[3:5], SNR)
 
-    print("--Plotting stuff...")
+    print("\n--Plotting stuff...")
     # Plot surface intensity and escape direction distribution
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])

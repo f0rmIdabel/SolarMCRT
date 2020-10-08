@@ -130,7 +130,7 @@ end
 
 function packets_per_box(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
                          χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, temperature::Array{<:Unitful.Temperature, 3},
-                         λ::Unitful.Length, target_packets::Real, boundary::Array{Int,2})
+                         λ::Unitful.Length, target_packets::Real, boundary::Array{Int64,2})
 
     nx,ny = size(boundary)
     nz = maximum(boundary)

@@ -27,45 +27,52 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     # Chosen wavelengths
     λ = wavelength
 
+    # Chosen number of escape bins
+    ϕ_bins, θ_bins = num_bins
+
     println("--Performing pre-calculations...")
 
-    # Pre-calculations: boundary and # packets in each box
+    # Find boundary for given τ_max
     boundary = optical_depth_boundary(χ, z, τ_max)
-    box_packets = packets_per_box(x,y,z,χ,temperature,
-                                  λ,target_packets,boundary)
 
     # Number of boxes
     nx, ny = size(boundary)
     nz = maximum(boundary)
     total_boxes = nx*ny*nz
 
-    # Number of escape bins
-    ϕ_bins, θ_bins = num_bins
-
     # Initialise variables
     surface_intensity = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
-    J = zeros(Int64, nx, ny, nz)
 
     total_packets = Threads.Atomic{Int64}(0)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_escaped = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
-    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
-            Threads.nthreads()))
+    # Find number of packets per box and add to source function
+    S = packets_per_box(x,y,z,χ,temperature,
+                        λ,target_packets,boundary)
 
+    J = S
+
+    # Actual number of packets generated
+    total_packets = sum(box_packets)
+
+    # Create ProgressBar that works with threads
     p = Progress(total_boxes)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
     l = Threads.SpinLock()
 
+    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
+            Threads.nthreads()))
+
     # Go through all boxes
     Threads.@threads for box in 1:total_boxes
 
         # Find (x,y,z) indices of box
-        i = 1 + box ÷ (ny*nz + 1)
-        j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
-        k = 1 + (box - (i-1)*ny*nz - 1) % (nz)
+        i = 1 + (box-1) ÷ (ny*nz)
+        j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
+        k = 1 + (box - (i-1)*ny*nz - 1) % nz
 
         # Skip boxes beneath boundary
         if k > boundary[i,j]
@@ -78,12 +85,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
         corner = [x[i], y[j], z[k]]
         box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
 
-        # Add to local field
-        packets = box_packets[box_id...]
-        J[box_id...] += packets
-        Threads.atomic_add!(total_packets, packets)
-
-        for packet=1:packets
+        for packet=1:S[box_id...]
 
             # Initial position uniformely drawn from box
             r = corner .+ (box_dim .* rand(3))
@@ -132,7 +134,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
 
     # Evaluate field above boundary
     mean_J, min_J, max_J = field_above_boundary(z, χ, J, τ_max)
-    J_data = [J, mean_J, min_J, max_J]
+    I_data = [J, S, mean_I, min_I, max_I]
 
     return packet_data, J_data, surface_intensity
 end
@@ -165,7 +167,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
     ϕ = 2π * rand()
     θ =  π * rand()
 
-    unit_vector = [cos(θ), sin(θ)*cos(ϕ), sin(θ)*sin(ϕ)]
+    unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
 
     # Find distance to closest face
     face, ds = next_edge(x, y, z, box_id, r, unit_vector)
