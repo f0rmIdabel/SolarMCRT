@@ -49,9 +49,11 @@ function main(max_scatterings = 1e10)
     write_results_to_file(current_time, threads, elapsed_time,
                           τ_max, packet_data, J_data[2:4], SNR)
 
+    print("--Plotting stuff...")
     # Plot surface intensity and escape direction distribution
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
+    traverse_field_gif(J_data[1], 504)
 end
 
 main()

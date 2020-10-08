@@ -76,7 +76,7 @@ function plot_escape_direction(surface::Array{Int64, 4}, τ_max::Real, total_pac
 end
 
 
-function plot_time_threads(threads::Array{Int64, 1}, time::Array{Float64, 1})
+function plot_thread_performance(threads::Array{Int64, 1}, time::Array{Float64, 1})
     plot(threads, time, legend=false)
     xlabel!("Threads")
     ylabel!("Time [s]")
@@ -84,6 +84,24 @@ function plot_time_threads(threads::Array{Int64, 1}, time::Array{Float64, 1})
     png(fig)
 end
 
-threads = [1,2,3,4,5,6,7,8,9,10]
-time = rand(10)
-plot_time_threads(threads,time)
+
+function plot_slice(slice, y::Int64, save::Bool)
+
+    heatmap(1:size(slice,1), 1:size(slice,2), slice, c=:grays, aspect_ratio=:equal)
+    plot!(size=(410,400))
+    if save
+        fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/field_y%d", y)
+        png(fig)
+    end
+end
+
+
+function traverse_field_gif(field, ny::Int64)
+
+    anim = @animate for y=1:ny
+        slice = field[:,y,:]
+        plot_slice(slice, y,false)
+    end
+
+    gif(anim, "/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/anim_fps15.gif", fps = 15)
+end
