@@ -41,7 +41,8 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = zeros(Int64, nx, ny, ϕ_bins, θ_bins)
+    surface_intensity = Tuple([zeros(Int, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
+    J = Tuple([zeros(Int, nx, ny, nz) for t in 1:Threads.nthreads() ])
 
     total_packets = Threads.Atomic{Int64}(0)
     total_destroyed = Threads.Atomic{Int64}(0)
@@ -52,19 +53,17 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     S = packets_per_box(x,y,z,χ,temperature,
                         λ,target_packets,boundary)
 
-    J = S
-
     # Actual number of packets generated
-    total_packets = sum(box_packets)
+    total_packets = sum(S)
+
+    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
+            Threads.nthreads()))
 
     # Create ProgressBar that works with threads
     p = Progress(total_boxes)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
     l = Threads.SpinLock()
-
-    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
-            Threads.nthreads()))
 
     # Go through all boxes
     Threads.@threads for box in 1:total_boxes
@@ -101,14 +100,15 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
 
                 # Scatter packet once
                 box_id, r, escaped, destroyed = scatter_packet(x, y, z, χ, boundary,
-                                                               box_id, r, J)
+                                                               box_id, r, J[Threads.threadid()])
 
                 # Check if escaped
                 if escaped[1]
                     ϕ, θ  = escaped[2]
                     ϕ_bin = 1 + Int(ϕ÷(2π/ϕ_bins))
                     θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))
-                    surface_intensity[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
+
+                    surface_intensity[Threads.threadid()][box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
                     Threads.atomic_add!(total_escaped, 1)
                     break
                 # Check if destroyed in bottom
@@ -129,12 +129,16 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     end
 
     # Collect packet data
-    packet_data = [total_packets.value, total_destroyed.value,
+    packet_data = [total_packets, total_destroyed.value,
                    total_escaped.value, total_scatterings.value]
 
+    surface_intensity = reduce(+, surface_intensity)
+    J = reduce(+, J)
+
+    J = J .+ S
     # Evaluate field above boundary
     mean_J, min_J, max_J = field_above_boundary(z, χ, J, τ_max)
-    I_data = [J, S, mean_I, min_I, max_I]
+    J_data = [J, S, mean_J, min_J, max_J]
 
     return packet_data, J_data, surface_intensity
 end
@@ -213,7 +217,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
         end
 
         # Add to radiation field
-        J[box_id...] += 1 #### reaches beyond nx
+        J[box_id...] += 1
 
         # Find distance to closest face
         face, ds = next_edge(x, y, z, box_id, r, unit_vector)

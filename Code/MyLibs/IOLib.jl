@@ -6,7 +6,7 @@ function quick_print(threads::Int64, packet_data::Array{Int64,1},
     packets, destroyed, escaped, scatterings = packet_data
     mean_J, min_J, max_J = J_data
 
-    println("\nSneak peak:\n----------- ")
+    println("\nSneak peak:\n","-"^37)
     println("Threads: ", threads)
     println("Packets: ", packets) #check actual value
     println("Destroyed: ", destroyed/packets)

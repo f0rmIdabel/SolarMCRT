@@ -1,4 +1,4 @@
-include("MCRTp.jl")
+include("MCRT.jl")
 include("atmos.jl")
 include("MyLibs/plotLib.jl")
 include("MyLibs/IOLib.jl")
@@ -55,5 +55,10 @@ function main(max_scatterings = 1e10)
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
     traverse_field_gif(J_data[1], 504)
 end
+
+function main_()
+
+end
+
 
 main()
