@@ -3,6 +3,7 @@ include("MyLibs/physLib.jl")
 using Random
 using ProgressBars
 using Printf
+using ProgressMeter
 
 """
     simulate(Atmosphere::Module, max_scatterings::Real,
@@ -53,8 +54,13 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
+    p = Progress(total_boxes)
+    update!(p,0)
+    jj = Threads.Atomic{Int}(0)
+    l = Threads.SpinLock()
+
     # Go through all boxes
-    Threads.@threads for box in ProgressBar(1:total_boxes)
+    Threads.@threads for box in 1:total_boxes
 
         # Find (x,y,z) indices of box
         i = 1 + box ÷ (ny*nz + 1)
@@ -114,6 +120,10 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                 end
             end
         end
+        Threads.atomic_add!(jj, 1)
+        Threads.lock(l)
+        update!(p, jj[])
+        Threads.unlock(l)
     end
 
     # Collect packet data
@@ -183,7 +193,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
             elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
-            end+ 1
+            end
 
         else
             box_id[face] += direction[face]
