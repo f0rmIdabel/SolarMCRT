@@ -5,8 +5,7 @@ include("MyLibs/IOLib.jl")
 using Dates
 
 function main(max_scatterings = 1e10)
-    println("\nMCRT calculation in the solar atmosphere")
-    println("----------------------------------------")
+    println("\nMCRT calculation in the solar atmosphere\n","-"^40)
     println("\n--Reading atmosphere...")
 
     # Load atmosphere data
@@ -26,7 +25,7 @@ function main(max_scatterings = 1e10)
     target_packets = readline()
     target_packets = parse(Float64, target_packets)
 
-    # Number of threads used, >export JULIA_NUM_THREADS=4
+    # Number of threads used, export JULIA_NUM_THREADS=4
     threads = Threads.nthreads()
 
     # Current time
@@ -54,10 +53,6 @@ function main(max_scatterings = 1e10)
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
     traverse_field_gif(J_data[1], 504)
-end
-
-function main_()
-
 end
 
 

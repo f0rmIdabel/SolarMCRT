@@ -1,18 +1,18 @@
 include("atmos.jl")
 include("MyLibs/physLib.jl")
 using Random
-using ProgressBars
-using Printf
 using ProgressMeter
+using Printf
 
 """
-    simulate(Atmosphere::Module, max_scatterings::Real,
-             scale_emission::Real, chi_max::Real,  rng::MersenneTwister)
+    simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
+             max_scatterings::Real, τ_max::Real,
+             target_packets::Real, num_bins = [4,2])
 
 Simulates the radiation field in a given atmosphere with
-a lower optical depth boundary given by tau_max.
+a lower optical depth boundary given by τ_max::Real.
 """
-function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
+function simulate(atmosphere::Atmosphere, wavelengths::Unitful.Length,
                   max_scatterings::Real, τ_max::Real,
                   target_packets::Real, num_bins = [4,2])
 
@@ -25,7 +25,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     temperature = atmosphere.temperature
 
     # Chosen wavelengths
-    λ = wavelength
+    λ = wavelengths
 
     # Chosen number of escape bins
     ϕ_bins, θ_bins = num_bins
@@ -44,7 +44,6 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     surface_intensity = Tuple([zeros(Int, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
     J = Tuple([zeros(Int, nx, ny, nz) for t in 1:Threads.nthreads() ])
 
-    total_packets = Threads.Atomic{Int64}(0)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_escaped = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
@@ -53,13 +52,13 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
     S = packets_per_box(x,y,z,χ,temperature,
                         λ,target_packets,boundary)
 
-    # Actual number of packets generated
+    # Actual number of packets generated, ≈ target_packets
     total_packets = sum(S)
 
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
-    # Create ProgressBar that works with threads
+    # Create ProgressMeter working with threads
     p = Progress(total_boxes)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
@@ -78,9 +77,11 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
             continue
         end
 
+        # Initial box
         box_id = [i,j,k]
 
-        # Find dimensions of box
+        println(box_id)
+        # Dimensions of box
         corner = [x[i], y[j], z[k]]
         box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
 
@@ -88,9 +89,6 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
 
             # Initial position uniformely drawn from box
             r = corner .+ (box_dim .* rand(3))
-
-            # Initial box
-            box_id = [i,j,k]
 
             # Scatter each packet until destroyed,
             # escape or reach max_scatterings
@@ -122,6 +120,7 @@ function simulate(atmosphere::Atmosphere, wavelength::Unitful.Length,
                 end
             end
         end
+        # Advance ProgressMeter
         Threads.atomic_add!(jj, 1)
         Threads.lock(l)
         update!(p, jj[])
@@ -156,27 +155,35 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, boundary::Array{Int, 2},
                         box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, J::Array{Int, 3})
 
-    # Usefule quantities
-    side_dim = size(boundary)
-    edge = [x[1] x[end]
-            y[1] y[end]]
-
     # Keep track of status
     escaped = false
-    escape_angle = nothing
     destroyed = false
+
+    # Useful quantities
+    side_dim = size(boundary)
+    side_edge = [x[1] x[end]
+                 y[1] y[end]]
 
     # Draw scattering depth and direction
     τ = -log(rand())
     ϕ = 2π * rand()
     θ =  π * rand()
 
+    # Find direction
     unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
-
-    # Find distance to closest face
-    face, ds = next_edge(x, y, z, box_id, r, unit_vector)
-
     direction = sign.(unit_vector)
+    direction[3] = -direction[3] # height array up->down
+
+    # Next face cross in all dimensions
+    next_edge = (direction .> 0) .+ box_id
+    # Distance to next face cross in all dimensions
+    distance = ([x[next_edge[1]],
+                 y[next_edge[2]],
+                 z[next_edge[3]]] .- r) ./unit_vector
+
+    # Closest face cross
+    face = argmin(distance)
+    ds = distance[face]
 
     # Add optical depth and update position
     τ_cum = ds * χ[box_id...]
@@ -187,9 +194,11 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
     while τ > τ_cum
 
         # Switch to new box
-        if face == 3
-            box_id[3] -= direction[3] # Consequence of height array up->down
+        box_id[face] += direction[face]
+        next_edge[face] += direction[face]
 
+        # Check that within bounds of atmosphere
+        if face == 3
             # Top escape
             if box_id[3] == 0
                 escaped = [true, [ϕ, θ]]
@@ -201,32 +210,39 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
                 break
             end
 
+        # Handle side escapes with periodic boundary
         else
-            box_id[face] += direction[face]
-
-            # Handle side escapes with periodic boundary
+            # Left-going packets
             if box_id[face] == 0
                 box_id[face] = side_dim[face]
-                r[face] = edge[face,2]
-
-            elseif  box_id[face] == side_dim[face] + 1
+                next_edge[face] = side_dim[face]
+                r[face] = side_edge[face,2]
+            # Right-going packets
+            elseif box_id[face] == side_dim[face] + 1
                 box_id[face] = 1
-                r[face] = edge[face,1]
+                next_edge[face] = 2
+                r[face] = side_edge[face,1]
             end
-
         end
 
         # Add to radiation field
         J[box_id...] += 1
 
-        # Find distance to closest face
-        face, ds = next_edge(x, y, z, box_id, r, unit_vector)
+        # Distance to next face cross in all dimensions
+        distance = ([x[next_edge[1]],
+                     y[next_edge[2]],
+                     z[next_edge[3]]] .- r) ./unit_vector
+
+        # Closest face cross
+        face = argmin(distance)
+        ds = distance[face]
 
         # Update optical depth and position
         τ_cum += ds*χ[box_id...]
         r += ds*unit_vector
     end
 
+    # Check if escaped or destroyed
     if escaped[1] || destroyed
         r = nothing
     else
@@ -234,31 +250,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length
         r -= unit_vector*(τ_cum - τ)/χ[box_id...]
     end
 
+
     return box_id, r, escaped, destroyed
-end
-
-
-
-"""
-    next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-              box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, unit_vector::Array{Float64, 1})
-
-Calculates the distance to the next box and the face that it crosses,
-given an initial position and direction of travel.
-"""
-function next_edge(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                   box_id::Array{Int,1}, r::Array{<:Unitful.Length, 1}, unit_vector::Array{Float64, 1})
-
-    direction = unit_vector .> 0.0
-
-    # Find distance to box crossings in all dimensions
-    distance = ([x[box_id[1] +  direction[1]],
-                 y[box_id[2] +  direction[2]],
-                 z[box_id[3] + !direction[3]]] .- r) ./unit_vector
-
-    # Closest face
-    face = argmin(distance)
-    ds = distance[face]
-
-    return face, ds
 end

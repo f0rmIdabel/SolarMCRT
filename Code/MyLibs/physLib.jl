@@ -30,7 +30,7 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
         τ = 0
         k = 0
 
-        while τ < τ_max
+        while τ < τ_max && k < dim[3]
             k += 1
             # Trapezoidal rule
             τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
