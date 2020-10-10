@@ -5,14 +5,19 @@ include("MyLibs/IOLib.jl")
 using Dates
 
 function main(max_scatterings = 1e10)
-    println("\nMCRT calculation in the solar atmosphere\n","-"^40)
-    println("\n--Reading atmosphere...")
+    println("-"^40,"\nMCRT calculation in the solar atmosphere\n","-"^40)
+    println("\n--Reading atmosphere model...")
 
-    # Load atmosphere data
+    # ==================================================================
+    # LOAD ATMOSPHERE DATA
+    # ==================================================================
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")
     atmosphere = Atmosphere(parameters...)
 
+    # ==================================================================
+    # CHOOSE PARANETERS
+    # ==================================================================
     # Choose wavelengths
     wavelength = 500u"nm"
 
@@ -25,10 +30,10 @@ function main(max_scatterings = 1e10)
     target_packets = readline()
     target_packets = parse(Float64, target_packets)
 
-    # Number of threads used, export JULIA_NUM_THREADS=4
+    # ==================================================================
+    # SIMULATION
+    # ==================================================================
     threads = Threads.nthreads()
-
-    # Current time
     current_time = string(now())
 
     # Run and time simulation
@@ -41,6 +46,9 @@ function main(max_scatterings = 1e10)
     # Signal to noise ratio
     SNR = sqrt(maximum(surface_intensity))
 
+    # ==================================================================
+    # WRITE RESULTS
+    # ==================================================================
     # Print results for quick check
     quick_print(threads, packet_data, J_data[3:5], SNR)
 
@@ -48,11 +56,14 @@ function main(max_scatterings = 1e10)
     write_results_to_file(current_time, threads, elapsed_time,
                           τ_max, packet_data, J_data[3:5], SNR)
 
-    print("\n--Plotting stuff...")
-    # Plot surface intensity and escape direction distribution
+    # ==================================================================
+    # PLOTTING
+    # ==================================================================
+    println("\n--Plotting stuff...")
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
     traverse_field_gif(J_data[1], 504)
+    println("--Finished successfully")
 end
 
 

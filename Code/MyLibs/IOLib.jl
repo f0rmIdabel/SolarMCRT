@@ -6,15 +6,16 @@ function quick_print(threads::Int64, packet_data::Array{Int64,1},
     packets, destroyed, escaped, scatterings = packet_data
     mean_J, min_J, max_J = J_data
 
-    println("\nSneak peak:\n","-"^37)
-    println("Threads: ", threads)
-    println("Packets: ", packets) #check actual value
-    println("Destroyed: ", destroyed/packets)
-    println("Escaped: ", escaped/packets)
-    println("Scatterings: ", scatterings/packets)
-    println(@sprintf("Mean/Med/Min/Max field: %.1f / %d / %d",
+    println("-"^37,"\nResults sneak peak\n","-"^37)
+    println("--Threads: ", threads)
+    println("--Packets: ", packets) #check actual value
+    println("--Destroyed: ", destroyed/packets)
+    println("--Escaped: ", escaped/packets)
+    println("--Scatterings: ", scatterings/packets)
+    println(@sprintf("--Mean/Med/Min/Max field: %.1f / %d / %d",
             mean_J,  min_J, max_J))
-    println("S/N: ", SNR)
+    println("--S/N: ", SNR)
+    println("-"^37)
 end
 
 function write_results_to_file(time::String, threads::Int64, elapsed_time::Float64,
