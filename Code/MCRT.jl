@@ -77,15 +77,15 @@ function simulate(atmosphere::Atmosphere, wavelengths::Unitful.Length,
             continue
         end
 
-        # Initial box
-        box_id = [i,j,k]
 
-        println(box_id)
         # Dimensions of box
         corner = [x[i], y[j], z[k]]
         box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
 
-        for packet=1:S[box_id...]
+        for packet=1:S[i,j,k]
+
+            # Initial box
+            box_id = [i,j,k]
 
             # Initial position uniformely drawn from box
             r = corner .+ (box_dim .* rand(3))
