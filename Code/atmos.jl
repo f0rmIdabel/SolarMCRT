@@ -17,16 +17,23 @@ struct Atmosphere
    ε_continuum::Array{Real, 3}
 end
 
+"""
+   function get_atmosphere_data(atmos_data,
+                                rh_output)
 
-function get_atmosphere_data(atmos_data, rh_output)
+Reads atmosphere parameters and reworks them to fit simulation.
+"""
+function get_atmosphere_data(atmos_data,
+                             rh_output)
 
     path_atmos = "../../basement/MScProject/Atmospheres/"*atmos_data
     path_RH = "../../basement/MScProject/Atmospheres/"*rh_output
 
-    # Read atmosphere file
-    #------------------------------------------------------------
+    # ===========================================================
+    # READ ATMOSPHERE FILE
+    # ===========================================================
     x = h5read(path_atmos, "x")u"m"
-    y = -h5read(path_atmos, "y")u"m" # !Beware of negative values!
+    y = -h5read(path_atmos, "y")u"m" # get pos values
     z = h5read(path_atmos, "z")[:,1]u"m"
 
     velocity_x = h5read(path_atmos, "velocity_x")[:,:,:,1]u"m/s"
@@ -36,13 +43,14 @@ function get_atmosphere_data(atmos_data, rh_output)
     temperature = h5read(path_atmos, "temperature")[:,:,:,1]u"K"
     electron_density = h5read(path_atmos, "electron_density")[:,:,:,1]u"m^-3"
 
-    # Read RH output
-    #---------------------------------------------------------------
+    # ===========================================================
+    # READ RH OUTPUT
+    # ===========================================================
     χ_absorption = h5read(path_RH, "chi_continuum")[1,:,:,:]u"m^-1"  #WL
 
-    # Re-work parameters
-    #---------------------------------------------------------------
-
+    # ===========================================================
+    # RE-WORK PARAMETERS
+    # ===========================================================
     # Add endpoints for box calculations
     x = push!(x, 2*x[end] - x[end-1])
     y = push!(y, 2*y[end] - y[end-1])

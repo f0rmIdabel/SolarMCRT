@@ -5,7 +5,7 @@ include("MyLibs/IOLib.jl")
 using Dates
 
 function main(max_scatterings = 1e10)
-    println("-"^40,"\nMCRT calculation in the solar atmosphere\n","-"^40)
+    println("\n","-"^40,"\nMCRT calculation in the solar atmosphere\n","-"^40)
     println("\n--Reading atmosphere model...")
 
     # ==================================================================
@@ -14,7 +14,6 @@ function main(max_scatterings = 1e10)
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")
     atmosphere = Atmosphere(parameters...)
-
     # ==================================================================
     # CHOOSE PARANETERS
     # ==================================================================
@@ -50,7 +49,7 @@ function main(max_scatterings = 1e10)
     # WRITE RESULTS
     # ==================================================================
     # Print results for quick check
-    quick_print(threads, packet_data, J_data[3:5], SNR)
+    quick_print(packet_data, J_data[3:5], SNR)
 
     # Append data to file
     write_results_to_file(current_time, threads, elapsed_time,
@@ -62,7 +61,7 @@ function main(max_scatterings = 1e10)
     println("\n--Plotting stuff...")
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
-    traverse_field_gif(J_data[1], 504)
+    traverse_field_gif(J_data[1], atmosphere.x, atmosphere.z, 504)
     println("--Finished successfully")
 end
 

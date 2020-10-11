@@ -2,21 +2,29 @@ using Unitful
 import PhysicalConstants.CODATA2018: c_0, h, k_B
 
 """
-Calculates the Blackbody (Planck) function per wavelength, for given
-arrays of wavelength and temperature.
+    function blackbody_lambda(λ::Unitful.Length,
+                              temperature::Unitful.Temperature)
 
-Returns monochromatic intensity (energy per time per area per steradian per wavelength).
+Calculates the Blackbody (Planck) function per wavelength, for given
+arrays of wavelength and temperature. Returns monochromatic intensity.
 
 Copied from Tiago, SSB
 """
-function blackbody_lambda(λ::Unitful.Length, temperature::Unitful.Temperature)
+function blackbody_lambda(λ::Unitful.Length,
+                          temperature::Unitful.Temperature)
     (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
 end
 
 """
-2D array  of indices of
+    function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                    z::Array{<:Unitful.Length, 1},
+                                    τ_max::Real)
+
+Returns 2D array containing the k-indices where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, z::Array{<:Unitful.Length, 1}, τ_max::Real)
+function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                z::Array{<:Unitful.Length, 1},
+                                τ_max::Real)
 
     dim = size(χ)
     columns = dim[1]*dim[2]
@@ -36,17 +44,29 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
             τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
         end
         boundary[i,j] = k
-
     end
+
     return boundary
 end
 
 """
-The total emission above the optical depth boundary
+    function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                        temperature::Array{<:Unitful.Temperature, 3},
+                        x::Array{<:Unitful.Length, 1},
+                        y::Array{<:Unitful.Length, 1},
+                        z::Array{<:Unitful.Length, 1},
+                        boundary::Array{Int,2},
+                        λ::Unitful.Length)
+
+Reurns the total emission above the optical depth boundary in intensity units.
 """
-function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, temperature::Array{<:Unitful.Temperature, 3},
-                        x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                        boundary::Array{Int,2}, λ::Unitful.Length)
+function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                        temperature::Array{<:Unitful.Temperature, 3},
+                        x::Array{<:Unitful.Length, 1},
+                        y::Array{<:Unitful.Length, 1},
+                        z::Array{<:Unitful.Length, 1},
+                        boundary::Array{Int,2},
+                        λ::Unitful.Length)
 
     total_emission = 0.0u"kW / sr / nm"
 
@@ -69,7 +89,14 @@ function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)},
     return total_emission
 end
 
-function extract_surface_bin(surface::Array{Int, 4}, bin = :[:,:])
+"""
+    function extract_surface_bin(surface::Array{Int, 4},
+                                 bin = :[:,:])
+
+Slices the surface for the given escape bins of ϕ and θ.
+"""
+function extract_surface_bin(surface::Array{Int, 4},
+                             bin = :[:,:])
 
     # Pick out bin
     surface = surface[:,:, eval(bin)[1], eval(bin)[2]]
@@ -90,9 +117,18 @@ function extract_surface_bin(surface::Array{Int, 4}, bin = :[:,:])
     return surface
 end
 
+"""
+    function field_above_boundary(z::Array{<:Unitful.Length, 1},
+                                  χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                  J::Array{Int, 3},
+                                  τ_max::Real)
+
+Calculates the average, maximum and minimum intensity value of the field above the boundary.
+"""
 function field_above_boundary(z::Array{<:Unitful.Length, 1},
                               χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
-                              J::Array{Int, 3}, τ_max::Real)
+                              J::Array{Int, 3},
+                              τ_max::Real)
 
     boundary = optical_depth_boundary(χ, z, τ_max)
 
@@ -128,9 +164,26 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
     return meanJ, minJ, maxJ
 end
 
-function packets_per_box(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Length, 1}, z::Array{<:Unitful.Length, 1},
-                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3}, temperature::Array{<:Unitful.Temperature, 3},
-                         λ::Unitful.Length, target_packets::Real, boundary::Array{Int64,2})
+"""
+    packets_per_box(x::Array{<:Unitful.Length, 1},
+                         y::Array{<:Unitful.Length, 1},
+                         z::Array{<:Unitful.Length, 1},
+                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                         temperature::Array{<:Unitful.Temperature, 3},
+                         λ::Unitful.Length,
+                         target_packets::Real,
+                         boundary::Array{Int64,2})
+
+Returns a 3D array of the # of packets to be generated in each box.
+"""
+function packets_per_box(x::Array{<:Unitful.Length, 1},
+                         y::Array{<:Unitful.Length, 1},
+                         z::Array{<:Unitful.Length, 1},
+                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                         temperature::Array{<:Unitful.Temperature, 3},
+                         λ::Unitful.Length,
+                         target_packets::Real,
+                         boundary::Array{Int64,2})
 
     nx,ny = size(boundary)
     nz = maximum(boundary)
@@ -142,7 +195,6 @@ function packets_per_box(x::Array{<:Unitful.Length, 1}, y::Array{<:Unitful.Lengt
     packets = zeros(Int64,nx,ny,nz)
 
     for box=1:total_boxes
-        # Find (x,y,z) indices of box
         i = 1 + box ÷ (ny*nz + 1)
         j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
         k = 1 + (box - (i-1)*ny*nz - 1) % (nz)

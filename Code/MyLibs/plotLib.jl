@@ -1,17 +1,19 @@
 include("physLib.jl")
-
 using Printf
 using Plots
 using UnitfulRecipes
 
-function plot_boundary_height(z::Array{<:Unitful.Length, 1},
-                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
-                         τ_max::Real, camera_tilt::Real)
-
-    #Plots.pyplot()
-
-    # To avoid ssh display problems
-    ENV["GKSwstype"]="nul"
+"""
+    function plot_3D_boundary(z::Array{<:Unitful.Length, 1},
+                          χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                          τ_max::Real,
+                          camera_tilt::Real)
+Plots the τ_max boundary.
+"""
+function plot_3D_boundary(z::Array{<:Unitful.Length, 1},
+                          χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                          τ_max::Real,
+                          camera_tilt::Real)
 
     b = optical_depth_boundary(χ, z, τ_max)
     nx, ny = size(b)
@@ -23,14 +25,23 @@ function plot_boundary_height(z::Array{<:Unitful.Length, 1},
     surface(x, y, f, zlim = [ustrip(z[end]),
             ustrip(z[1])], camera=(-45,camera_tilt))
 
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Boundary/boundary_%.1f_%g",
+    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/TauBoundary/boundary_%.1f_%g",
                     τ_max, camera_tilt)
     png(fig)
 end
 
+"""
+    function plot_surface_intensity(surface::Array{Int64, 4},
+                                    τ_max::Real,
+                                    total_packets::Real,
+                                    bin=:[:,:])
 
-function plot_surface_intensity(surface::Array{Int64, 4}, τ_max::Real,
-                           total_packets::Real, bin=:[:,:])
+Plots the surface intensity for given escape bins.
+"""
+function plot_surface_intensity(surface::Array{Int64, 4},
+                                τ_max::Real,
+                                total_packets::Real,
+                                bin=:[:,:])
 
     surface = extract_surface_bin(surface, bin)
 
@@ -39,13 +50,22 @@ function plot_surface_intensity(surface::Array{Int64, 4}, τ_max::Real,
 
     heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
     plot!(size=(410,400))
-    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/Surface/bf_tau%.1f_pcts%.0e_bin%s",
+    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/SurfaceIntensity/bf_tau%.1f_pcts%.0e_bin%s",
                    τ_max, total_packets, string(bin))
     png(fig)
 end
 
+"""
+    function plot_escape_direction(surface::Array{Int, 4},
+                                τ_max::Real,
+                                total_packets::Real)
 
-function plot_escape_direction(surface::Array{Int64, 4}, τ_max::Real, total_packets::Real)
+Plots the distribution of escapes in different directions.
+One histogram for polar escapes and one for azimuthal.
+"""
+function plot_escape_direction(surface::Array{Int, 4},
+                                τ_max::Real,
+                                total_packets::Real)
 
     ϕ_bins, θ_bins = size(surface)[3:4]
 
@@ -55,12 +75,12 @@ function plot_escape_direction(surface::Array{Int64, 4}, τ_max::Real, total_pac
     ϕ_hits = Array{Int, 1}(undef, ϕ_bins)
     θ_hits = Array{Int, 1}(undef, θ_bins)
 
-    # ϕ direction
+    # Polar direction
     for i=1:ϕ_bins
         ϕ_hits[i] = sum(extract_surface_bin(surface, :[$i,:]))
     end
 
-    # θ direction
+    # Azmiuthal direction
     for i=1:θ_bins
         θ_hits[i] = sum(extract_surface_bin(surface, :[:,$i]))
     end
@@ -75,8 +95,14 @@ function plot_escape_direction(surface::Array{Int64, 4}, τ_max::Real, total_pac
     png(fig)
 end
 
+"""
+    function plot_thread_performance(threads::Array{Int64, 1},
+                                     time::Array{Float64, 1})
 
-function plot_thread_performance(threads::Array{Int64, 1}, time::Array{Float64, 1})
+Plots the time usage for different number of threads.
+"""
+function plot_thread_performance(threads::Array{Int64, 1},
+                                 time::Array{Float64, 1})
     plot(threads, time, legend=false)
     xlabel!("Threads")
     ylabel!("Time [s]")
@@ -84,24 +110,49 @@ function plot_thread_performance(threads::Array{Int64, 1}, time::Array{Float64, 
     png(fig)
 end
 
+"""
+function plot_slice(slice::Array{Any, 2},
+                    x::Array{<:Unitful.Length,1},
+                    z::Array{<:Unitful.Length,1},
+                    iy::Int64,
+                    save::Bool)
 
-function plot_slice(slice, y::Int64, save::Bool)
-
-    heatmap(1:size(slice,1), 1:size(slice,2), slice, c=:grays, aspect_ratio=:equal)
-    plot!(size=(410,400))
+Plots 2D slice of any field.
+"""
+function plot_slice(slice::Array{Any, 2},
+                    x::Array{<:Unitful.Length,1},
+                    z::Array{<:Unitful.Length,1},
+                    iy::Int64,
+                    save::Bool)
+    #gr()
+    ENV["GKSwstype"]="nul"
+    heatmap(x, reverse(z), permutedims(slice[:,end:-1:1]), c=:grayC)
+    #plot!(size=(410,400))
     if save
-        fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/field_y%d", y)
+        fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/field_y%d", iy)
         png(fig)
     end
 end
 
+"""
+    function traverse_field_gif(field::Array{Any, 3},
+                            x::Array{<:Unitful.Length,1},
+                            z::Array{<:Unitful.Length,1},
+                            ny::Int64)
 
-function traverse_field_gif(field, ny::Int64)
-
+Makes a 15fps GIF of the traversal of any field in the y-direction.
+"""
+function traverse_field_gif(field::Array{Any, 3},
+                            x::Array{<:Unitful.Length,1},
+                            z::Array{<:Unitful.Length,1},
+                            ny::Int64)
+    z_end = size(field)[3]
+    z = z[1:z_end+1]
     anim = @animate for y=1:ny
-        slice = field[:,y,:]
-        plot_slice(slice, y,false)
+        slice = field[:,y,1:z_end]
+        plot_slice(slice, x, z, y, false)
+        println(y)
     end
 
-    gif(anim, "/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/anim_fps15.gif", fps = 15)
+    gif(anim, @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/GIFs/anim_fps15_%d.gif", z_end), fps = 15)
 end

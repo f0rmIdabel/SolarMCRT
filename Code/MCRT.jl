@@ -243,12 +243,12 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         # Check that within bounds of atmosphere
         if face == 3
             # Top escape
-            if box_id[3] == 0
+            if box_id[3] < 1 # == 0
                 escaped = [true, [ϕ, θ]]
                 break
 
             # Bottom destruction
-            elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
+            elseif box_id[3] > boundary[box_id[1], box_id[2]] #+ 1 wronggggg
                 destroyed = true
                 break
             end
