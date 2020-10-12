@@ -111,48 +111,48 @@ function plot_thread_performance(threads::Array{Int64, 1},
 end
 
 """
-function plot_slice(slice::Array{Any, 2},
+function plot_slice(field,
                     x::Array{<:Unitful.Length,1},
                     z::Array{<:Unitful.Length,1},
-                    iy::Int64,
-                    save::Bool)
+                    j::Int64
 
 Plots 2D slice of any field.
 """
-function plot_slice(slice::Array{Any, 2},
+function plot_slice(field,
                     x::Array{<:Unitful.Length,1},
                     z::Array{<:Unitful.Length,1},
-                    iy::Int64,
-                    save::Bool)
-    #gr()
+                    j::Int64)
+
+    slice = field[:,j,:]
     ENV["GKSwstype"]="nul"
-    heatmap(x, reverse(z), permutedims(slice[:,end:-1:1]), c=:grayC)
-    #plot!(size=(410,400))
-    if save
-        fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/field_y%d", iy)
-        png(fig)
-    end
+    heatmap(x, reverse(z), permutedims(slice[:,end:-1:1]), c=:gist_gray)
+    fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/field_y%d", j)
+    png(fig)
 end
 
 """
     function traverse_field_gif(field::Array{Any, 3},
-                            x::Array{<:Unitful.Length,1},
-                            z::Array{<:Unitful.Length,1},
-                            ny::Int64)
+                                x::Array{<:Unitful.Length,1},
+                                z::Array{<:Unitful.Length,1)
 
 Makes a 15fps GIF of the traversal of any field in the y-direction.
 """
-function traverse_field_gif(field::Array{Any, 3},
+function traverse_field_gif(field,
                             x::Array{<:Unitful.Length,1},
-                            z::Array{<:Unitful.Length,1},
-                            ny::Int64)
-    z_end = size(field)[3]
-    z = z[1:z_end+1]
-    anim = @animate for y=1:ny
-        slice = field[:,y,1:z_end]
-        plot_slice(slice, x, z, y, false)
-        println(y)
+                            z::Array{<:Unitful.Length,1})
+
+    ENV["GKSwstype"]="nul"
+    max_field = ustrip(maximum(field))
+    min_field = ustrip(minimum(field))
+
+    nx, ny, nz = size(field)
+    z = z[1:nz+1]
+
+    anim = @animate for j=1:ny
+        slice = field[:,j,1:nz]
+        heatmap(x, reverse(z), permutedims(slice[:,end:-1:1]), c=:gist_gray, clims=(min_field, max_field))
+        println(j)
     end
 
-    gif(anim, @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/GIFs/anim_fps15_%d.gif", z_end), fps = 15)
+    gif(anim, @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/anim_fps15_%d.gif", nz), fps = 15)
 end

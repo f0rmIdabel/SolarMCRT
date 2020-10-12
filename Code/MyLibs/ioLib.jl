@@ -14,7 +14,7 @@ function quick_print(packet_data::Array{Int64,1},
     packets, destroyed, escaped, scatterings = packet_data
     mean_J, min_J, max_J = J_data
 
-    println("\n","-"^47,"\nResults sneak peak\n","-"^47)
+    println("\n","-"^47,"\n  Results sneak peak\n","-"^47)
     println("--Packets:                ", packets) #check actual value
     println("--Destroyed:              ", destroyed/packets)
     println("--Escaped:                ", escaped/packets)
@@ -26,12 +26,12 @@ end
 
 """
     function write_results_to_file(time::String,
-                               threads::Int64,
-                               elapsed_time::Float64,
-                               τ_max::Real,
-                               packet_data::Array{Int64, 1},
-                               J_data::Array{Any, 1},
-                               SNR::Real)
+                                   threads::Int64,
+                                   elapsed_time::Float64,
+                                   τ_max::Real,
+                                   packet_data::Array{Int64, 1},
+                                   J_data::Array{Any, 1},
+                                   SNR::Real)
 
 Writes selected results from simulation to file.
 """

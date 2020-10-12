@@ -1,11 +1,11 @@
-include("MCRT.jl")
+include("mcRT.jl")
 include("atmos.jl")
 include("MyLibs/plotLib.jl")
-include("MyLibs/IOLib.jl")
+include("MyLibs/ioLib.jl")
 using Dates
 
 function main(max_scatterings = 1e10)
-    println("\n","-"^40,"\nMCRT calculation in the solar atmosphere\n","-"^40)
+    println("\n","-"^42,"\n MCRT calculation in the solar atmosphere \n","-"^42)
     println("\n--Reading atmosphere model...")
 
     # ==================================================================
@@ -13,12 +13,14 @@ function main(max_scatterings = 1e10)
     # ==================================================================
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")
+
     atmosphere = Atmosphere(parameters...)
+
     # ==================================================================
     # CHOOSE PARANETERS
     # ==================================================================
     # Choose wavelengths
-    wavelength = 500u"nm"
+    wavelength = 499.86u"nm" ###########################################
 
     # Get user input: τ_max, # packets
     print("--Choose maximum optical depth: ")
@@ -59,10 +61,10 @@ function main(max_scatterings = 1e10)
     # PLOTTING
     # ==================================================================
     println("\n--Plotting stuff...")
-    plot_surface_intensity(surface_intensity, τ_max, packet_data[1])
+    plot_surface_intensity(surface_intensity, τ_max, packet_data[1], :[:,1])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
-    traverse_field_gif(J_data[1], atmosphere.x, atmosphere.z, 504)
-    println("--Finished successfully")
+    traverse_field_gif(log10.(J_data[1]), atmosphere.x, atmosphere.z)
+    println("--Finished successfully\n")
 end
 
 

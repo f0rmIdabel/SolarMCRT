@@ -1,6 +1,7 @@
 include("atmos.jl")
 include("MyLibs/physLib.jl")
 using Random
+using Future # for randjump in rng when using threads
 using Printf
 using ProgressMeter
 
@@ -68,6 +69,9 @@ function simulate(atmosphere::Atmosphere,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
+    # Give each thread seeded rng
+    rng = Tuple([Future.randjump(MersenneTwister(1), t*big(10)^20) for t in 1:Threads.nthreads()])
+
     # Create ProgressMeter working with threads
     p = Progress(total_boxes)
     update!(p,0)
@@ -110,7 +114,7 @@ function simulate(atmosphere::Atmosphere,
             box_id = [i,j,k]
 
             # Initial position uniformely drawn from box
-            r = corner .+ (box_dim .* rand(3))
+            r = corner .+ (box_dim .* rand(rng[Threads.threadid()],3))
 
             # Scatter each packet until destroyed,
             # escape or reach max_scatterings
@@ -121,7 +125,7 @@ function simulate(atmosphere::Atmosphere,
                 # Scatter packet once
                 box_id, r, escaped, destroyed = scatter_packet(x, y, z, χ, boundary,
                                                                box_id, r,
-                                                               J[Threads.threadid()])
+                                                               J[Threads.threadid()], rng[Threads.threadid()])
                 # Check if escaped
                 if escaped[1]
                     ϕ, θ  = escaped[2]
@@ -135,7 +139,7 @@ function simulate(atmosphere::Atmosphere,
                     Threads.atomic_add!(total_destroyed, 1)
                     break
                 # Check if destroyed in next particle interaction
-                elseif rand() < ε[box_id...]
+                elseif rand(rng[Threads.threadid()]) < ε[box_id...]
                     Threads.atomic_add!(total_destroyed, 1)
                     break
                 end
@@ -175,7 +179,8 @@ end
                             boundary::Array{Int, 2},
                             box_id::Array{Int,1},
                             r::Array{<:Unitful.Length, 1},
-                            J::Array{Int, 3})
+                            J::Array{Int, 3},
+                            rng::MersenneTwister)
 
 Scatters photon packet once. Returns new position, box_id and escape/destroyed-status.
 """
@@ -186,7 +191,8 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         boundary::Array{Int, 2},
                         box_id::Array{Int,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{Int, 3})
+                        J::Array{Int, 3},
+                        rng::MersenneTwister)
 
     # Keep track of status
     escaped = [false, nothing]
@@ -202,9 +208,9 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # ===================================================================
 
     # Draw scattering depth and direction
-    τ = -log(rand())
-    ϕ = 2π * rand()
-    θ =  π * rand()
+    τ = -log(rand(rng))
+    ϕ = 2π * rand(rng)
+    θ =  π * rand(rng)
 
     # Find direction
     unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
