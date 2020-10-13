@@ -26,19 +26,19 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
 
-    dim = size(χ)
-    columns = dim[1]*dim[2]
-    boundary = Array{Int, 2}(undef, dim[1], dim[2])
+    nx, ny, nz = size(χ)
+    columns = nx*ny
+    boundary = Array{Int, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
     for col=1:columns
-        i = 1 + (col-1)÷dim[2]
-        j = col - (i-1)*dim[2]
+        i = 1 + (col-1)÷ny
+        j = col - (i-1)*ny
 
         τ = 0
         k = 0
 
-        while τ < τ_max && k < dim[3]
+        while τ < τ_max && k < ny
             k += 1
             # Trapezoidal rule
             τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
@@ -71,13 +71,13 @@ function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)},
     total_emission = 0.0u"kW / sr / nm"
 
     dim = size(χ)
-    columns = dim[1]*dim[2]
+    columns = nx*ny
 
     # Calculate vertical optical depth for each column
     for col=1:columns
 
-        i = 1 + (col - 1)÷dim[2]
-        j = col - (i - 1)*dim[2]
+        i = 1 + (col-1)÷ny
+        j = col - (i-1)*ny
 
         for k=1:boundary[i,j]
             box_volume = (x[i+1] - x[i])*(y[j+1] - y[j])*(z[k] - z[k+1])
@@ -195,9 +195,9 @@ function packets_per_box(x::Array{<:Unitful.Length, 1},
     packets = zeros(Int64,nx,ny,nz)
 
     for box=1:total_boxes
-        i = 1 + box ÷ (ny*nz + 1)
-        j = 1 + (box - (i-1)*ny*nz) ÷ (nz + 1)
-        k = 1 + (box - (i-1)*ny*nz - 1) % (nz)
+        i = 1 + (box-1) ÷ (ny*nz)
+        j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
+        k = 1 + (box - (i-1)*ny*nz - 1) % nz
 
         # Skip boxes beneath boundary
         if k > boundary[i,j]

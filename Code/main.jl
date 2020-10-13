@@ -13,14 +13,13 @@ function main(max_scatterings = 1e10)
     # ==================================================================
     parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
                                      "output_ray.hdf5")
-
     atmosphere = Atmosphere(parameters...)
 
     # ==================================================================
-    # CHOOSE PARANETERS
+    # CHOOSE PARAMETERS
     # ==================================================================
     # Choose wavelengths
-    wavelength = 499.86u"nm" ###########################################
+    wavelength = 499.86u"nm"
 
     # Get user input: τ_max, # packets
     print("--Choose maximum optical depth: ")
@@ -61,7 +60,7 @@ function main(max_scatterings = 1e10)
     # PLOTTING
     # ==================================================================
     println("\n--Plotting stuff...")
-    plot_surface_intensity(surface_intensity, τ_max, packet_data[1], :[:,1])
+    plot_surface_intensity(surface_intensity, τ_max, packet_data[1], :[:,:])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
     traverse_field_gif(log10.(J_data[1]), atmosphere.x, atmosphere.z)
     println("--Finished successfully\n")

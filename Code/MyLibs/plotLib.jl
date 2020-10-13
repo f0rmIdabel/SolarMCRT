@@ -48,7 +48,7 @@ function plot_surface_intensity(surface::Array{Int64, 4},
     # To avoid ssh display problems
     ENV["GKSwstype"]="nul"
 
-    heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
+    heatmap(1:size(surface,1), 1:size(surface,2), permutedims(surface), c=:grays, aspect_ratio=:equal)
     plot!(size=(410,400))
     fig = @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/SurfaceIntensity/bf_tau%.1f_pcts%.0e_bin%s",
                    τ_max, total_packets, string(bin))

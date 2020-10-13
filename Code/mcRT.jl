@@ -249,12 +249,12 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         # Check that within bounds of atmosphere
         if face == 3
             # Top escape
-            if box_id[3] < 1 # == 0
+            if box_id[3] == 0
                 escaped = [true, [ϕ, θ]]
                 break
 
             # Bottom destruction
-            elseif box_id[3] > boundary[box_id[1], box_id[2]] #+ 1 wronggggg
+            elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
                 destroyed = true
                 break
             end
@@ -273,7 +273,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                 r[face] = side_edge[face,1]
             end
         end
-
+        println(face)
         # Add to radiation field
         J[box_id...] += 1
 
