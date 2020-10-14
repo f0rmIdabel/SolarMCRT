@@ -31,7 +31,7 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
     boundary = Array{Int, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
-    for col=1:columns
+    Threads.@threads for col=1:columns
         i = 1 + (col-1)÷ny
         j = col - (i-1)*ny
 
@@ -70,11 +70,11 @@ function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)},
 
     total_emission = 0.0u"kW / sr / nm"
 
-    dim = size(χ)
+    nx,ny = size(boundary)
     columns = nx*ny
 
     # Calculate vertical optical depth for each column
-    for col=1:columns
+    Threads.@threads for col=1:columns
 
         i = 1 + (col-1)÷ny
         j = col - (i-1)*ny
@@ -132,8 +132,8 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
 
     boundary = optical_depth_boundary(χ, z, τ_max)
 
-    dim = size(χ)
-    columns = dim[1]*dim[2]
+    nx, ny = size(boundary)
+    columns = nx*ny
 
     # Initialize variables
     meanJ = 0.0
@@ -143,10 +143,10 @@ function field_above_boundary(z::Array{<:Unitful.Length, 1},
     total_boxes = 0
 
     # Calculate mean, min and max J above boundary
-    for col=1:columns
+    Threads.@threads for col=1:columns
 
-        i = 1 + (col - 1)÷dim[2]
-        j = col - (i - 1)*dim[2]
+        i = 1 + (col - 1)÷ny
+        j = col - (i - 1)*ny
 
         for k=1:boundary[i,j]
             meanJ += J[i,j,k]
@@ -194,7 +194,7 @@ function packets_per_box(x::Array{<:Unitful.Length, 1},
 
     packets = zeros(Int64,nx,ny,nz)
 
-    for box=1:total_boxes
+    Threads.@threads for box=1:total_boxes
         i = 1 + (box-1) ÷ (ny*nz)
         j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
         k = 1 + (box - (i-1)*ny*nz - 1) % nz
@@ -204,12 +204,8 @@ function packets_per_box(x::Array{<:Unitful.Length, 1},
             continue
         end
 
-        box_dim = [x[i+1], y[j+1], z[k+1]] .- [x[i], y[j], z[k]]
-        box_volume = box_dim[1]*box_dim[2]*(-box_dim[3])
-
-        # Based on condition in box,
-        # create certain number of photons packets
         B = blackbody_lambda(λ, temperature[i,j,k])
+        box_volume = (x[i+1] - x[i])*(y[j+1] - y[j])*(z[k] - z[k+1])
         box_emission = B*χ[i,j,k]*box_volume
         packets[i,j,k] = Int(round(box_emission*scale_emission))
     end

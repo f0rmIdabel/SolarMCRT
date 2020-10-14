@@ -32,21 +32,21 @@ function get_atmosphere_data(atmos_data,
     # ===========================================================
     # READ ATMOSPHERE FILE
     # ===========================================================
-    x = h5read(path_atmos, "x")[450:end]u"m"
-    y = -h5read(path_atmos, "y")[450:end]u"m" # get pos values
+    x = h5read(path_atmos, "x")u"m"
+    y = -h5read(path_atmos, "y")u"m"
     z = h5read(path_atmos, "z")[:,1]u"m"
 
     velocity_x = h5read(path_atmos, "velocity_x")[:,:,:,1]u"m/s"
     velocity_y = h5read(path_atmos, "velocity_y")[:,:,:,1]u"m/s"
     velocity_z = h5read(path_atmos, "velocity_z")[:,:,:,1]u"m/s"
 
-    temperature = h5read(path_atmos, "temperature")[:,450:end,450:end,1]u"K"
-    electron_density = h5read(path_atmos, "electron_density")[:,450:end,450:end,1]u"m^-3"
+    temperature = h5read(path_atmos, "temperature")[:,:,:,1]u"K"
+    electron_density = h5read(path_atmos, "electron_density")[:,:,:,1]u"m^-3"
 
     # ===========================================================
     # READ RH OUTPUT
     # ===========================================================
-    χ_absorption = h5read(path_RH, "chi_continuum")[1,:,450:end,450:end]u"m^-1"  #WL
+    χ_absorption = h5read(path_RH, "chi_continuum")[1,:,:,:]u"m^-1"  #WL
     # ===========================================================
     # RE-WORK PARAMETERS
     # ===========================================================

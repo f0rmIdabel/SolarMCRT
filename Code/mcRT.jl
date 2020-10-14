@@ -125,7 +125,8 @@ function simulate(atmosphere::Atmosphere,
                 # Scatter packet once
                 box_id, r, escaped, destroyed = scatter_packet(x, y, z, χ, boundary,
                                                                box_id, r,
-                                                               J[Threads.threadid()], rng[Threads.threadid()])
+                                                               J[Threads.threadid()],
+                                                               rng[Threads.threadid()])
                 # Check if escaped
                 if escaped[1]
                     ϕ, θ  = escaped[2]
@@ -214,7 +215,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 
     # Find direction
     unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
-    direction = sign.(unit_vector)
+    direction = Int.(sign.(unit_vector))
     direction[3] = -direction[3] # height array up->down
 
     # ===================================================================
@@ -241,24 +242,16 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # TRAVERSE BOXES UNTIL DEPTH TARGET REACHED
     # ===================================================================
     while τ > τ_cum
-
         # Switch to new box
         box_id[face] += direction[face]
         next_edge[face] += direction[face]
 
-        # Check that within bounds of atmosphere
+        # Check if escaped
         if face == 3
-            # Top escape
             if box_id[3] == 0
                 escaped = [true, [ϕ, θ]]
                 break
-
-            # Bottom destruction
-            elseif box_id[3] == boundary[box_id[1], box_id[2]] + 1
-                destroyed = true
-                break
             end
-
         # Handle side escapes with periodic boundary
         else
             # Left-going packets
@@ -273,7 +266,13 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                 r[face] = side_edge[face,1]
             end
         end
-        println(face)
+
+        # Check that above boundary
+        if box_id[3] > boundary[box_id[1], box_id[2]]
+            destroyed = true
+            break
+        end
+
         # Add to radiation field
         J[box_id...] += 1
 

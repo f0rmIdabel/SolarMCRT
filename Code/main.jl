@@ -62,7 +62,7 @@ function main(max_scatterings = 1e10)
     println("\n--Plotting stuff...")
     plot_surface_intensity(surface_intensity, τ_max, packet_data[1], :[:,:])
     plot_escape_direction(surface_intensity, τ_max, packet_data[1])
-    traverse_field_gif(log10.(J_data[1]), atmosphere.x, atmosphere.z)
+    traverse_field_gif(J_data[1], atmosphere.x, atmosphere.z)
     println("--Finished successfully\n")
 end
 

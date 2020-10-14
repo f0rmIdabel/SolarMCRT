@@ -151,7 +151,6 @@ function traverse_field_gif(field,
     anim = @animate for j=1:ny
         slice = field[:,j,1:nz]
         heatmap(x, reverse(z), permutedims(slice[:,end:-1:1]), c=:gist_gray, clims=(min_field, max_field))
-        println(j)
     end
 
     gif(anim, @sprintf("/mn/stornext/u3/idarhan/SolarMCRT/Results/Plots/FieldSlice/anim_fps15_%d.gif", nz), fps = 15)
