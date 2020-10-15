@@ -151,14 +151,14 @@ function mcrt(atmosphere::Atmosphere,
     J = reduce(+, J)
     J = J .+ S
 
-    h5write("../output/output.hdf5", "total_packets", sum(S))
-    h5write("../output/output.hdf5", "total_destroyed", total_destroyed.value)
-    h5write("../output/output.hdf5", "total_escaped", sum(surface_intensity))
-    h5write("../output/output.hdf5", "SNR", sqrt(maximum(surface_intensity)))
-    h5write("../output/output.hdf5", "total_scatterings", total_scatterings.value)
-    h5write("../output/output.hdf5", "S", S)
-    h5write("../output/output.hdf5", "J", J)
-    h5write("../output/output.hdf5", "surface_intensity", surface_intensity)
+    h5write("../out/output.hdf5", "total_packets", sum(S))
+    h5write("../out/output.hdf5", "total_destroyed", total_destroyed.value)
+    h5write("../out/output.hdf5", "total_escaped", sum(surface_intensity))
+    h5write("../out/output.hdf5", "SNR", sqrt(maximum(surface_intensity)))
+    h5write("../out/output.hdf5", "total_scatterings", total_scatterings.value)
+    h5write("../out/output.hdf5", "S", S)
+    h5write("../out/output.hdf5", "J", J)
+    h5write("../out/output.hdf5", "surface_intensity", surface_intensity)
 
 end
 

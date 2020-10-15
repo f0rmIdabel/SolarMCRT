@@ -34,7 +34,7 @@ function run(τ_max=nothing, target_packets=nothing)
         target_packets = readline()
         target_packets = parse(Float64, target_packets)
     else
-        print(@sprintf("--Generating %.1e photon packets.", target_packets))
+        println(@sprintf("--Generating %.1e photon packets.", target_packets))
     end
 
     # ==================================================================
@@ -59,4 +59,4 @@ function run(τ_max=nothing, target_packets=nothing)
 end
 
 
-run(30, 1e8)
+run(30, 1e9)
