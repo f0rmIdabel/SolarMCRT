@@ -1,5 +1,4 @@
 include("atmos.jl")
-include("MyLibs/physLib.jl")
 using Random
 using Future # for randjump in rng when using threads
 using Printf
@@ -17,12 +16,12 @@ using HDF5
 Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by τ_max.
 """
-function simulate(atmosphere::Atmosphere,
-                  wavelengths::Unitful.Length,
-                  max_scatterings::Real,
-                  τ_max::Real,
-                  target_packets::Real,
-                  num_bins = [4,2])
+function mcrt(atmosphere::Atmosphere,
+              boundary::Array{Int64, 2},
+              wavelengths::Unitful.Length,
+              S::Array{Int64, 3},
+              max_scatterings = 1e9,
+              num_bins = [4,2])
 
     # ==================================================================
     # ATMOSPHERE DATA
@@ -41,12 +40,9 @@ function simulate(atmosphere::Atmosphere,
     ϕ_bins, θ_bins = num_bins
 
     # ===================================================================
-    # PRE-CALCULATIONS
+    # SET UP VARIABLES
     # ===================================================================
-    println("--Performing pre-calculations...")
-
-    # Find boundary for given τ_max
-    boundary = optical_depth_boundary(χ, z, τ_max)
+    println("--Setting up simulation...")
 
     # Number of boxes
     nx, ny = size(boundary)
@@ -56,13 +52,11 @@ function simulate(atmosphere::Atmosphere,
     # Initialise variables
     surface_intensity = Tuple([zeros(Int, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
     J = Tuple([zeros(Int, nx, ny, nz) for t in 1:Threads.nthreads() ])
-
     total_destroyed = Threads.Atomic{Int}(0)
     total_scatterings = Threads.Atomic{Int}(0)
 
-    # Find number of packets per box and add to source function
-    S = packets_per_box(x,y,z,χ,temperature,
-                        λ,target_packets,boundary)
+    # Give each thread seeded rng
+    rng = Tuple([Future.randjump(MersenneTwister(1), t*big(10)^20) for t in 1:Threads.nthreads()])
 
     # ===================================================================
     # SIMULATION
@@ -70,14 +64,12 @@ function simulate(atmosphere::Atmosphere,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
-    # Give each thread seeded rng
-    rng = Tuple([Future.randjump(MersenneTwister(1), t*big(10)^20) for t in 1:Threads.nthreads()])
-
     # Create ProgressMeter working with threads
     p = Progress(total_boxes)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
     l = Threads.SpinLock()
+
 
     # Go through all boxes
     Threads.@threads for box in 1:total_boxes
@@ -159,13 +151,14 @@ function simulate(atmosphere::Atmosphere,
     J = reduce(+, J)
     J = J .+ S
 
-    h5write("../Results/output.hdf5", "total_packets", sum(S))
-    h5write("../Results/output.hdf5", "total_destroyed", total_destroyed.value)
-    h5write("../Results/output.hdf5", "total_escaped", sum(surface_intensity))
-    h5write("../Results/output.hdf5", "total_scatterings", total_scatterings.value)
-    h5write("../Results/output.hdf5", "S", S)
-    h5write("../Results/output.hdf5", "J", J)
-    h5write("../Results/output.hdf5", "surface_intensity", surface_intensity)
+    h5write("../output/output.hdf5", "total_packets", sum(S))
+    h5write("../output/output.hdf5", "total_destroyed", total_destroyed.value)
+    h5write("../output/output.hdf5", "total_escaped", sum(surface_intensity))
+    h5write("../output/output.hdf5", "SNR", sqrt(maximum(surface_intensity)))
+    h5write("../output/output.hdf5", "total_scatterings", total_scatterings.value)
+    h5write("../output/output.hdf5", "S", S)
+    h5write("../output/output.hdf5", "J", J)
+    h5write("../output/output.hdf5", "surface_intensity", surface_intensity)
 
 end
 

@@ -26,8 +26,8 @@ Reads atmosphere parameters and reworks them to fit simulation.
 function get_atmosphere_data(atmos_data,
                              rh_output)
 
-    path_atmos = "../../basement/MScProject/Atmospheres/"*atmos_data
-    path_RH = "../../basement/MScProject/Atmospheres/"*rh_output
+    path_atmos = "../../../basement/MScProject/Atmospheres/"*atmos_data
+    path_RH = "../../../basement/MScProject/Atmospheres/"*rh_output
 
     # ===========================================================
     # READ ATMOSPHERE FILE

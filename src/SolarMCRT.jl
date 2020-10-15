@@ -1,10 +1,9 @@
-include("mcRT.jl")
+include("mcrt.jl")
+include("tools.jl")
 include("atmos.jl")
-include("MyLibs/plotLib.jl")
-include("MyLibs/ioLib.jl")
-using Dates
 
-function main(max_scatterings = 1e10)
+function run(τ_max=nothing, target_packets=nothing)
+
     println("\n","-"^42,"\n MCRT calculation in the solar atmosphere \n","-"^42)
     println("\n--Reading atmosphere model...")
 
@@ -21,50 +20,43 @@ function main(max_scatterings = 1e10)
     # Choose wavelengths
     wavelength = 499.86u"nm"
 
-    # Get user input: τ_max, # packets
-    print("--Choose maximum optical depth: ")
-    τ_max = readline()
-    τ_max = parse(Float64, τ_max)
+    if τ_max == nothing
+        # Get user input: τ_max, # packets
+        print("--Choose maximum optical depth: ")
+        τ_max = readline()
+        τ_max = parse(Float64, τ_max)
+    else
+        println(@sprintf("--Maximum optical depth set to %.1f.", τ_max))
+    end
 
-    print("--Choose number of photon packets: ")
-    target_packets = readline()
-    target_packets = parse(Float64, target_packets)
+    if target_packets == nothing
+        print("--Choose number of photon packets: ")
+        target_packets = readline()
+        target_packets = parse(Float64, target_packets)
+    else
+        print(@sprintf("--Generating %.1e photon packets.", target_packets))
+    end
+
+    # ==================================================================
+    # PRE-CALCULATIONS
+    # ==================================================================
+
+    # Find boundary for given τ_max
+    boundary = optical_depth_boundary(atmosphere.χ_continuum, atmosphere.z, τ_max)
+
+    # Find number of packets per box and add to source function
+    S = packets_per_box(atmosphere.x, atmosphere.y, atmosphere.z,
+                        atmosphere.χ_continuum, atmosphere.temperature,
+                        wavelength, target_packets, boundary)
+
 
     # ==================================================================
     # SIMULATION
     # ==================================================================
-    threads = Threads.nthreads()
-    current_time = string(now())
 
-    # Run and time simulation
-    simulation = @timed simulate(atmosphere, wavelength,
-                                 max_scatterings, τ_max, target_packets)
-
-    packet_data, J_data, surface_intensity = simulation.value
-    elapsed_time = simulation.time
-
-    # Signal to noise ratio
-    SNR = sqrt(maximum(surface_intensity))
-
-    # ==================================================================
-    # WRITE RESULTS
-    # ==================================================================
-    # Print results for quick check
-    quick_print(packet_data, J_data[3:5], SNR)
-
-    # Append data to file
-    write_results_to_file(current_time, threads, elapsed_time,
-                          τ_max, packet_data, J_data[3:5], SNR)
-
-    # ==================================================================
-    # PLOTTING
-    # ==================================================================
-    println("\n--Plotting stuff...")
-    plot_surface_intensity(surface_intensity, τ_max, packet_data[1], :[:,:])
-    plot_escape_direction(surface_intensity, τ_max, packet_data[1])
-    traverse_field_gif(J_data[1], atmosphere.x, atmosphere.z)
-    println("--Finished successfully\n")
+    # Run simulation
+    mcrt(atmosphere, boundary, wavelength, S)
 end
 
 
-main()
+run(30, 1e8)
