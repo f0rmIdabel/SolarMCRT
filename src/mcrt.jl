@@ -29,9 +29,9 @@ function mcrt(atmosphere::Atmosphere,
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
-    ε = atmosphere.ε_continuum
-    χ = atmosphere.χ_continuum
     temperature = atmosphere.temperature
+    χ = atmosphere.χ_continuum
+    ε = atmosphere.ε_continuum
 
     # ===================================================================
     # CHOSEN WAVELENGTHS AND ESCAPE BINS
@@ -42,18 +42,15 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    println("--Setting up simulation...")
-
-    # Number of boxes
     nx, ny = size(boundary)
     nz = maximum(boundary)
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = Tuple([zeros(Int, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
-    J = Tuple([zeros(Int, nx, ny, nz) for t in 1:Threads.nthreads() ])
-    total_destroyed = Threads.Atomic{Int}(0)
-    total_scatterings = Threads.Atomic{Int}(0)
+    surface_intensity = Tuple([zeros(Int64, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
+    J = Tuple([zeros(Int64, nx, ny, nz) for t in 1:Threads.nthreads() ])
+    total_destroyed = Threads.Atomic{Int64}(0)
+    total_scatterings = Threads.Atomic{Int64}(0)
 
     # Give each thread seeded rng
     rng = Tuple([Future.randjump(MersenneTwister(1), t*big(10)^20) for t in 1:Threads.nthreads()])
@@ -69,7 +66,6 @@ function mcrt(atmosphere::Atmosphere,
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
     l = Threads.SpinLock()
-
 
     # Go through all boxes
     Threads.@threads for box in 1:total_boxes
@@ -116,21 +112,14 @@ function mcrt(atmosphere::Atmosphere,
                 Threads.atomic_add!(total_scatterings, 1)
 
                 # Scatter packet once
-                box_id, r, escaped, destroyed = scatter_packet(x, y, z, χ, boundary,
-                                                               box_id, r,
-                                                               J[Threads.threadid()],
-                                                               rng[Threads.threadid()])
-                # Check if escaped
-                if escaped[1]
-                    ϕ, θ  = escaped[2]
-                    ϕ_bin = 1 + Int(ϕ÷(2π/ϕ_bins))
-                    θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:θ_bins))))
-
-                    surface_intensity[Threads.threadid()][box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
-                    break
-                # Check if destroyed in bottom
-                elseif destroyed
-                    Threads.atomic_add!(total_destroyed, 1)
+                box_id, r, lost = scatter_packet(x, y, z, χ, boundary,
+                                                 box_id, r,
+                                                 J[Threads.threadid()],
+                                                 surface_intensity[Threads.threadid()],
+                                                 rng[Threads.threadid()],
+                                                 num_bins)
+                # Check if escaped or lost in bottom
+                if lost
                     break
                 # Check if destroyed in next particle interaction
                 elseif rand(rng[Threads.threadid()]) < ε[box_id...]
@@ -144,22 +133,23 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # WRITE TO FILE
     # ===================================================================
-    println("\n--Writing results to file...")
+    println("\n--Writing results to file...\n")
 
     # Collect results from all threads
     surface_intensity = reduce(+, surface_intensity)
     J = reduce(+, J)
     J = J .+ S
 
-    h5write("../out/output.hdf5", "total_packets", sum(S))
-    h5write("../out/output.hdf5", "total_destroyed", total_destroyed.value)
-    h5write("../out/output.hdf5", "total_escaped", sum(surface_intensity))
-    h5write("../out/output.hdf5", "SNR", sqrt(maximum(surface_intensity)))
-    h5write("../out/output.hdf5", "total_scatterings", total_scatterings.value)
-    h5write("../out/output.hdf5", "S", S)
-    h5write("../out/output.hdf5", "J", J)
-    h5write("../out/output.hdf5", "surface_intensity", surface_intensity)
-
+    out = h5open("../out/output.hdf5", "w")
+    write(out, "total_packets", sum(S))
+    write(out, "total_destroyed", total_destroyed.value)
+    write(out, "total_escaped", sum(surface_intensity))
+    write(out, "SNR", sqrt(maximum(surface_intensity)))
+    write(out, "total_scatterings", total_scatterings.value)
+    write(out, "S", S)
+    write(out, "J", J)
+    write(out, "surface_intensity", surface_intensity)
+    close(out)
 end
 
 
@@ -180,15 +170,16 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
-                        boundary::Array{Int, 2},
-                        box_id::Array{Int,1},
+                        boundary::Array{Int64, 2},
+                        box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{Int, 3},
-                        rng::MersenneTwister)
+                        J::Array{Int64, 3},
+                        surface_intensity::Array{Int64,4},
+                        rng::MersenneTwister,
+                        num_bins::Array{Int64, 1})
 
     # Keep track of status
-    escaped = [false, nothing]
-    destroyed = false
+    lost = false
 
     # Useful quantities
     side_dim = size(boundary)
@@ -207,7 +198,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # Find direction
     unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
     direction = Int.(sign.(unit_vector))
-    direction[3] = -direction[3] # height array up->down
+    direction[3] = -direction[3] # because height array up->down
 
     # ===================================================================
     # MOVE PACKET TO FIRST BOX INTERSECTION
@@ -240,7 +231,10 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         # Check if escaped
         if face == 3
             if box_id[3] == 0
-                escaped = [true, [ϕ, θ]]
+                lost = true
+                ϕ_bin = 1 + Int(ϕ÷(2π/num_bins[1]))
+                θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:num_bins[2]))))
+                surface_intensity[box_id[1], box_id[2], ϕ_bin, θ_bin] += 1
                 break
             end
         # Handle side escapes with periodic boundary
@@ -260,7 +254,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 
         # Check that above boundary
         if box_id[3] > boundary[box_id[1], box_id[2]]
-            destroyed = true
+            lost = true
             break
         end
 
@@ -282,14 +276,11 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     end
 
     # ===================================================================
-    # CHECK PACKET STATUS BEFORE RETURNING
+    # CORRECT FOR OVERSHOOT IN FINAL BOX
     # ===================================================================
-    if escaped[1] || destroyed
-        r = nothing
-    else
-        # Correct for overshoot in final box
+    if !lost
         r -= unit_vector*(τ_cum - τ)/χ[box_id...]
     end
 
-    return box_id, r, escaped, destroyed
+    return box_id, r, lost
 end
