@@ -1,5 +1,7 @@
 using Unitful
 import PhysicalConstants.CODATA2018: c_0, h, k_B
+@derived_dimension NumberDensity Unitful.𝐋^-3
+@derived_dimension PerLength Unitful.𝐋^-1
 
 """
     function blackbody_lambda(λ::Unitful.Length,
@@ -22,7 +24,7 @@ end
 
 Returns 2D array containing the k-indices where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+function optical_depth_boundary(χ::Array{PerLength, 3},
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
 
@@ -60,7 +62,7 @@ end
 
 Reurns the total emission above the optical depth boundary in intensity units.
 """
-function total_emission(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+function total_emission(χ::Array{PerLength, 3},
                         temperature::Array{<:Unitful.Temperature, 3},
                         x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
@@ -104,7 +106,7 @@ Returns a 3D array of the # of packets to be generated in each box.
 function packets_per_box(x::Array{<:Unitful.Length, 1},
                          y::Array{<:Unitful.Length, 1},
                          z::Array{<:Unitful.Length, 1},
-                         χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                         χ::Array{PerLength, 3},
                          temperature::Array{<:Unitful.Temperature, 3},
                          λ::Unitful.Length,
                          target_packets::Real,

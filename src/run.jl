@@ -1,22 +1,21 @@
 include("mcrt.jl")
 include("tools.jl")
-include("atmos.jl")
 
 function run(τ_max=nothing, target_packets=nothing)
 
     println("\n","-"^42,"\n MCRT calculation in the solar atmosphere \n","-"^42)
-    println("\n--Reading atmosphere model...")
-
     # ==================================================================
     # LOAD ATMOSPHERE DATA
-    # ==================================================================
-    parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf",
-                                     "output_ray.hdf5")
+    # ================================================================== MOVE THIS TO MCRT file
+
+    println("\n--Reading atmosphere model...")
+
+    parameters = get_atmosphere_data("bifrost_cb24bih_s385_fullv.ncdf", 499.86u"nm")
     atmosphere = Atmosphere(parameters...)
 
     # ==================================================================
     # CHOOSE PARAMETERS
-    # ==================================================================
+    # ================================================================== MOVE THIS TO INPUT FILE
     # Choose wavelengths
     wavelength = 499.86u"nm" #################################################################
 
@@ -39,15 +38,15 @@ function run(τ_max=nothing, target_packets=nothing)
 
     # ==================================================================
     # PRE-CALCULATIONS
-    # ==================================================================
+    # ================================================================== MOVE THIS TO DIFFERENT FILE
     println("--Setting up simulation...")
 
     # Find boundary for given τ_max
-    boundary = optical_depth_boundary(atmosphere.χ_continuum, atmosphere.z, τ_max)
+    boundary = optical_depth_boundary(atmosphere.χ, atmosphere.z, τ_max)
 
     # Find number of packets per box
     S = packets_per_box(atmosphere.x, atmosphere.y, atmosphere.z,
-                        atmosphere.χ_continuum, atmosphere.temperature,
+                        atmosphere.χ, atmosphere.temperature,
                         wavelength, target_packets, boundary)
 
     # ==================================================================
@@ -57,4 +56,4 @@ function run(τ_max=nothing, target_packets=nothing)
 end
 
 
-run(30, 1e8)
+run(30, 1e9)

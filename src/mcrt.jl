@@ -4,6 +4,7 @@ using Future # for randjump in rng when using threads
 using Printf
 using ProgressMeter
 using HDF5
+using Unitful
 
 """
     function simulate(atmosphere::Atmosphere,
@@ -30,8 +31,8 @@ function mcrt(atmosphere::Atmosphere,
     y = atmosphere.y
     z = atmosphere.z
     temperature = atmosphere.temperature
-    χ = atmosphere.χ_continuum
-    ε = atmosphere.ε_continuum
+    χ = atmosphere.χ
+    ε = atmosphere.ε
 
     # ===================================================================
     # CHOSEN WAVELENGTHS AND ESCAPE BINS
@@ -169,7 +170,7 @@ Scatters photon packet once. Returns new position, box_id and escape/destroyed-s
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                        χ::Array{PerLength, 3},
                         boundary::Array{Int64, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
