@@ -10,7 +10,7 @@ target_packets = 1e9
 tau_max = 30
 
 # Maximum number of scatterings before stopping.
-max_scatterings = 1e9
+max_scatterings = 1e7
 
 # Number of escape bins in polar and azimuth directions.
 escape_bins = [4,2]
