@@ -1,4 +1,5 @@
-include("atmos.jl")
+include("atmosphere.jl")
+include("radiation.jl")
 using Random
 using Future # for randjump in rng when using threads
 using Printf
@@ -18,7 +19,6 @@ Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by τ_max.
 """
 function mcrt(atmosphere::Atmosphere,
-              boundary::Array{Int64, 2},
               wavelengths::Unitful.Length,
               S::Array{Int64, 3},
               max_scatterings = 1e9,
@@ -30,21 +30,24 @@ function mcrt(atmosphere::Atmosphere,
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
-    temperature = atmosphere.temperature
     χ = atmosphere.χ
     ε = atmosphere.ε
+    boundary = atmosphere.boundary
 
     # ===================================================================
-    # CHOSEN WAVELENGTHS AND ESCAPE BINS
+    # RADIATION DATA
     # ===================================================================
+    #
+    #
+    #
+    #
     λ = wavelengths
     ϕ_bins, θ_bins = num_bins
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    nx, ny = size(boundary)
-    nz = maximum(boundary)
+    nx, ny, nz = size(χ)
     total_boxes = nx*ny*nz
 
     # Initialise variables
@@ -81,11 +84,6 @@ function mcrt(atmosphere::Atmosphere,
         i = 1 + (box-1) ÷ (ny*nz)
         j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
         k = 1 + (box - (i-1)*ny*nz - 1) % nz
-
-        # Skip boxes beneath boundary
-        if k > boundary[i,j]
-            continue
-        end
 
         # Packets in box
         packets = S[i,j,k]

@@ -1,6 +1,5 @@
 using HDF5
 using Unitful
-using UnitfulRecipes
 using Transparency
 import PhysicalConstants.CODATA2018: c_0
 @derived_dimension NumberDensity Unitful.𝐋^-3
@@ -8,7 +7,6 @@ import PhysicalConstants.CODATA2018: c_0
 
 struct Atmosphere
    # Dimensions - position of box edges
-   # (nx+1), (ny+1), (nz+1)
    x::Array{<:Unitful.Length, 1} # Increasing
    y::Array{<:Unitful.Length, 1} # Increasing
    z::Array{<:Unitful.Length, 1} # Decreasing
@@ -21,9 +19,13 @@ struct Atmosphere
    temperature::Array{<:Unitful.Temperature, 3}
 
    # (λ, nx, ny, nz)
-   χ::Array{<:PerLength, 3}# 4 ##########################################
-   ε::Array{Real, 3} # 4 ########################################################
+   χ::Array{PerLength, 3}
+   ε::Array{Real, 3}
+
+   # (λ, nx, ny)
+   # boundary::Array{Int64, 2}
 end
+
 
 """
 From Tiago
@@ -55,12 +57,45 @@ function α_scatt(λ::Unitful.Length,
 end
 
 """
+    function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                    z::Array{<:Unitful.Length, 1},
+                                    τ_max::Real)
+
+Returns 2D array containing the k-indices where the optical depth reaches τ_max.
+"""
+function optical_depth_boundary(χ,
+                                z::Array{<:Unitful.Length, 1},
+                                τ_max::Real)
+    nx, ny, nz = size(χ)
+    columns = nx*ny
+    boundary = Array{Int, 2}(undef, nx, ny)
+
+    # Calculate vertical optical depth for each column
+    Threads.@threads for col=1:columns
+        i = 1 + (col-1)÷ny
+        j = col - (i-1)*ny
+
+        τ = 0
+        k = 0
+
+        while τ < τ_max && k < ny
+            k += 1
+            # Trapezoidal rule
+            τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
+        end
+        boundary[i,j] = k
+    end
+
+    return boundary
+end
+
+"""
    function get_atmosphere_data(atmos_data,
                                 rh_output)
 
 Reads atmosphere parameters and reworks them to fit simulation.
 """
-function get_atmosphere_data(atmos_data, λ)
+function get_atmosphere_data(atmos_data, λ, τ_max)
 
     path_atmos = "../../../basement/MScProject/Atmospheres/"*atmos_data
     # ===========================================================
@@ -80,14 +115,13 @@ function get_atmosphere_data(atmos_data, λ)
     electron_density = read(atmos, "electron_density")[:,:,:,1]u"m^-3"
     hydrogen_populations = read(atmos, "hydrogen_populations")[:,:,:,:,1]u"m^-3"
     close(atmos)
-    # ===========================================================
-    # RE-WORK PARAMETERS
-    # ===========================================================
 
+    # ===========================================================
+    # RE-WORK PARAMETERS TO FIT SIMULATION
+    # ===========================================================
     # Calculate epsilon and chi
-    hydrogen_density = sum(hydrogen_populations, dims = 4)
     ionised_hydrogen_density = hydrogen_populations[:,:,:,end]
-    neutral_hydrogen_density = hydrogen_density .- ionised_hydrogen_density
+    neutral_hydrogen_density = sum(hydrogen_populations, dims = 4) .- ionised_hydrogen_density
 
     χ_abs = α_abs.(λ, temperature, electron_density, neutral_hydrogen_density, ionised_hydrogen_density)[:,:,:,1]
     χ_scatt = α_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
@@ -99,11 +133,10 @@ function get_atmosphere_data(atmos_data, λ)
     velocity_y = permutedims(velocity_y, [2,3,1])
     velocity_z = permutedims(velocity_z, [2,3,1])
     temperature = permutedims(temperature, [2,3,1])
-    χ = permutedims(χ, [2,3,1]) #########################################
-    ε = permutedims(ε, [2,3,1]) #########################################
+    χ = permutedims(χ, [2,3,1])
+    ε = permutedims(ε, [2,3,1])
 
     # Make sure x and y are increasing and z decreasing
-
     if x[1] > x[end]
         x = reverse(x)
         velocity_x = velocity_x[end:-1:1,:,:]
@@ -139,6 +172,20 @@ function get_atmosphere_data(atmos_data, λ)
     y = push!(y, 2*y[end] - y[end-1])
     z = push!(z, 2*z[end] - z[end-1])
 
+    # ===========================================================
+    # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
+    # ===========================================================
+    boundary = optical_depth_boundary(χ, z, τ_max)
+
+    nz = maximum(boundary)
+    z = [1:nz+1]
+    velocity_x = velocity_x[:,:,1:nz]
+    velocity_y = velocity_y[:,:,1:nz]
+    velocity_z = velocity_z[:,:,1:nz]
+    temperature = temperature[:,:,1:nz]
+    χ = χ[:,:,1:nz]
+    ε = ε[:,:,1:nz]
+
     return x, y, z, velocity_x, velocity_y, velocity_z,
-           temperature, χ, ε
+           temperature, χ, ε #, boundary
 end

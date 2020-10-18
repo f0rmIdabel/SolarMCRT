@@ -1,0 +1,17 @@
+
+# Path to the atmosphere file
+atmosphere_path = "../../../basement/MScProject/Atmospheres/bifrost_cb24bih_s385_fullv.ncdf" 
+
+# The approximate number of packets to be created.
+# Deviates from the actual number,
+# as packets cannot be perfectly divided between boxes
+target_packets = 1e9
+
+# Optical depth where atmosphere is cut off for each wavelength.
+tau_max = 30
+
+# Maximum number of scatterings before stopping.
+max_scatterings = 1e9
+
+# Number of escape bins in polar and azimuth directions.
+escape_bins = [4,2]
