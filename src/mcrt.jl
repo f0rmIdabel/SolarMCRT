@@ -38,7 +38,7 @@ function mcrt(atmosphere::Atmosphere,
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = Tuple([zeros(Int64, nx, ny, ϕ_bins, θ_bins) for t in 1:Threads.nthreads()])
+    surface_intensity = Tuple([zeros(Int64, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
     J = Tuple([zeros(Int64, nx, ny, nz) for t in 1:Threads.nthreads() ])
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
