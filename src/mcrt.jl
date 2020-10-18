@@ -29,7 +29,7 @@ function mcrt(atmosphere::Atmosphere,
     λ = radiation.λ
     S = radiation.S
     max_scatterings = radiation.max_scatterings
-    ϕ_bins, θ_bins = radiation.escape_bins
+    num_bins = radiation.escape_bins
 
     # ===================================================================
     # SET UP VARIABLES
