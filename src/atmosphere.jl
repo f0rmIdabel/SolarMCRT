@@ -63,7 +63,7 @@ end
 
 Returns 2D array containing the k-indices where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(χ,
+function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
     nx, ny, nz = size(χ)

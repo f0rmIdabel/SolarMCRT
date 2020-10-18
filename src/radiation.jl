@@ -2,10 +2,10 @@ include("atmosphere.jl")
 import PhysicalConstants.CODATA2018: c_0, h, k_B
 
 struct Radiation
-    λ::Array{<:Unitful.Length}
+    λ::Unitful.Length
     S::Array{Int64,3}
     max_scatterings::Real
-    escape_bins::Array{Int64,2}
+    escape_bins::Array{Int64,1}
 end
 
 """
@@ -64,7 +64,7 @@ end
 """
 Collects radition data that will go into structure
 """
-function collect_radiation_data(atmosphere::Atmosphere, λ)
+function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     target_packets = get_target_packets()
     max_scatterings = get_max_scatterings()
     escape_bins = get_escape_bins()

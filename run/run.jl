@@ -1,6 +1,4 @@
-#include("../src/mcrt.jl")
-include("../src/radiation.jl") #remove
-include("../src/atmosphere.jl") #remove
+include("../src/mcrt.jl")
 
 function run()
 
@@ -9,27 +7,27 @@ function run()
     # ==================================================================
     # LOAD WAVELENGTHS
     # ==================================================================
-    println("\n--Reading wavelengths...")
+    println("\n--Loading wavelengths...")
     λ = 499.86u"nm"
 
     # ==================================================================
-    # LOAD ATMOSPHERE DATA
+    # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
     # ==================================================================
-    println("--Reading atmosphere model...")
+    println("--Loading atmosphere data...")
     atmosphere_parameters = collect_atmosphere_data(λ)
     atmosphere = Atmosphere(atmosphere_parameters...)
 
     # ==================================================================
     # LOAD RADIATION DATA
     # ==================================================================
-    println("--Reading radiation data...")
+    println("--Loading radiation data...")
     radiation_parameters = collect_radiation_data(atmosphere, λ)
     radiation = Radiation(λ, radiation_parameters...)
 
     # ==================================================================
     # SIMULATION
     # ==================================================================
-    #mcrt(atmosphere, radiation)
+    mcrt(atmosphere, radiation)
 end
 
 
