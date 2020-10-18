@@ -1,4 +1,3 @@
-include("atmosphere.jl")
 include("radiation.jl")
 using Random
 using Future # for randjump in rng when using threads
@@ -8,21 +7,11 @@ using HDF5
 using Unitful
 
 """
-    function simulate(atmosphere::Atmosphere,
-                      wavelengths::Unitful.Length,
-                      max_scatterings::Real,
-                      τ_max::Real,
-                      target_packets::Real,
-                      num_bins = [4,2])
-
 Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by τ_max.
 """
 function mcrt(atmosphere::Atmosphere,
-              wavelengths::Unitful.Length,
-              S::Array{Int64, 3},
-              max_scatterings = 1e9,
-              num_bins = [4,2])
+              radiation::Radiation)
 
     # ==================================================================
     # ATMOSPHERE DATA
@@ -37,12 +26,10 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # RADIATION DATA
     # ===================================================================
-    #
-    #
-    #
-    #
-    λ = wavelengths
-    ϕ_bins, θ_bins = num_bins
+    λ = radiation.λ
+    S = radiation.S
+    max_scatterings = radiation.max_scatterings
+    ϕ_bins, θ_bins = radiation.escape_bins
 
     # ===================================================================
     # SET UP VARIABLES
@@ -129,40 +116,21 @@ function mcrt(atmosphere::Atmosphere,
         end
     end
 
-    # ===================================================================
-    # WRITE TO FILE
-    # ===================================================================
-    println("\n--Writing results to file...\n")
-
     # Collect results from all threads
     surface_intensity = reduce(+, surface_intensity)
     J = reduce(+, J)
     J = J .+ S
 
-    out = h5open("../out/output.hdf5", "w")
-    write(out, "total_packets", sum(S))
-    write(out, "total_destroyed", total_destroyed.value)
-    write(out, "total_escaped", sum(surface_intensity))
-    write(out, "SNR", sqrt(maximum(surface_intensity)))
-    write(out, "total_scatterings", total_scatterings.value)
-    write(out, "S", S)
-    write(out, "J", J)
-    write(out, "surface_intensity", surface_intensity)
-    close(out)
+    # ===================================================================
+    # WRITE TO FILE
+    # ===================================================================
+    println("\n--Writing results to file...\n")
+    output(S, J, surface_intensity, total_destroyed.value, total_scatterings.value)
+
 end
 
 
 """
-    function scatter_packet(x::Array{<:Unitful.Length, 1},
-                            y::Array{<:Unitful.Length, 1},
-                            z::Array{<:Unitful.Length, 1},
-                            χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
-                            boundary::Array{Int, 2},
-                            box_id::Array{Int,1},
-                            r::Array{<:Unitful.Length, 1},
-                            J::Array{Int, 3},
-                            rng::MersenneTwister)
-
 Scatters photon packet once. Returns new position, box_id and escape/destroyed-status.
 """
 function scatter_packet(x::Array{<:Unitful.Length, 1},

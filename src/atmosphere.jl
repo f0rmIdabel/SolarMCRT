@@ -1,3 +1,4 @@
+include("io.jl")
 using HDF5
 using Unitful
 using Transparency
@@ -6,26 +7,25 @@ import PhysicalConstants.CODATA2018: c_0
 @derived_dimension PerLength Unitful.𝐋^-1
 
 struct Atmosphere
-   # Dimensions - position of box edges
-   x::Array{<:Unitful.Length, 1} # Increasing
-   y::Array{<:Unitful.Length, 1} # Increasing
-   z::Array{<:Unitful.Length, 1} # Decreasing
+    # Dimensions - position of box edges
+    x::Array{<:Unitful.Length, 1} # Increasing
+    y::Array{<:Unitful.Length, 1} # Increasing
+    z::Array{<:Unitful.Length, 1} # Decreasing
 
-   # Local box properties
-   # (nx, ny, nz)
-   velocity_x::Array{<:Unitful.Velocity, 3}
-   velocity_y::Array{<:Unitful.Velocity, 3}
-   velocity_z::Array{<:Unitful.Velocity, 3}
-   temperature::Array{<:Unitful.Temperature, 3}
+    # Local box properties
+    # (nx, ny, nz)
+    velocity_x::Array{<:Unitful.Velocity, 3}
+    velocity_y::Array{<:Unitful.Velocity, 3}
+    velocity_z::Array{<:Unitful.Velocity, 3}
+    temperature::Array{<:Unitful.Temperature, 3}
 
-   # (λ, nx, ny, nz)
-   χ::Array{PerLength, 3}
-   ε::Array{Real, 3}
+    # (λ, nx, ny, nz)
+    χ::Array{PerLength, 3}
+    ε::Array{Real, 3}
 
-   # (λ, nx, ny)
-   # boundary::Array{Int64, 2}
+    # (λ, nx, ny)
+    boundary::Array{Int64, 2}
 end
-
 
 """
 From Tiago
@@ -95,13 +95,18 @@ end
 
 Reads atmosphere parameters and reworks them to fit simulation.
 """
-function get_atmosphere_data(atmos_data, λ, τ_max)
+function collect_atmosphere_data(λ)
 
-    path_atmos = "../../../basement/MScProject/Atmospheres/"*atmos_data
+    # ===========================================================
+    # READ INPUT FILE
+    # ===========================================================
+    atmosphere_path = get_atmosphere_path()
+    τ_max = get_τ_max()
+
     # ===========================================================
     # READ ATMOSPHERE FILE
     # ===========================================================
-    atmos = h5open(path_atmos, "r")
+    atmos = h5open(atmosphere_path, "r")
 
     x = read(atmos, "x")u"m"
     y = read(atmos, "y")u"m"
@@ -178,7 +183,7 @@ function get_atmosphere_data(atmos_data, λ, τ_max)
     boundary = optical_depth_boundary(χ, z, τ_max)
 
     nz = maximum(boundary)
-    z = [1:nz+1]
+    z = z[1:nz+1]
     velocity_x = velocity_x[:,:,1:nz]
     velocity_y = velocity_y[:,:,1:nz]
     velocity_z = velocity_z[:,:,1:nz]
@@ -187,5 +192,5 @@ function get_atmosphere_data(atmos_data, λ, τ_max)
     ε = ε[:,:,1:nz]
 
     return x, y, z, velocity_x, velocity_y, velocity_z,
-           temperature, χ, ε #, boundary
+           temperature, χ, ε, boundary
 end

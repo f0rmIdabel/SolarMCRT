@@ -5,13 +5,10 @@ struct Radiation
     λ::Array{<:Unitful.Length}
     S::Array{Int64,3}
     max_scatterings::Real
-    num_bins::Array{Int64,2}
+    escape_bins::Array{Int64,2}
 end
 
 """
-    function blackbody_lambda(λ::Unitful.Length,
-                              temperature::Unitful.Temperature)
-
 Calculates the Blackbody (Planck) function per wavelength, for given
 arrays of wavelength and temperature. Returns monochromatic intensity.
 Copied from Tiago, SSB
@@ -23,14 +20,11 @@ end
 
 
 """
-
-
 Returns a 3D array of the # of packets to be generated in each box.
 """
 function packets_per_box(atmosphere::Atmosphere,
                          λ::Unitful.Length,
                          target_packets::Real)
-
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
@@ -42,9 +36,8 @@ function packets_per_box(atmosphere::Atmosphere,
     nz = maximum(boundary)
     total_boxes = nx*ny*nz
 
-    total_emission = 0.0u"kW / sr / nm"
-    #total_emission_ = total_emission(atmosphere, λ)
-    box_emission = blackbody_lambda.(λ, temperature) .* χ
+    box_emissivity = blackbody_lambda.(λ, temperature) .* χ
+    box_emission = zeros(Float64,nx,ny,nz)u"kW / sr / nm"
     packets = zeros(Int64,nx,ny,nz)
 
     for box=1:total_boxes
@@ -58,15 +51,23 @@ function packets_per_box(atmosphere::Atmosphere,
         end
 
         box_volume = (x[i+1] - x[i])*(y[j+1] - y[j])*(z[k] - z[k+1])
-        box_emission[i,j,k] *= box_volume
-        total_emission += box_emission[i,j,k]
+        box_emission[i,j,k] = box_emissivity[i,j,k]*box_volume
     end
 
-    scale_emission = target_packets/total_emission_
+    total_emission = sum(box_emission)
+    scale_emission = target_packets/total_emission
     packets = Int.(round.(box_emission*scale_emission))
 
     return packets
 end
 
-
-function get_radiation_data(atmosphere::Atmos)
+"""
+Collects radition data that will go into structure
+"""
+function collect_radiation_data(atmosphere::Atmosphere, λ)
+    target_packets = get_target_packets()
+    max_scatterings = get_max_scatterings()
+    escape_bins = get_escape_bins()
+    S = packets_per_box(atmosphere, λ, target_packets)
+    return S, max_scatterings, escape_bins
+end
