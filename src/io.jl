@@ -2,7 +2,7 @@
 
 function output(S::Array{Int64,3},
                 J::Array{Int64,3},
-                surface_intensity::Array{Int64,2},
+                surface_intensity::Array{Int64,4},
                 total_destroyed::Int64,
                 total_scatterings::Int64)
     out = h5open("../out/output.hdf5", "w")
