@@ -17,6 +17,10 @@ function output(S::Array{Int64,3},
     close(out)
 end
 
+function get_λ()
+    input_file = open(f->read(f, String), "../run/wavelength.input")
+end
+
 function get_τ_max()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("tau_max", input_file)[end] + 1

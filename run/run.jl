@@ -8,7 +8,7 @@ function run()
     # LOAD WAVELENGTHS
     # ==================================================================
     println("\n--Loading wavelengths...")
-    λ = 499.86u"nm"
+    λ = 499.86u"nm" #get_λ()
 
     # ==================================================================
     # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY

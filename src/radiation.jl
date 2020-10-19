@@ -9,17 +9,6 @@ struct Radiation
 end
 
 """
-Calculates the Blackbody (Planck) function per wavelength, for given
-arrays of wavelength and temperature. Returns monochromatic intensity.
-Copied from Tiago, SSB
-"""
-function blackbody_lambda(λ::Unitful.Length,
-                          temperature::Unitful.Temperature)
-    (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
-end
-
-
-"""
 Returns a 3D array of the # of packets to be generated in each box.
 """
 function packets_per_box(atmosphere::Atmosphere,
@@ -40,7 +29,7 @@ function packets_per_box(atmosphere::Atmosphere,
     box_emission = zeros(Float64,nx,ny,nz)u"kW / sr / nm"
     packets = zeros(Int64,nx,ny,nz)
 
-    for box=1:total_boxes
+    @Threads.threads for box=1:total_boxes
         i = 1 + (box-1) ÷ (ny*nz)
         j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
         k = 1 + (box - (i-1)*ny*nz - 1) % nz
@@ -61,13 +50,26 @@ function packets_per_box(atmosphere::Atmosphere,
     return packets
 end
 
+
+"""
+Calculates the Blackbody (Planck) function per wavelength, for given
+arrays of wavelength and temperature. Returns monochromatic intensity.
+Copied from Tiago, SSB
+"""
+function blackbody_lambda(λ::Unitful.Length,
+                          temperature::Unitful.Temperature)
+    (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
+end
+
 """
 Collects radition data that will go into structure
 """
 function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
+    # Read from input file
     target_packets = get_target_packets()
     max_scatterings = get_max_scatterings()
     escape_bins = get_escape_bins()
+    # Calculate escapes per box
     S = packets_per_box(atmosphere, λ, target_packets)
     return S, max_scatterings, escape_bins
 end
