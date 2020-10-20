@@ -1,28 +1,32 @@
 include("../src/mcrt.jl")
 
 function run()
-
-    println("\n","-"^42,"\n MCRT calculation in the solar atmosphere \n","-"^42)
+    println("\n", "="^79, "\n", " "^18,
+            "MCRT SIMULATION IN A SOLAR ATMOSPHERE MODEL",
+            "\n", "="^79)
 
     # ==================================================================
     # LOAD WAVELENGTHS
     # ==================================================================
-    println("\n--Loading wavelengths...")
-    λ = 499.86u"nm" #get_λ()
+    print("\n--Loading wavelengths.......")
+    λ = get_λ()
+    println(@sprintf(" %d wavelength(s) loaded.", length(λ)))
 
     # ==================================================================
     # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
     # ==================================================================
-    println("--Loading atmosphere data...")
+    print("--Loading atmosphere data...")
     atmosphere_parameters = collect_atmosphere_data(λ)
     atmosphere = Atmosphere(atmosphere_parameters...)
+    println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_τ_max()))
 
     # ==================================================================
-    # LOAD RADIATION DATA
+    # LOAD RADIATION DATA AND CALCULATE # PACKETS
     # ==================================================================
-    println("--Loading radiation data...")
+    print("--Loading radiation data....")
     radiation_parameters = collect_radiation_data(atmosphere, λ)
     radiation = Radiation(λ, radiation_parameters...)
+    println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
 
     # ==================================================================
     # SIMULATION

@@ -1,4 +1,5 @@
-
+using DelimitedFiles
+using Unitful
 
 function output(S::Array{Int64,3},
                 J::Array{Int64,3},
@@ -18,7 +19,8 @@ function output(S::Array{Int64,3},
 end
 
 function get_λ()
-    input_file = open(f->read(f, String), "../run/wavelength.input")
+    λ = readdlm("../run/wavelengths.input", ' ')[1,:]u"nm"
+    return λ
 end
 
 function get_τ_max()
