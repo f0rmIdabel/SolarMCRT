@@ -1,6 +1,5 @@
 include("io.jl")
 using HDF5
-using Unitful
 using Transparency
 import PhysicalConstants.CODATA2018: c_0
 @derived_dimension NumberDensity Unitful.𝐋^-3
@@ -19,12 +18,12 @@ struct Atmosphere
     velocity_z::Array{<:Unitful.Velocity, 3}
     temperature::Array{<:Unitful.Temperature, 3}
 
-    # (λ, nx, ny, nz)
-    χ::Array{PerLength, 3}
-    ε::Array{Real, 3}
+    # (nλ, nx, ny, nz)
+    χ::Array{PerLength, 4}
+    ε::Array{Real, 4}
 
-    # (λ, nx, ny)
-    boundary::Array{Int64, 2}
+    # (nλ, nx, ny)
+    boundary::Array{UInt16, 3}
 end
 
 
@@ -36,7 +35,7 @@ end
 
 Reads atmosphere parameters and reworks them to fit simulation.
 """
-function collect_atmosphere_data(λ)
+function collect_atmosphere_data(λ::Array{<:Unitful.Length, 1})
 
     # ===========================================================
     # READ INPUT FILE
@@ -68,8 +67,14 @@ function collect_atmosphere_data(λ)
     ionised_hydrogen_density = hydrogen_populations[:,:,:,end]
     neutral_hydrogen_density = sum(hydrogen_populations, dims = 4) .- ionised_hydrogen_density
 
-    χ_a = χ_abs.(λ, temperature, electron_density, neutral_hydrogen_density, ionised_hydrogen_density)[:,:,:,1]
-    χ_s = χ_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
+    χ_a = Array{Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 4}(undef, length(λ), length(z), length(x), length(y))
+    χ_s = Array{Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 4}(undef, length(λ), length(z), length(x), length(y))
+
+    Threads.@threads for l=1:length(λ)
+        χ_a[l,:,:,:] = χ_abs.(λ[l], temperature, electron_density, neutral_hydrogen_density, ionised_hydrogen_density)
+        χ_s[l,:,:,:] = χ_scatt.(λ[l], electron_density, neutral_hydrogen_density)
+    end
+
     χ = χ_a .+ χ_s
     ε = χ_a ./ χ
 
@@ -82,8 +87,8 @@ function collect_atmosphere_data(λ)
     velocity_y = permutedims(velocity_y, [2,3,1])
     velocity_z = permutedims(velocity_z, [2,3,1])
     temperature = permutedims(temperature, [2,3,1])
-    χ = permutedims(χ, [2,3,1])
-    ε = permutedims(ε, [2,3,1])
+    χ = permutedims(χ, [1,3,4,2])
+    ε = permutedims(ε, [1,3,4,2])
 
     # Make sure x and y are increasing and z decreasing
     if x[1] > x[end]
@@ -92,8 +97,8 @@ function collect_atmosphere_data(λ)
         velocity_y = velocity_y[end:-1:1,:,:]
         velocity_z = velocity_z[end:-1:1,:,:]
         temperature = temperature[end:-1:1,:,:]
-        χ = χ[end:-1:1,:,:]
-        ε = ε[end:-1:1,:,:]
+        χ = χ[:,end:-1:1,:,:]
+        ε = ε[:,end:-1:1,:,:]
     end
 
     if y[1] > y[end]
@@ -102,8 +107,8 @@ function collect_atmosphere_data(λ)
         velocity_y = velocity_y[:,end:-1:1,:]
         velocity_z = velocity_z[:,end:-1:1,:]
         temperature = temperature[:,end:-1:1,:]
-        χ = χ[:,end:-1:1,:]
-        ε = ε[:,end:-1:1,:]
+        χ = χ[:,:,end:-1:1,:]
+        ε = ε[:,:,end:-1:1,:]
     end
 
     if z[1] < z[end]
@@ -112,8 +117,8 @@ function collect_atmosphere_data(λ)
         velocity_y = velocity_y[:,:,end:-1:1]
         velocity_z = velocity_z[:,:,end:-1:1]
         temperature = temperature[:,:,end:-1:1]
-        χ = χ[:,:,end:-1:1]
-        ε = ε[:,:,end:-1:1]
+        χ = χ[:,:,:,end:-1:1]
+        ε = ε[:,:,:,end:-1:1]
     end
 
     # Add endpoints for box calculations
@@ -132,16 +137,18 @@ function collect_atmosphere_data(λ)
     velocity_y = velocity_y[:,:,1:nz]
     velocity_z = velocity_z[:,:,1:nz]
     temperature = temperature[:,:,1:nz]
-    χ = χ[:,:,1:nz]
-    ε = ε[:,:,1:nz]
+    χ = χ[:,:,:,1:nz]
+    ε = ε[:,:,:,1:nz]
+
+    println(χ[1,1,1,:])
 
     return x, y, z, velocity_x, velocity_y, velocity_z,
            temperature, χ, ε, boundary
 end
 
-
 """
-From Tiago
+H- ff, H- bf, H ff, H2+ ff, H2+ bf
+Copied from Tiago
 """
 function χ_abs(λ::Unitful.Length,
                temperature::Unitful.Temperature,
@@ -158,7 +165,9 @@ function χ_abs(λ::Unitful.Length,
 end
 
 """
-From Tiago
+
+Thomson scattering, rayleigh scattering from hydrogen.
+Copied from Tiago
 """
 function χ_scatt(λ::Unitful.Length,
                  electron_density::NumberDensity,
@@ -176,12 +185,12 @@ end
 
 Returns 2D array containing the k-indices where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 4},
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
-    nx, ny, nz = size(χ)
+    nλ, nx, ny, nz = size(χ)
     columns = nx*ny
-    boundary = Array{Int64, 2}(undef, nx, ny)
+    boundary = Array{UInt16, 3}(undef, nλ, nx, ny)
 
     # Calculate vertical optical depth for each column
     Threads.@threads for col=1:columns
@@ -190,13 +199,14 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
 
         τ = 0
         k = 0
-
-        while τ < τ_max && k < ny
-            k += 1
-            # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
+        for l=1:nλ
+            while τ < τ_max && k < ny
+                k += 1
+                # Trapezoidal rule
+                τ += 0.5(z[k] - z[k+1]) * (χ[l,i,j,k] + χ[l,i,j,k+1])
+            end
+            boundary[l,i,j] = k
         end
-        boundary[i,j] = k
     end
 
     return boundary

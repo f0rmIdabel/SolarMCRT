@@ -5,6 +5,7 @@ using Printf
 using ProgressMeter
 using HDF5
 using Unitful
+#using StaticArrays
 
 """
 Simulates the radiation field in a given atmosphere with
@@ -34,12 +35,12 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    nx, ny, nz = size(χ)
+    nλ, nx, ny, nz = size(χ)
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = Tuple([zeros(Int64, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
-    J = Tuple([zeros(Int64, nx, ny, nz) for t in 1:Threads.nthreads() ])
+    surface_intensity = Tuple([zeros(UInt32, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
+    J = Tuple([zeros(UInt32, nx, ny, nz) for t in 1:Threads.nthreads() ])
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -53,79 +54,95 @@ function mcrt(atmosphere::Atmosphere,
             Threads.nthreads()))
 
     # Create ProgressMeter working with threads
-    p = Progress(total_boxes)
+    p = Progress(total_boxes*nλ)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
-    l = Threads.SpinLock()
+    ll = Threads.SpinLock()
 
-    # Go through all boxes
-    Threads.@threads for box in 1:total_boxes
+    for l=1:nλ
+        # Go through all boxes
+        Threads.@threads for box in 1:total_boxes
 
-        # Advance ProgressMeter
-        Threads.atomic_add!(jj, 1)
-        Threads.lock(l)
-        update!(p, jj[])
-        Threads.unlock(l)
+            # Advance ProgressMeter
+            Threads.atomic_add!(jj, 1)
+            Threads.lock(ll)
+            update!(p, jj[])
+            Threads.unlock(ll)
 
-        # Find (x,y,z) indices of box
-        i = 1 + (box-1) ÷ (ny*nz)
-        j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
-        k = 1 + (box - (i-1)*ny*nz - 1) % nz
 
-        # Packets in box
-        packets = S[i,j,k]
+            # Find (x,y,z) indices of box
+            k = 1 + (box-1) ÷ (ny*nx)
+            j = 1 + (box - (k-1)*ny*nx - 1) ÷ nx
+            i = 1 + (box - (k-1)*ny*nx - 1) % nx
 
-        if packets < 1
-            continue
-        end
+            # Packets in box
+            packets = S[l,i,j,k]
 
-        # Dimensions of box
-        corner = [x[i], y[j], z[k]]
-        box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
+            if packets < 1
+                continue
+            end
 
-        for packet=1:packets
+            # Dimensions of box
+            corner = [x[i], y[j], z[k]]
+            box_dim = [x[i+1], y[j+1], z[k+1]] .- corner
+            #corner = SA[x[i], y[j], z[k]]
+            #box_dim = SA[x[i+1], y[j+1], z[k+1]] .- corner
 
-            # Initial box
-            box_id = [i,j,k]
+            for packet=1:packets
 
-            # Initial position uniformely drawn from box
-            r = corner .+ (box_dim .* rand(rng[Threads.threadid()],3))
+                # Initial box
+                #box_id = SVector{3, UInt16}([i,j,k])
+                box_id = UInt16.([i,j,k])
 
-            # Scatter each packet until destroyed,
-            # escape or reach max_scatterings
-            for s=1:Int(max_scatterings)
+                # Initial position uniformely drawn from box
+                r = corner .+ (box_dim .* rand(rng[Threads.threadid()],3))
+                #r =SVector{3, Float64}(corner .+ (box_dim .* rand(rng[Threads.threadid()],3)))
 
-                Threads.atomic_add!(total_scatterings, 1)
+                # Scatter each packet until destroyed,
+                # escape or reach max_scatterings
+                for s=1:Int(max_scatterings)
 
-                # Scatter packet once
-                box_id, r, lost = scatter_packet(x, y, z, χ, boundary,
-                                                 box_id, r,
-                                                 J[Threads.threadid()],
-                                                 surface_intensity[Threads.threadid()],
-                                                 rng[Threads.threadid()],
-                                                 num_bins)
-                # Check if escaped or lost in bottom
-                if lost
-                    break
-                # Check if destroyed in next particle interaction
-                elseif rand(rng[Threads.threadid()]) < ε[box_id...]
-                    Threads.atomic_add!(total_destroyed, 1)
-                    break
+                    Threads.atomic_add!(total_scatterings, 1)
+
+                    # Scatter packet once
+                    box_id, r, lost = scatter_packet(x, y, z, χ[l,:,:,:], boundary[l,:,:],
+                                                     box_id, r,
+                                                     J[Threads.threadid()],
+                                                     surface_intensity[Threads.threadid()],
+                                                     rng[Threads.threadid()],
+                                                     num_bins)
+                    # Check if escaped or lost in bottom
+                    if lost
+                        break
+                    # Check if destroyed in next particle interaction
+                    elseif rand(rng[Threads.threadid()]) < ε[box_id...]
+                        Threads.atomic_add!(total_destroyed, 1)
+                        break
+                    end
                 end
             end
         end
+
+        # Collect results from all threads
+        surface_intensity = reduce(+, surface_intensity)
+        J = reduce(+, J)
+        J = J .+ S
+
+        # ===================================================================
+        # WRITE TO FILE
+        # ===================================================================
+        println("\n--Writing results to file...\n")
+        output(S[l,:,:,:], J, surface_intensity, total_destroyed.value, total_scatterings.value)
+
+        # Put field to zero for next λ
+        for t=1:Threads.nthreads()
+            fill!(J[t],0)
+            fill!(surface_intensity[t], 0)
+        end
+        total_destroyed = Threads.Atomic{Int64}(0)
+        total_scatterings = Threads.Atomic{Int64}(0)
+
     end
-
-    # Collect results from all threads
-    surface_intensity = reduce(+, surface_intensity)
-    J = reduce(+, J)
-    J = J .+ S
-
-    # ===================================================================
-    # WRITE TO FILE
-    # ===================================================================
-    println("\n--Writing results to file...\n")
-    output(S, J, surface_intensity, total_destroyed.value, total_scatterings.value)
 
 end
 
@@ -137,15 +154,16 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
                         χ::Array{PerLength, 3},
-                        boundary::Array{Int64, 2},
-                        box_id::Array{Int64,1},
-                        r::Array{<:Unitful.Length, 1},
-                        J::Array{Int64, 3},
-                        surface_intensity::Array{Int64,4},
+                        boundary::Array{UInt16, 2},
+                        box_id::Array{UInt16,1}, #SArray{3,UInt16}
+                        r::Array{<:Unitful.Length, 1}, #SArray{3,Float64}
+                        J::Array{UInt32, 3},
+                        surface_intensity::Array{UInt32,4},
                         rng::MersenneTwister,
-                        num_bins::Array{Int64, 1})
+                        num_bins::Array{UInt16, 1})
 
     # Keep track of status
+    #lost::Bool = false
     lost = false
 
     # Useful quantities
@@ -163,8 +181,8 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     θ =  π * rand(rng)
 
     # Find direction
-    unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)]
-    direction = Int.(sign.(unit_vector))
+    unit_vector = [sin(θ)*cos(ϕ), sin(θ)*sin(ϕ), cos(θ)] #SA
+    direction = Int.(sign.(unit_vector)) #SArray{3}(Int.(sign.(unit_vector)))
     direction[3] = -direction[3] # because height array up->down
 
     # ===================================================================

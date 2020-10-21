@@ -1,9 +1,9 @@
 using DelimitedFiles
 using Unitful
 
-function output(S::Array{Int64,3},
-                J::Array{Int64,3},
-                surface_intensity::Array{Int64,4},
+function output(S::Array{UInt32,3},
+                J::Array{UInt32,3},
+                surface_intensity::Array{UInt32,4},
                 total_destroyed::Int64,
                 total_scatterings::Int64)
     out = h5open("../out/output.hdf5", "w")
@@ -14,7 +14,6 @@ function output(S::Array{Int64,3},
     write(out, "total_destroyed", total_destroyed)
     write(out, "total_escaped", sum(surface_intensity))
     write(out, "total_scatterings", total_scatterings)
-    write(out, "SNR", sqrt(maximum(surface_intensity)))
     close(out)
 end
 
@@ -69,10 +68,10 @@ function get_escape_bins()
     file = input_file[i:end]
     i = findfirst("[", file)[end] + 1
     j = findfirst(",", file)[end] - 1
-    ϕ_bin = parse(Int64, file[i:j])
+    ϕ_bin = parse(UInt16, file[i:j])
     i = j + 2
     j = findfirst("]", file)[end] - 1
-    θ_bin = parse(Int64, file[i:j])
-    escape_bins = [ϕ_bin, θ_bin]
+    θ_bin = parse(UInt16, file[i:j])
+    escape_bins = [ϕ_bin, θ_bin] #SA[ϕ_bin, θ_bin]
     return escape_bins
 end
