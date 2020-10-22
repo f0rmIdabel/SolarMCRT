@@ -8,7 +8,7 @@ struct Radiation
     S::Array{UInt32,4}
     max_scatterings::Real
     # (2)
-    escape_bins::Array{UInt16,1}
+    escape_bins::Array{UInt16,1}  ##SArray{2,UInt16}
 end
 
 """

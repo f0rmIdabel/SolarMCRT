@@ -1,5 +1,6 @@
 using DelimitedFiles
 using Unitful
+#using StaticArrays
 
 function output(S::Array{UInt32,3},
                 J::Array{UInt32,3},

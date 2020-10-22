@@ -39,8 +39,8 @@ function mcrt(atmosphere::Atmosphere,
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = Tuple([zeros(UInt32, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
-    J = Tuple([zeros(UInt32, nx, ny, nz) for t in 1:Threads.nthreads() ])
+    surface_intensity = Tuple([Array{UInt32,4}(undef, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
+    J = Tuple([Array{UInt32,3}(undef, nx, ny, nz) for t in 1:Threads.nthreads() ])
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -60,8 +60,18 @@ function mcrt(atmosphere::Atmosphere,
     ll = Threads.SpinLock()
 
     for l=1:nλ
+
+        # Put field to zero for each λ
+        for t=1:Threads.nthreads()
+            fill!(J[t],0)
+            fill!(surface_intensity[t], 0)
+        end
+        total_destroyed = Threads.Atomic{Int64}(0)
+        total_scatterings = Threads.Atomic{Int64}(0)
+
         # Go through all boxes
-        Threads.@threads for box in 1:total_boxes
+        Threads.@threads for box=1:total_boxes
+            println(box)
 
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
@@ -69,11 +79,10 @@ function mcrt(atmosphere::Atmosphere,
             update!(p, jj[])
             Threads.unlock(ll)
 
-
             # Find (x,y,z) indices of box
-            k = 1 + (box-1) ÷ (ny*nx)
-            j = 1 + (box - (k-1)*ny*nx - 1) ÷ nx
-            i = 1 + (box - (k-1)*ny*nx - 1) % nx
+            i = 1 + (box-1) ÷ (ny*nz)
+            j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
+            k = 1 + (box - (i-1)*ny*nz - 1) % nz
 
             # Packets in box
             packets = S[l,i,j,k]
@@ -96,7 +105,7 @@ function mcrt(atmosphere::Atmosphere,
 
                 # Initial position uniformely drawn from box
                 r = corner .+ (box_dim .* rand(rng[Threads.threadid()],3))
-                #r =SVector{3, Float64}(corner .+ (box_dim .* rand(rng[Threads.threadid()],3)))
+                #r = SVector{3, Float64}(corner .+ (box_dim .* rand(rng[Threads.threadid()],3)))
 
                 # Scatter each packet until destroyed,
                 # escape or reach max_scatterings
@@ -115,10 +124,12 @@ function mcrt(atmosphere::Atmosphere,
                     if lost
                         break
                     # Check if destroyed in next particle interaction
-                    elseif rand(rng[Threads.threadid()]) < ε[box_id...]
+                    elseif rand(rng[Threads.threadid()]) < ε[l, box_id...]
                         Threads.atomic_add!(total_destroyed, 1)
                         break
                     end
+
+
                 end
             end
         end
@@ -126,21 +137,13 @@ function mcrt(atmosphere::Atmosphere,
         # Collect results from all threads
         surface_intensity = reduce(+, surface_intensity)
         J = reduce(+, J)
-        J = J .+ S
+        J = J .+ S[l,:,:,:]
 
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
         println("\n--Writing results to file...\n")
         output(S[l,:,:,:], J, surface_intensity, total_destroyed.value, total_scatterings.value)
-
-        # Put field to zero for next λ
-        for t=1:Threads.nthreads()
-            fill!(J[t],0)
-            fill!(surface_intensity[t], 0)
-        end
-        total_destroyed = Threads.Atomic{Int64}(0)
-        total_scatterings = Threads.Atomic{Int64}(0)
 
     end
 
@@ -163,8 +166,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         num_bins::Array{UInt16, 1})
 
     # Keep track of status
-    #lost::Bool = false
-    lost = false
+    lost::Bool = false
 
     # Useful quantities
     side_dim = size(boundary)

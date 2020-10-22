@@ -140,8 +140,6 @@ function collect_atmosphere_data(λ::Array{<:Unitful.Length, 1})
     χ = χ[:,:,:,1:nz]
     ε = ε[:,:,:,1:nz]
 
-    println(χ[1,1,1,:])
-
     return x, y, z, velocity_x, velocity_y, velocity_z,
            temperature, χ, ε, boundary
 end
@@ -159,8 +157,8 @@ function χ_abs(λ::Unitful.Length,
     α = Transparency.hminus_ff_stilley(λ, temperature, h_ground_density, electron_density)
     α += Transparency.hminus_bf_geltman(λ, temperature, h_ground_density, electron_density)
     α += hydrogenic_ff(c_0 / λ, temperature, electron_density, proton_density, 1)
-    α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
-    α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
+    #α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
+    #α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
     return α
 end
 
