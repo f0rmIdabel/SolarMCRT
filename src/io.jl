@@ -18,11 +18,14 @@ function output(S::Array{UInt32,3},
     close(out)
 end
 
+<<<<<<< HEAD
 function get_λ()
     λ = readdlm("../run/wavelengths.input", ' ')[1,:]u"nm"
     return λ
 end
 
+=======
+>>>>>>> parent of a9dacc3... Push before major changes
 function get_τ_max()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("tau_max", input_file)[end] + 1

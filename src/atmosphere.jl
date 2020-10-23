@@ -26,8 +26,67 @@ struct Atmosphere
     boundary::Array{UInt16, 3}
 end
 
+"""
+From Tiago
+"""
+function α_abs(λ::Unitful.Length,
+               temperature::Unitful.Temperature,
+               electron_density::NumberDensity,
+               h_ground_density::NumberDensity,
+               proton_density::NumberDensity)
 
+    α = Transparency.hminus_ff_stilley(λ, temperature, h_ground_density, electron_density)
+    α += Transparency.hminus_bf_geltman(λ, temperature, h_ground_density, electron_density)
+    α += hydrogenic_ff(c_0 / λ, temperature, electron_density, proton_density, 1)
+    α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
+    α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
+    return α
+end
 
+"""
+From Tiago
+"""
+function α_scatt(λ::Unitful.Length,
+                 electron_density::NumberDensity,
+                 h_ground_density::NumberDensity)
+
+    α = thomson(electron_density)
+    α += rayleigh_h(λ, h_ground_density)
+    return α
+end
+
+"""
+    function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                    z::Array{<:Unitful.Length, 1},
+                                    τ_max::Real)
+
+Returns 2D array containing the k-indices where the optical depth reaches τ_max.
+"""
+function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                                z::Array{<:Unitful.Length, 1},
+                                τ_max::Real)
+    nx, ny, nz = size(χ)
+    columns = nx*ny
+    boundary = Array{Int, 2}(undef, nx, ny)
+
+    # Calculate vertical optical depth for each column
+    Threads.@threads for col=1:columns
+        i = 1 + (col-1)÷ny
+        j = col - (i-1)*ny
+
+        τ = 0
+        k = 0
+
+        while τ < τ_max && k < ny
+            k += 1
+            # Trapezoidal rule
+            τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
+        end
+        boundary[i,j] = k
+    end
+
+    return boundary
+end
 
 """
    function get_atmosphere_data(atmos_data,
@@ -62,11 +121,13 @@ function collect_atmosphere_data(λ::Array{<:Unitful.Length, 1})
     close(atmos)
 
     # ===========================================================
-    # CALCULATE ϵ and χ
+    # RE-WORK PARAMETERS TO FIT SIMULATION
     # ===========================================================
+    # Calculate epsilon and chi
     ionised_hydrogen_density = hydrogen_populations[:,:,:,end]
     neutral_hydrogen_density = sum(hydrogen_populations, dims = 4) .- ionised_hydrogen_density
 
+<<<<<<< HEAD
     χ_a = Array{Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 4}(undef, length(λ), length(z), length(x), length(y))
     χ_s = Array{Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 4}(undef, length(λ), length(z), length(x), length(y))
 
@@ -81,6 +142,12 @@ function collect_atmosphere_data(λ::Array{<:Unitful.Length, 1})
     # ===========================================================
     # RE-WORK DIMENSIONS TO FIT SIMULATION
     # ===========================================================
+=======
+    χ_abs = α_abs.(λ, temperature, electron_density, neutral_hydrogen_density, ionised_hydrogen_density)[:,:,:,1]
+    χ_scatt = α_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
+    χ = χ_abs .+ χ_scatt
+    ε = χ_abs ./ χ
+>>>>>>> parent of a9dacc3... Push before major changes
 
     # Transpose all 3D-space arrays,(k,i,j) -> (i,j,k)
     velocity_x = permutedims(velocity_x, [2,3,1])
@@ -143,6 +210,7 @@ function collect_atmosphere_data(λ::Array{<:Unitful.Length, 1})
     return x, y, z, velocity_x, velocity_y, velocity_z,
            temperature, χ, ε, boundary
 end
+<<<<<<< HEAD
 
 """
 H- ff, H- bf, H ff, H2+ ff, H2+ bf
@@ -209,3 +277,5 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
 
     return boundary
 end
+=======
+>>>>>>> parent of a9dacc3... Push before major changes
