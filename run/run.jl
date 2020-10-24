@@ -8,14 +8,9 @@ function run()
     # ==================================================================
     # LOAD WAVELENGTHS
     # ==================================================================
-<<<<<<< HEAD
     print("\n--Loading wavelengths......................")
-    λ = get_λ()
+    λ = get_λ()[1]
     println(@sprintf(" %d wavelength(s) loaded.", length(λ)))
-=======
-    println("\n--Loading wavelengths...")
-    λ = 499.86u"nm"
->>>>>>> parent of a9dacc3... Push before major changes
 
     # ==================================================================
     # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
