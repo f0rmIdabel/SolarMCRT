@@ -1,10 +1,21 @@
 using DelimitedFiles
 using Unitful
+using HDF5
+using Transparency
+import PhysicalConstants.CODATA2018: c_0, h, k_B
+using Random
+using Future # for randjump in rng when using threads
+using Printf
+using ProgressMeter
+#import PhysicalConstants.CODATA2018: c_0
+@derived_dimension NumberDensity Unitful.𝐋^-3
+@derived_dimension PerLength Unitful.𝐋^-1
+
 #using StaticArrays
 
-function output(S::Array{UInt32,3},
-                J::Array{UInt32,3},
-                surface_intensity::Array{UInt32,4},
+function output(S::Array{Int64,3},
+                J::Array{Int64,3},
+                surface_intensity::Array{Int64,4},
                 total_destroyed::Int64,
                 total_scatterings::Int64)
     out = h5open("../out/output.hdf5", "w")
@@ -22,7 +33,6 @@ function get_λ()
     λ = readdlm("../run/wavelengths.input", ' ')[1,:]u"nm"
     return λ
 end
-
 
 function get_τ_max()
     input_file = open(f->read(f, String), "../run/keywords.input")

@@ -1,10 +1,4 @@
 include("io.jl")
-using HDF5
-using Unitful
-using Transparency
-import PhysicalConstants.CODATA2018: c_0
-@derived_dimension NumberDensity Unitful.𝐋^-3
-@derived_dimension PerLength Unitful.𝐋^-1
 
 struct Atmosphere
     # Dimensions - position of box edges
@@ -24,7 +18,7 @@ struct Atmosphere
     ε::Array{Real, 3}
 
     # (λ, nx, ny)
-    boundary::Array{UInt32, 2}
+    boundary::Array{Int64, 2}
 end
 
 
@@ -48,7 +42,7 @@ function collect_atmosphere_data(λ)
 
     x = read(atmos, "x")u"m"
     y = read(atmos, "y")u"m"
-    z = read(atmos, "z")[:,1]u"m"
+    z = read(atmos, "z")[:,1]u"m"  # slice due to snapshot
 
     velocity_x = read(atmos, "velocity_x")[:,:,:,1]u"m/s"
     velocity_y = read(atmos, "velocity_y")[:,:,:,1]u"m/s"
@@ -65,6 +59,7 @@ function collect_atmosphere_data(λ)
     ionised_hydrogen_density = hydrogen_populations[:,:,:,end]
     neutral_hydrogen_density = sum(hydrogen_populations, dims = 4) .- ionised_hydrogen_density
 
+    # slice for λ, change later
     χ_a = χ_abs.(λ, temperature, electron_density, neutral_hydrogen_density, ionised_hydrogen_density)[:,:,:,1]
     χ_s = χ_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
     χ = χ_a .+ χ_s
@@ -199,7 +194,7 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
                                 τ_max::Real)
     nx, ny, nz = size(χ)
     columns = nx*ny
-    boundary = Array{UInt32, 2}(undef, nx, ny)
+    boundary = Array{Int64, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
     Threads.@threads for col=1:columns

@@ -3,7 +3,7 @@ import PhysicalConstants.CODATA2018: c_0, h, k_B
 
 struct Radiation
     λ::Unitful.Length
-    S::Array{UInt32,3}
+    S::Array{Int64,3}
     max_scatterings::Real
     escape_bins::Array{Int64,1}
 end
@@ -27,7 +27,7 @@ function packets_per_box(atmosphere::Atmosphere,
 
     box_emissivity = blackbody_lambda.(λ, temperature) .* χ
     box_emission = zeros(Float64,nx,ny,nz)u"kW / sr / nm"
-    packets = zeros(UInt32,nx,ny,nz)
+    packets = zeros(Int64,nx,ny,nz)
 
     @Threads.threads for box=1:total_boxes
         i = 1 + (box-1) ÷ (ny*nz)

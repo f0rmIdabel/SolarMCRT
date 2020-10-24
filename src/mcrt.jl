@@ -38,8 +38,8 @@ function mcrt(atmosphere::Atmosphere,
     total_boxes = nx*ny*nz
 
     # Initialise variables
-    surface_intensity = Tuple([zeros(UInt32, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
-    J = Tuple([zeros(UInt32, nx, ny, nz) for t in 1:Threads.nthreads() ])
+    surface_intensity = Tuple([zeros(Int64, nx, ny, num_bins...) for t in 1:Threads.nthreads()])
+    J = Tuple([zeros(Int64, nx, ny, nz) for t in 1:Threads.nthreads() ])
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -68,9 +68,13 @@ function mcrt(atmosphere::Atmosphere,
         Threads.unlock(l)
 
         # Find (x,y,z) indices of box
-        i = 1 + (box-1) ÷ (ny*nz)
-        j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
-        k = 1 + (box - (i-1)*ny*nz - 1) % nz
+        #i = 1 + (box-1) ÷ (ny*nz)
+        #j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
+        #k = 1 + (box - (i-1)*ny*nz - 1) % nz
+
+        k = 1 + (box-1) ÷ (ny*nx)
+        j = 1 + (box - (k-1)*ny*nx - 1) ÷ nx
+        i = 1 + (box - (k-1)*ny*nx - 1) % nx
 
         # Packets in box
         packets = S[i,j,k]
@@ -137,11 +141,11 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
                         χ::Array{PerLength, 3},
-                        boundary::Array{UInt32, 2},
+                        boundary::Array{Int64, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{UInt32, 3},
-                        surface_intensity::Array{UInt32,4},
+                        J::Array{Int64, 3},
+                        surface_intensity::Array{Int64,4},
                         rng::MersenneTwister,
                         num_bins::Array{Int64, 1})
 
