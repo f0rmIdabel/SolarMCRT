@@ -1,16 +1,18 @@
-using DelimitedFiles
-using Unitful
-using HDF5
-using Transparency
 import PhysicalConstants.CODATA2018: c_0, h, k_B
-using Random
-using Future # for randjump in rng when using threads
-using Printf
+using DelimitedFiles
 using ProgressMeter
-#import PhysicalConstants.CODATA2018: c_0
+using Transparency
+using StaticArrays
+using Unitful
+using Future
+using Random
+using Printf
+using HDF5
+
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 
+#using Future # for randjump in rng when using threads
 #using StaticArrays
 
 function output(S::Array{Int64,3},

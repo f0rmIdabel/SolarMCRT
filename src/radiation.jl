@@ -1,5 +1,4 @@
 include("atmosphere.jl")
-import PhysicalConstants.CODATA2018: c_0, h, k_B
 
 struct Radiation
     λ::Unitful.Length
@@ -21,18 +20,17 @@ function packets_per_box(atmosphere::Atmosphere,
     temperature = atmosphere.temperature
     boundary = atmosphere.boundary
 
-    nx, ny = size(boundary)
-    nz = maximum(boundary)
-    total_boxes = nx*ny*nz
+    nz, nx, ny = size(χ)
+    total_boxes = nz*nx*ny
 
     box_emissivity = blackbody_lambda.(λ, temperature) .* χ
-    box_emission = zeros(Float64,nx,ny,nz)u"kW / sr / nm"
-    packets = zeros(Int64,nx,ny,nz)
+    box_emission = zeros(Float64,nz,nx,ny)u"kW / sr / nm"
+    packets = zeros(Int64,nz,nx,ny)
 
     @Threads.threads for box=1:total_boxes
-        i = 1 + (box-1) ÷ (ny*nz)
-        j = 1 + (box - (i-1)*ny*nz - 1) ÷ nz
-        k = 1 + (box - (i-1)*ny*nz - 1) % nz
+        j = 1 + (box-1) ÷ (nx*nz)
+        i = 1 + (box - (j-1)*nx*nz - 1) ÷ nz
+        k = 1 + (box - (j-1)*nx*nz - 1) % nz
 
         # Skip boxes beneath boundary
         if k > boundary[i,j]
@@ -40,7 +38,7 @@ function packets_per_box(atmosphere::Atmosphere,
         end
 
         box_volume = (x[i+1] - x[i])*(y[j+1] - y[j])*(z[k] - z[k+1])
-        box_emission[i,j,k] = box_emissivity[i,j,k]*box_volume
+        box_emission[k,i,j] = box_emissivity[k,i,j]*box_volume
     end
 
     total_emission = sum(box_emission)

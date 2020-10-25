@@ -69,17 +69,9 @@ function collect_atmosphere_data(λ)
     # RE-WORK DIMENSIONS TO FIT SIMULATION
     # ===========================================================
 
-    # Transpose all 3D-space arrays,(k,i,j) -> (i,j,k)
-    velocity_x = permutedims(velocity_x, [2,3,1])
-    velocity_y = permutedims(velocity_y, [2,3,1])
-    velocity_z = permutedims(velocity_z, [2,3,1])
-    temperature = permutedims(temperature, [2,3,1])
-    χ = permutedims(χ, [2,3,1])
-    ε = permutedims(ε, [2,3,1])
-
     # Make sure x and y are increasing and z decreasing
-    if x[1] > x[end]
-        x = reverse(x)
+    if z[1] < z[end]
+        z = reverse(z)
         velocity_x = velocity_x[end:-1:1,:,:]
         velocity_y = velocity_y[end:-1:1,:,:]
         velocity_z = velocity_z[end:-1:1,:,:]
@@ -88,8 +80,8 @@ function collect_atmosphere_data(λ)
         ε = ε[end:-1:1,:,:]
     end
 
-    if y[1] > y[end]
-        y = reverse(y)
+    if x[1] > x[end]
+        x = reverse(x)
         velocity_x = velocity_x[:,end:-1:1,:]
         velocity_y = velocity_y[:,end:-1:1,:]
         velocity_z = velocity_z[:,end:-1:1,:]
@@ -98,8 +90,8 @@ function collect_atmosphere_data(λ)
         ε = ε[:,end:-1:1,:]
     end
 
-    if z[1] < z[end]
-        z = reverse(z)
+    if y[1] > y[end]
+        y = reverse(y)
         velocity_x = velocity_x[:,:,end:-1:1]
         velocity_y = velocity_y[:,:,end:-1:1]
         velocity_z = velocity_z[:,:,end:-1:1]
@@ -109,9 +101,9 @@ function collect_atmosphere_data(λ)
     end
 
     # Add endpoints for box calculations
+    z = push!(z, 2*z[end] - z[end-1])
     x = push!(x, 2*x[end] - x[end-1])
     y = push!(y, 2*y[end] - y[end-1])
-    z = push!(z, 2*z[end] - z[end-1])
 
     # ===========================================================
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
@@ -120,12 +112,12 @@ function collect_atmosphere_data(λ)
 
     nz = maximum(boundary)
     z = z[1:nz+1]
-    velocity_x = velocity_x[:,:,1:nz]
-    velocity_y = velocity_y[:,:,1:nz]
-    velocity_z = velocity_z[:,:,1:nz]
-    temperature = temperature[:,:,1:nz]
-    χ = χ[:,:,1:nz]
-    ε = ε[:,:,1:nz]
+    velocity_x = velocity_x[1:nz,:,:]
+    velocity_y = velocity_y[1:nz,:,:]
+    velocity_z = velocity_z[1:nz,:,:]
+    temperature = temperature[1:nz,:,:]
+    χ = χ[1:nz,:,:]
+    ε = ε[1:nz,:,:]
 
     return x, y, z, velocity_x, velocity_y, velocity_z,
            temperature, χ, ε, boundary
@@ -160,23 +152,21 @@ function χ_scatt(λ::Unitful.Length,
     return α
 end
 
-function optical_depth(χ,
-                       z,
-                       boundary)
-    nx, ny, nz = size(χ)
+function optical_depth(χ, z)
+    nz, nx, ny = size(χ)
     columns = nx*ny
 
-    τ = Array{Float64,3}(undef, nx, ny, nz)
+    τ = Array{Float64,3}(undef, nz-1, nx, ny)
 
     # Calculate vertical optical depth for each column
     Threads.@threads for col=1:columns
-        i = 1 + (col-1)÷ny
-        j = col - (i-1)*ny
+        j = 1 + (col-1)÷nx
+        i = col - (j-1)*nx
 
-        τ[i,j,1] = 0.5(z[1] - z[2]) * (χ[i,j,1] + χ[i,j,2])
+        τ[1,i,j] = 0.5(z[1] - z[2]) * (χ[1,i,j] + χ[2,i,j])
 
-        for k=2:boundary[i,j]-1
-            τ[i,j,k] =  τ[i,j,k-1] + 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
+        for k=2:nz-1
+            τ[k,i,j] =  τ[k-1,i,j] + 0.5(z[k] - z[k+1]) * (χ[k,i,j] + χ[k+1,i,j])
         end
     end
 
@@ -192,22 +182,22 @@ Returns 2D array containing the k-indices where the optical depth reaches τ_max
 function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
-    nx, ny, nz = size(χ)
+    nz, nx, ny = size(χ)
     columns = nx*ny
     boundary = Array{Int64, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
     Threads.@threads for col=1:columns
-        i = 1 + (col-1)÷ny
-        j = col - (i-1)*ny
+        j = 1 + (col-1)÷nx
+        i = col - (j-1)*nx
 
         τ = 0
         k = 0
 
-        while τ < τ_max && k < ny
+        while τ < τ_max && k < nz
             k += 1
             # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (χ[i,j,k] + χ[i,j,k+1])
+            τ += 0.5(z[k] - z[k+1]) * (χ[k,i,j] + χ[k+1,i,j])
         end
         boundary[i,j] = k
     end
