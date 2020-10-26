@@ -5,7 +5,10 @@ using Plots
 
 function feautrier()
     λ = 500u"nm"
-    μ = [1.0]
+    μ = [-0.9815606342467192506906  -0.9041172563704748566785  -0.769902674194304687037
+         -0.5873179542866174472967  -0.3678314989981801937527  -0.1252334085114689154724
+          0.1252334085114689154724   0.3678314989981801937527   0.5873179542866174472967
+          0.7699026741943046870369   0.9041172563704748566785   0.9815606342467192506906] ./2.0 .+ 0.5
 
     atmosphere_parameters = collect_atmosphere_data(λ)
     atmosphere = Atmosphere(atmosphere_parameters...)
@@ -24,7 +27,7 @@ function feautrier()
     D = Array{Float64,1}(undef,nz-1)
     E = Array{Float64,1}(undef,nz-1) * u"kW / m^2 / sr / nm"
     P = Array{Float64,1}(undef,nz) * u"kW / m^2 / sr / nm"
-    #Pμ = Array{Float64,2}(undef,nμ, nz) * u"kW / m^2 / sr / nm"
+    Pμ = Array{Float64,2}(undef,nμ, nz) * u"kW / m^2 / sr / nm"
     J = Array{Float64,3}(undef,nz, nx, ny) * u"kW / m^2 / sr / nm"
     for j=1:ny
         for i=1:nx
@@ -33,13 +36,11 @@ function feautrier()
                 P[end] = forward(D, E, S[:,i,j], τ[:,i,j], μ[m])
                 backward(P, D, E)
 
-                #Pμ[m,:] = P
+                Pμ[m,:] = P
             end
-            #J[:,i,j] = quadrature(Pμ, μ)
-            J[:,i,j] = P
+            J[:,i,j] .= quadrature(Pμ, μ)
         end
     end
-
 
     surface = ustrip(J[1,:,:])
     # To avoid ssh display problems
@@ -83,18 +84,19 @@ end
 
 function quadrature(P, μ)
 
+    nμ, nz = size(P)
+    J = zeros(nz) * u"kW / m^2 / sr / nm"
+
+    w = [0.0471753363865118271946  0.1069393259953184309603  0.1600783285433462263347  0.2031674267230659217491
+         0.233492536538354808761   0.2491470458134027850006  0.2491470458134027850006  0.233492536538354808761
+         0.203167426723065921749   0.160078328543346226335   0.1069393259953184309603  0.0471753363865118271946] ./2
+
     for i=1:nμ
-        J += w[i]*P[i]
+        J = J .+ w[i]*P[i,:]
     end
 
-    -0.5773502691896257645092
-    0.5773502691896257645092
+    return J
 
 end
-
-
-"""
-Returns 2D array containing the k-indices where the optical depth.
-"""
 
 feautrier()
