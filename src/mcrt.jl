@@ -164,7 +164,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # Next face cross in all dimensions
     next_edge = (direction .> 0) .+ box_id
 
-    # Distance to next face cross in all dimensions
+    """# Distance to next face cross in all dimensions
     distance = ([z[next_edge[1]],
                  x[next_edge[2]],
                  y[next_edge[3]]] .- r) ./unit_vector
@@ -174,6 +174,11 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     ds = distance[face]
 
     # Update optical depth and position
+    τ_cum = ds * χ[box_id...]
+    r += ds * unit_vector"""
+    face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
+                             r, unit_vector)
+
     τ_cum = ds * χ[box_id...]
     r += ds * unit_vector
 
@@ -218,8 +223,15 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         # Add to radiation field
         J[box_id...] += 1
 
+        face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
+                                 r, unit_vector)
+
+        τ_cum += ds * χ[box_id...]
+        r += ds * unit_vector
+
+
         # Distance to next face cross in all dimensions
-        distance = ([z[next_edge[1]],
+        """distance = ([z[next_edge[1]],
                      x[next_edge[2]],
                      y[next_edge[3]]] .- r) ./unit_vector
 
@@ -229,7 +241,8 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 
         # Update optical depth and position
         τ_cum += ds*χ[box_id...]
-        r += ds*unit_vector
+        r += ds*unit_vector"""
+
     end
 
     # ===================================================================
@@ -240,4 +253,18 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     end
 
     return box_id, r, lost
+end
+
+
+
+function closest_edge(next_edges, r, unit_vector)
+
+    # Distance to next face cross in all dimensions
+    distance = (next_edges .- r) ./unit_vector
+
+    # Closest face cross
+    face = argmin(distance)
+    ds = distance[face]
+
+    return face, ds
 end

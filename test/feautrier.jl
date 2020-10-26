@@ -21,8 +21,6 @@ function feautrier()
     nμ = length(μ)
 
     P = Array{Float64,1}(undef,nz)
-    nx = ny = 50
-
     D = Array{Float64,1}(undef,nz-1)
     E = Array{Float64,1}(undef,nz-1) * u"kW / m^2 / sr / nm"
     P = Array{Float64,1}(undef,nz) * u"kW / m^2 / sr / nm"
@@ -40,7 +38,6 @@ function feautrier()
             #J[:,i,j] = quadrature(Pμ, μ)
             J[:,i,j] = P
         end
-        println(j)
     end
 
 
@@ -49,8 +46,7 @@ function feautrier()
     ENV["GKSwstype"]="nul"
     heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
     plot!(size=(410,400))
-    fig = @sprintf("/mn/stornext/u3/idarhan/MScProject/Analysis/bf_tau%.1f_pcts%.0e_bin%s",
-                   τ_max, total_packets, string(bin))
+    fig = "/mn/stornext/u3/idarhan/MScProject/Analysis/feautrier"
     png(fig)
 
 
