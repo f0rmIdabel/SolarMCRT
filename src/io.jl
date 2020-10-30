@@ -4,7 +4,6 @@ using ProgressMeter
 using Transparency
 using StaticArrays
 using Unitful
-using Future
 using Random
 using Printf
 using HDF5
@@ -12,9 +11,9 @@ using HDF5
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 
-#using Future # for randjump in rng when using threads
-#using StaticArrays
-
+"""
+Writes the output from the MC simulation to a HDF5 file.
+"""
 function output(S::Array{Int64,3},
                 J::Array{Int64,3},
                 surface_intensity::Array{Int64,4},
@@ -31,11 +30,17 @@ function output(S::Array{Int64,3},
     close(out)
 end
 
+"""
+Reads λ from input file.
+"""
 function get_λ()
     λ = readdlm("../run/wavelengths.input", ' ')[1,:]u"nm"
     return λ
 end
 
+"""
+Reads τ from input file.
+"""
 function get_τ_max()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("tau_max", input_file)[end] + 1
@@ -46,6 +51,9 @@ function get_τ_max()
     return τ_max
 end
 
+"""
+Reads location of atmosphere file from input file.
+"""
 function get_atmosphere_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("atmosphere_path", input_file)[end] + 1
@@ -56,6 +64,9 @@ function get_atmosphere_path()
     return atmosphere_path
 end
 
+"""
+Reads the target # of packets to be generated from input file.
+"""
 function get_target_packets()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("target_packets", input_file)[end] + 1
@@ -66,6 +77,10 @@ function get_target_packets()
     return target_packets
 end
 
+"""
+Reads the maximum # of scatterings
+for each packet from input file.
+"""
 function get_max_scatterings()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("max_scatterings", input_file)[end] + 1
@@ -76,6 +91,10 @@ function get_max_scatterings()
     return max_scatterings
 end
 
+"""
+Reads the # of escape bins in the polar and
+azimuthal directions from input file.
+"""
 function get_escape_bins()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("escape_bins", input_file)[end] + 1

@@ -1,33 +1,23 @@
 include("io.jl")
 
 struct Atmosphere
-    # Dimensions - position of box edges
-    x::Array{<:Unitful.Length, 1} # Increasing
-    y::Array{<:Unitful.Length, 1} # Increasing
-    z::Array{<:Unitful.Length, 1} # Decreasing
-
-    # Local box properties
-    # (nx, ny, nz)
-    velocity_x::Array{<:Unitful.Velocity, 3}
-    velocity_y::Array{<:Unitful.Velocity, 3}
-    velocity_z::Array{<:Unitful.Velocity, 3}
-    temperature::Array{<:Unitful.Temperature, 3}
-
-    # (λ, nx, ny, nz)
-    χ::Array{PerLength, 3}
-    ε::Array{Real, 3}
-
-    # (λ, nx, ny)
-    boundary::Array{Int64, 2}
+    z::Array{<:Unitful.Length, 1}                  # (nz + 1)
+    x::Array{<:Unitful.Length, 1}                  # (nx + 1)
+    y::Array{<:Unitful.Length, 1}                  # (ny + 1)
+    velocity_z::Array{<:Unitful.Velocity, 3}       # (nx, ny, nz)
+    velocity_x::Array{<:Unitful.Velocity, 3}       # (nx, ny, nz)
+    velocity_y::Array{<:Unitful.Velocity, 3}       # (nx, ny, nz)
+    temperature::Array{<:Unitful.Temperature, 3}   # (nx, ny, nz)
+    χ::Array{PerLength, 3}                         # (λ, nx, ny, nz)
+    ε::Array{Real, 3}                              # (λ, nx, ny, nz)
+    boundary::Array{Int64, 2}                      # (λ, nx, ny)
 end
 
 
 """
-   function get_atmosphere_data(atmos_data,
-                                rh_output)
 Reads atmosphere parameters and reworks them to fit simulation.
 """
-function collect_atmosphere_data(λ)
+function collect_atmosphere_data(λ, cut_off = true)
 
     # ===========================================================
     # READ INPUT FILE
@@ -54,7 +44,7 @@ function collect_atmosphere_data(λ)
     close(atmos)
 
     # ===========================================================
-    # CALCULATE ϵ and χ
+    # CALCULATE χ AND ϵ
     # ===========================================================
     ionised_hydrogen_density = hydrogen_populations[:,:,:,end]
     neutral_hydrogen_density = sum(hydrogen_populations, dims = 4) .- ionised_hydrogen_density
@@ -64,17 +54,19 @@ function collect_atmosphere_data(λ)
     χ_s = χ_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
     χ = χ_a .+ χ_s
     ε = χ_a ./ χ
-
     # ===========================================================
     # RE-WORK DIMENSIONS TO FIT SIMULATION
     # ===========================================================
 
+    # dimensions of data
+    nz, nx, ny = size(temperature)
+
     # Make sure x and y are increasing and z decreasing
     if z[1] < z[end]
         z = reverse(z)
+        velocity_z = velocity_z[end:-1:1,:,:]
         velocity_x = velocity_x[end:-1:1,:,:]
         velocity_y = velocity_y[end:-1:1,:,:]
-        velocity_z = velocity_z[end:-1:1,:,:]
         temperature = temperature[end:-1:1,:,:]
         χ = χ[end:-1:1,:,:]
         ε = ε[end:-1:1,:,:]
@@ -82,9 +74,9 @@ function collect_atmosphere_data(λ)
 
     if x[1] > x[end]
         x = reverse(x)
+        velocity_z = velocity_z[:,end:-1:1,:]
         velocity_x = velocity_x[:,end:-1:1,:]
         velocity_y = velocity_y[:,end:-1:1,:]
-        velocity_z = velocity_z[:,end:-1:1,:]
         temperature = temperature[:,end:-1:1,:]
         χ = χ[:,end:-1:1,:]
         ε = ε[:,end:-1:1,:]
@@ -92,39 +84,49 @@ function collect_atmosphere_data(λ)
 
     if y[1] > y[end]
         y = reverse(y)
+        velocity_z = velocity_z[:,:,end:-1:1]
         velocity_x = velocity_x[:,:,end:-1:1]
         velocity_y = velocity_y[:,:,end:-1:1]
-        velocity_z = velocity_z[:,:,end:-1:1]
         temperature = temperature[:,:,end:-1:1]
         χ = χ[:,:,end:-1:1]
         ε = ε[:,:,end:-1:1]
     end
 
     # Add endpoints for box calculations
-    z = push!(z, 2*z[end] - z[end-1])
-    x = push!(x, 2*x[end] - x[end-1])
-    y = push!(y, 2*y[end] - y[end-1])
+    if length(z) == nz
+        z = push!(z, 2*z[end] - z[end-1])
+    end
+    if length(x) == nx
+        x = push!(x, 2*x[end] - x[end-1])
+    end
+    if length(y) == ny
+        y = push!(y, 2*y[end] - y[end-1])
+    end
 
     # ===========================================================
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
-    boundary = optical_depth_boundary(χ, z, τ_max)
 
-    nz = maximum(boundary)
-    z = z[1:nz+1]
-    velocity_x = velocity_x[1:nz,:,:]
-    velocity_y = velocity_y[1:nz,:,:]
-    velocity_z = velocity_z[1:nz,:,:]
-    temperature = temperature[1:nz,:,:]
-    χ = χ[1:nz,:,:]
-    ε = ε[1:nz,:,:]
+    if cut_off == true
+        boundary = optical_depth_boundary(χ, z, τ_max)
+        nz = maximum(boundary)
+        z = z[1:nz+1]
+        velocity_x = velocity_x[1:nz,:,:]
+        velocity_y = velocity_y[1:nz,:,:]
+        velocity_z = velocity_z[1:nz,:,:]
+        temperature = temperature[1:nz,:,:]
+        χ = χ[1:nz,:,:]
+        ε = ε[1:nz,:,:]
+    end
 
-    return x, y, z, velocity_x, velocity_y, velocity_z,
+    return z, x, y, velocity_z, velocity_x, velocity_y,
            temperature, χ, ε, boundary
 end
 
 """
-From Tiago
+The extinction from continuum absorption processes for a given λ.
+Includes H- ff, H- bf, H ff, H2+ ff and H2+ bf.
+Credit: Tiago
 """
 function χ_abs(λ::Unitful.Length,
                temperature::Unitful.Temperature,
@@ -141,7 +143,8 @@ function χ_abs(λ::Unitful.Length,
 end
 
 """
-From Tiago
+The extincion from Thomson and Rayleigh scattering for a given λ.
+Credit: Tiago
 """
 function χ_scatt(λ::Unitful.Length,
                  electron_density::NumberDensity,
@@ -152,7 +155,11 @@ function χ_scatt(λ::Unitful.Length,
     return α
 end
 
-function optical_depth(χ, z)
+"""
+Calculates the vertical optical depth of the atmosphere.
+"""
+function optical_depth(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+                       z::Array{<:Unitful.Length, 1})
     nz, nx, ny = size(χ)
     columns = nx*ny
 
@@ -162,7 +169,6 @@ function optical_depth(χ, z)
     Threads.@threads for col=1:columns
         j = 1 + (col-1)÷nx
         i = col - (j-1)*nx
-
         τ[1,i,j] = 0.5(z[1] - z[2]) * (χ[1,i,j] + χ[2,i,j])
 
         for k=2:nz-1
@@ -174,10 +180,8 @@ function optical_depth(χ, z)
 end
 
 """
-    function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
-                                    z::Array{<:Unitful.Length, 1},
-                                    τ_max::Real)
-Returns 2D array containing the k-indices where the optical depth reaches τ_max.
+
+Returns 2D array containing the z-indices where the optical depth reaches τ_max.
 """
 function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
                                 z::Array{<:Unitful.Length, 1},

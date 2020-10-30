@@ -1,34 +1,49 @@
-include("../src/atmosphere.jl")
+#include("../src/atmosphere.jl")
 include("../src/radiation.jl")
-using Unitful
-using Plots
+#include("../src/io.jl")
+#using Unitful
+#using Plots
 
-function feautrier()
-    λ = 500u"nm"
+"""
+1.5D feautrier calculation.
+"""
+function feautrier(atmosphere::Atmosphere, λ::Unitful.Length)
+
+    # ==================================================================
+    # ATMOSPHERE DATA
+    # ==================================================================
+    χ = atmosphere.χ
+    z = atmosphere.z
+    temperature = atmosphere.temperature
+    τ = optical_depth(χ, z)
+
+    # ===================================================================
+    # CALCULATE BB SOURCE FUNCTION
+    # ===================================================================
+    S = blackbody_lambda.(λ, temperature)
+
+    # ===================================================================
+    # SET UP VARIABLES
+    # ===================================================================
+    # Using 12 angles
     μ = [-0.9815606342467192506906  -0.9041172563704748566785  -0.769902674194304687037
          -0.5873179542866174472967  -0.3678314989981801937527  -0.1252334085114689154724
           0.1252334085114689154724   0.3678314989981801937527   0.5873179542866174472967
           0.7699026741943046870369   0.9041172563704748566785   0.9815606342467192506906] ./2.0 .+ 0.5
-
-    atmosphere_parameters = collect_atmosphere_data(λ)
-    atmosphere = Atmosphere(atmosphere_parameters...)
-
-    χ = atmosphere.χ
-    z = atmosphere.z
-    temperature = atmosphere.temperature
-
-    τ = optical_depth(χ, z)
-    S = blackbody_lambda.(λ, temperature)
 
     nz, nx, ny = size(τ)
     nμ = length(μ)
 
     P = Array{Float64,1}(undef,nz)
     D = Array{Float64,1}(undef,nz-1)
-    E = Array{Float64,1}(undef,nz-1) * u"kW / m^2 / sr / nm"
-    P = Array{Float64,1}(undef,nz) * u"kW / m^2 / sr / nm"
-    Pμ = Array{Float64,2}(undef,nμ, nz) * u"kW / m^2 / sr / nm"
-    J = Array{Float64,3}(undef,nz, nx, ny) * u"kW / m^2 / sr / nm"
+    E = Array{Float64,1}(undef,nz-1)u"kW / m^2 / sr / nm"
+    P = Array{Float64,1}(undef,nz)u"kW / m^2 / sr / nm"
+    Pμ = Array{Float64,2}(undef,nμ, nz)u"kW / m^2 / sr / nm"
+    J = Array{Float64,3}(undef,nz, nx, ny)u"kW / m^2 / sr / nm"
+
+    # ==================================================================
+    # FEAUTRIER, COLUMN BY COLUMN
+    # ==================================================================
     for j=1:ny
         for i=1:nx
             for m=1:nμ
@@ -38,25 +53,30 @@ function feautrier()
 
                 Pμ[m,:] = P
             end
-            J[:,i,j] .= quadrature(Pμ, μ)
+            J[:,i,j] .= gauss_legendre12(Pμ, μ)
         end
     end
 
-    surface = ustrip(J[1,:,:])
-    # To avoid ssh display problems
-    ENV["GKSwstype"]="nul"
-    heatmap(1:size(surface,1), 1:size(surface,2), surface, c=:grays, aspect_ratio=:equal)
-    plot!(size=(410,400))
-    fig = "/mn/stornext/u3/idarhan/MScProject/Analysis/feautrier"
-    png(fig)
-
-
+    # ==================================================================
+    # WRITE TO FILE
+    # ==================================================================
+    out = h5open("../out/output.hdf5", "w")
+    write(out, "J_feautrier", J)
+    close(out)
 end
 
-function forward(D, E, S, τ, μ)
-    Δτ = τ[2:end] .- τ[1:end-1] #nz - 1
+"""
+Forward-propagation to find the coefficients.
+"""
+function forward(D::Array{Float64, 1},
+                 E::Array{<:Unitful.Quantity,1},
+                 S::Array{<:Unitful.Quantity,1},
+                 τ::Array{Float64, 1},
+                 μ::Array{Float64, 1})
 
-    # From boundary at the top
+    Δτ = τ[2:end] .- τ[1:end-1]
+
+    # From boundary condition at the top
     E[1] = 0.0 * u"kW / m^2 / sr / nm"
     D[1] = 1.0/(Δτ[1]/μ + 1.0)
 
@@ -69,12 +89,16 @@ function forward(D, E, S, τ, μ)
         D[i] = C / (B - A*D[i-1])
         E[i] = (S[i] + A*E[i-1]) / (B - A*D[i-1])
     end
-    # From boundary condition at bottom
+
+    # From boundary condition at the bottom
     P_end = ( E[end] + Δτ[end]/μ * S[end] + (S[end] - S[end-1]) ) / (1.0 - D[end] + Δτ[end]/μ)
 
     return P_end
 end
 
+"""
+Back-propagation to find the P.
+"""
 function backward(P, D, E)
     n = length(D)
     for i in range(n, step=-1,stop=1)
@@ -82,8 +106,10 @@ function backward(P, D, E)
     end
 end
 
-function quadrature(P, μ)
-
+"""
+Gauss-Legendre with 12 angles.
+"""
+function gauss_legendre12(P, μ)
     nμ, nz = size(P)
     J = zeros(nz) * u"kW / m^2 / sr / nm"
 
@@ -96,7 +122,6 @@ function quadrature(P, μ)
     end
 
     return J
-
 end
 
 feautrier()

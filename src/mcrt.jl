@@ -2,7 +2,7 @@ include("radiation.jl")
 
 """
 Simulates the radiation field in a given atmosphere with
-a lower optical depth boundary given by τ_max.
+a lower optical depth boundary given by a maximum τ.
 """
 function mcrt(atmosphere::Atmosphere,
               radiation::Radiation)
@@ -121,7 +121,8 @@ function mcrt(atmosphere::Atmosphere,
 end
 
 """
-Scatters photon packet once. Returns new position, box_id and escape/destroyed-status.
+Scatters photon packet once.
+Returns new position, box_id and lost-status.
 """
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
@@ -164,18 +165,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # Next face cross in all dimensions
     next_edge = (direction .> 0) .+ box_id
 
-    """# Distance to next face cross in all dimensions
-    distance = ([z[next_edge[1]],
-                 x[next_edge[2]],
-                 y[next_edge[3]]] .- r) ./unit_vector
-
-    # Closest face cross
-    face = argmin(distance)
-    ds = distance[face]
-
-    # Update optical depth and position
-    τ_cum = ds * χ[box_id...]
-    r += ds * unit_vector"""
+    # Closest face and distance to it
     face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                              r, unit_vector)
 
@@ -223,26 +213,12 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         # Add to radiation field
         J[box_id...] += 1
 
+        # Closest face and distance to it
         face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                                  r, unit_vector)
 
         τ_cum += ds * χ[box_id...]
         r += ds * unit_vector
-
-
-        # Distance to next face cross in all dimensions
-        """distance = ([z[next_edge[1]],
-                     x[next_edge[2]],
-                     y[next_edge[3]]] .- r) ./unit_vector
-
-        # Closest face cross
-        face = argmin(distance)
-        ds = distance[face]
-
-        # Update optical depth and position
-        τ_cum += ds*χ[box_id...]
-        r += ds*unit_vector"""
-
     end
 
     # ===================================================================
@@ -256,8 +232,13 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 end
 
 
-
-function closest_edge(next_edges, r, unit_vector)
+"""
+Returns the face (1=z,2=x or 3=y) that
+the packet will cross next and the distance to it.
+"""
+function closest_edge(next_edges::Array{<:Unitful.Length, 1},
+                      r::Array{<:Unitful.Length, 1},
+                      unit_vector::Array{Float64, 1})
 
     # Distance to next face cross in all dimensions
     distance = (next_edges .- r) ./unit_vector

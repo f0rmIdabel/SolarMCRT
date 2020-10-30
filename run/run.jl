@@ -19,6 +19,7 @@ function run()
     atmosphere_parameters = collect_atmosphere_data(λ)
     atmosphere = Atmosphere(atmosphere_parameters...)
     println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_τ_max()))
+
     # ==================================================================
     # LOAD RADIATION DATA AND CALCULATE # PACKETS
     # ==================================================================
@@ -32,6 +33,5 @@ function run()
     # ==================================================================
     mcrt(atmosphere, radiation)
 end
-
 
 run()
