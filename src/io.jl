@@ -19,7 +19,7 @@ function output(S::Array{Int64,3},
                 surface_intensity::Array{Int64,4},
                 total_destroyed::Int64,
                 total_scatterings::Int64)
-    out = h5open("../out/output.hdf5", "w")
+    out = h5open("../out/output.hdf5", "cw")
     write(out, "S", S)
     write(out, "J", J)
     write(out, "surface_intensity", surface_intensity)

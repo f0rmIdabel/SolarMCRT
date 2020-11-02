@@ -16,14 +16,16 @@ function feautrier_test()
       # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
       # ==================================================================
       print("--Loading atmosphere data..................")
-      atmosphere_parameters = collect_atmosphere_data(λ,  false)
+      atmosphere_parameters = collect_atmosphere_data(λ, false)
       atmosphere = Atmosphere(atmosphere_parameters...)
       println(" Full atmosphere loaded.")
 
       # ==================================================================
       # FEAUTRIER CALCULATION
       # ==================================================================
+      print("--Starting Feautrier.......................")
       feautrier(atmosphere, λ)
+      println(" Feautrier finished.")
 end
 
 feautrier_test()
