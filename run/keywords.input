@@ -11,12 +11,12 @@ atmosphere_path = "../../../basement/MScProject/Atmospheres/bifrost_cb24bih_s385
 #  The intended number of packets to be created.                                            #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.         #
 # ========================================================================================= #
-target_packets = 1e8
+target_packets = 1e10
 
 # ========================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                           #
 # ========================================================================================= #
-tau_max = 10
+tau_max = 20
 
 # ========================================================================================= #
 #  Maximum number of scatterings before stopping.                                           #

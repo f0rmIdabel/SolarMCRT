@@ -123,5 +123,3 @@ function gauss_legendre12(P, μ)
 
     return J
 end
-
-feautrier()

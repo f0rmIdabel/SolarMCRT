@@ -106,9 +106,9 @@ function collect_atmosphere_data(λ, cut_off = true)
     # ===========================================================
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
+    boundary = optical_depth_boundary(χ, z, τ_max)
 
     if cut_off == true
-        boundary = optical_depth_boundary(χ, z, τ_max)
         nz = maximum(boundary)
         z = z[1:nz+1]
         velocity_x = velocity_x[1:nz,:,:]
@@ -158,7 +158,7 @@ end
 """
 Calculates the vertical optical depth of the atmosphere.
 """
-function optical_depth(χ::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+function optical_depth(χ::Array{PerLength, 3},
                        z::Array{<:Unitful.Length, 1})
     nz, nx, ny = size(χ)
     columns = nx*ny

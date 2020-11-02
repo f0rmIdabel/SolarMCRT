@@ -1,7 +1,7 @@
 include("atmosphere.jl")
 
 struct Radiation
-    λ::Array{Unitful.Length,1}    # (nλ)
+    λ::Unitful.Length #Array{Unitful.Length,1}    # (nλ)
     S::Array{Int64,3}             # (nz*, nx, ny)
     max_scatterings::Real
     escape_bins::Array{Int64,1}   # (nϕ, nθ)

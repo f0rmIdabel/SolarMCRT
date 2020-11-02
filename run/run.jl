@@ -1,8 +1,8 @@
 include("../src/mcrt.jl")
 
 function run()
-    println("\n", "="^83, "\n", " "^20,
-            "MCRT SIMULATION IN A SOLAR ATMOSPHERE MODEL",
+    println("\n", "="^83, "\n", " "^30,
+            "SOLAR ATMOSPHERE MCRT",
             "\n", "="^83)
 
     # ==================================================================
