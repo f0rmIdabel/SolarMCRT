@@ -1,8 +1,4 @@
-#include("../src/atmosphere.jl")
 include("../src/radiation.jl")
-#include("../src/io.jl")
-#using Unitful
-#using Plots
 
 """
 1.5D feautrier calculation.

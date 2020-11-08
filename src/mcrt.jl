@@ -37,8 +37,8 @@ function mcrt(atmosphere::Atmosphere,
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
-    # Give each thread seeded rng
-    rng = MersenneTwister(1)
+    # Init rng
+    #rng = MersenneTwister(1)
 
     # ===================================================================
     # SIMULATION
@@ -46,7 +46,7 @@ function mcrt(atmosphere::Atmosphere,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
-    # Create ProgressMeter working with threads, this takes about 30 secs extra
+    # Create ProgressMeter working with threads
     p = Progress(ny)
     update!(p,0)
     jj = Threads.Atomic{Int}(0)
@@ -82,7 +82,7 @@ function mcrt(atmosphere::Atmosphere,
                     box_id = [k,i,j]
 
                     # Initial position uniformely drawn from box
-                    r = corner .+ (box_dim .* rand(rng,3))
+                    r = corner .+ (box_dim .* rand(3))
 
                     # Scatter each packet until destroyed,
                     # escape or reach max_scatterings
@@ -95,12 +95,12 @@ function mcrt(atmosphere::Atmosphere,
                                                          boundary,
                                                          box_id, r,
                                                          J, surface_intensity,
-                                                         rng, num_bins)
+                                                         num_bins)
                         # Check if escaped or lost in bottom
                         if lost
                             break
                         # Check if destroyed in next particle interaction
-                        elseif rand(rng) < ε[box_id...]
+                        elseif rand() < ε[box_id...]
                             Threads.atomic_add!(total_destroyed, 1)
                             break
                         end
@@ -133,7 +133,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int64, 3},
                         surface_intensity::Array{Int64,4},
-                        rng::MersenneTwister,
                         num_bins::Array{Int64, 1})
 
     # Keep track of status
@@ -149,9 +148,9 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # ===================================================================
 
     # Draw scattering depth and direction
-    τ = -log(rand(rng))
-    ϕ = 2π * rand(rng)
-    θ =  π * rand(rng)
+    τ = -log(rand())
+    ϕ = 2π * rand()
+    θ =  π * rand()
 
     # Find direction
     unit_vector = [cos(θ), sin(θ)*cos(ϕ), sin(θ)*sin(ϕ)]

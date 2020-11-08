@@ -34,9 +34,9 @@ function collect_atmosphere_data(λ, cut_off = true)
     y = read(atmos, "y")u"m"
     z = read(atmos, "z")[:,1]u"m"  # slice due to snapshot
 
-    velocity_x = read(atmos, "velocity_x")[:,:,:,1]u"m/s"
-    velocity_y = read(atmos, "velocity_y")[:,:,:,1]u"m/s"
-    velocity_z = read(atmos, "velocity_z")[:,:,:,1]u"m/s"
+    velocity_x = rand(length(z), length(x), length(y))u"m/s" # read(atmos, "velocity_x")[:,:,:,1]u"m/s"
+    velocity_y = rand(length(z), length(x), length(y))u"m/s" # read(atmos, "velocity_y")[:,:,:,1]u"m/s"
+    velocity_z = rand(length(z), length(x), length(y))u"m/s" # read(atmos, "velocity_z")[:,:,:,1]u"m/s"
 
     temperature = read(atmos, "temperature")[:,:,:,1]u"K"
     electron_density = read(atmos, "electron_density")[:,:,:,1]u"m^-3"
@@ -54,6 +54,115 @@ function collect_atmosphere_data(λ, cut_off = true)
     χ_s = χ_scatt.(λ, electron_density, neutral_hydrogen_density)[:,:,:,1]
     χ = χ_a .+ χ_s
     ε = χ_a ./ χ
+    # ===========================================================
+    # RE-WORK DIMENSIONS TO FIT SIMULATION
+    # ===========================================================
+
+    # dimensions of data
+    nz, nx, ny = size(temperature)
+
+    # Make sure x and y are increasing and z decreasing
+    if z[1] < z[end]
+        z = reverse(z)
+        velocity_z = velocity_z[end:-1:1,:,:]
+        velocity_x = velocity_x[end:-1:1,:,:]
+        velocity_y = velocity_y[end:-1:1,:,:]
+        temperature = temperature[end:-1:1,:,:]
+        χ = χ[end:-1:1,:,:]
+        ε = ε[end:-1:1,:,:]
+    end
+
+    if x[1] > x[end]
+        x = reverse(x)
+        velocity_z = velocity_z[:,end:-1:1,:]
+        velocity_x = velocity_x[:,end:-1:1,:]
+        velocity_y = velocity_y[:,end:-1:1,:]
+        temperature = temperature[:,end:-1:1,:]
+        χ = χ[:,end:-1:1,:]
+        ε = ε[:,end:-1:1,:]
+    end
+
+    if y[1] > y[end]
+        y = reverse(y)
+        velocity_z = velocity_z[:,:,end:-1:1]
+        velocity_x = velocity_x[:,:,end:-1:1]
+        velocity_y = velocity_y[:,:,end:-1:1]
+        temperature = temperature[:,:,end:-1:1]
+        χ = χ[:,:,end:-1:1]
+        ε = ε[:,:,end:-1:1]
+    end
+
+    # Add endpoints for box calculations
+    if length(z) == nz
+        z = push!(z, 2*z[end] - z[end-1])
+    end
+    if length(x) == nx
+        x = push!(x, 2*x[end] - x[end-1])
+    end
+    if length(y) == ny
+        y = push!(y, 2*y[end] - y[end-1])
+    end
+
+    # ===========================================================
+    # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
+    # ===========================================================
+    boundary = optical_depth_boundary(χ, z, τ_max)
+    
+    if cut_off == true
+        nz = maximum(boundary)
+        z = z[1:nz+1]
+        velocity_x = velocity_x[1:nz,:,:]
+        velocity_y = velocity_y[1:nz,:,:]
+        velocity_z = velocity_z[1:nz,:,:]
+        temperature = temperature[1:nz,:,:]
+        χ = χ[1:nz,:,:]
+        ε = ε[1:nz,:,:]
+    end
+
+    return z, x, y, velocity_z, velocity_x, velocity_y,
+           temperature, χ, ε, boundary
+end
+
+function collect_atmosphere_data_line(λ, cut_off = true)
+
+    # ===========================================================
+    # READ INPUT FILE
+    # ===========================================================
+    atmosphere_path = get_atmosphere_path()
+    τ_max = get_τ_max()
+
+    # ===========================================================
+    # READ ATMOSPHERE FILE
+    # ===========================================================
+    atmos = h5open(atmosphere_path, "r")
+
+    x = read(atmos, "x")u"m"
+    y = read(atmos, "y")u"m"
+    z = read(atmos, "z")[:,1]u"m"  # slice due to snapshot
+
+    velocity_x = read(atmos, "velocity_x")[:,:,:,1]u"m/s"
+    velocity_y = read(atmos, "velocity_y")[:,:,:,1]u"m/s"
+    velocity_z = read(atmos, "velocity_z")[:,:,:,1]u"m/s"
+
+    temperature = read(atmos, "temperature")[:,:,:,1]u"K"
+    close(atmos)
+
+    rh_ray = h5open("../../../basement/MScProject/Atmospheres/output_ray.hdf5", "r")
+    χ_l = read(rh_ray, "chi_line")[2,:,:,:]u"m^-1"
+    χ_c = read(rh_ray, "chi_continuum")[2,:,:,:]u"m^-1"
+    ε_c = read(rh_ray, "epsilon_continuum")[2,:,:,:]
+    close(rh_ray)
+
+    rh_aux = h5open("../../../basement/MScProject/Atmospheres/output_aux.hdf5", "r")
+    Rji = read(rh_aux, "atom_CA/Rji_line")[:,:,:,4]
+    Cji = read(rh_aux, "atom_CA/Cji_line")[:,:,:,4]
+    close(rh_aux)
+
+    ε_l = Cji ./ (Rji .+ Cji)
+    χ = χ_l .+ χ_c
+
+    ε = ε_l .* (χ_l ./ χ)  .+ ε_c .* (χ_c ./ χ)
+
     # ===========================================================
     # RE-WORK DIMENSIONS TO FIT SIMULATION
     # ===========================================================
