@@ -16,7 +16,7 @@ function run()
     # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
     # ==================================================================
     print("--Loading atmosphere data..................")
-    atmosphere_parameters = collect_atmosphere_data(λ)
+    atmosphere_parameters = collect_atmosphere_data(λ, false)
     atmosphere = Atmosphere(atmosphere_parameters...)
     println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_τ_max()))
 

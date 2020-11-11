@@ -1,6 +1,7 @@
 include("feautrier.jl")
+include("compare.jl")
 
-function feautrier_test()
+function run()
     println("\n", "="^83, "\n", " "^20,
               "FEAUTRIER RT IN A SOLAR ATMOSPHERE MODEL",
               "\n", "="^83)
@@ -28,4 +29,4 @@ function feautrier_test()
       println(" Feautrier finished.")
 end
 
-feautrier_test()
+run()

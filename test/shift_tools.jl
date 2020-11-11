@@ -25,9 +25,9 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
     z = ustrip(height)
     height_pix = uconvert.(Unitful.NoUnits, height / pixel_size)
 
-    tmp = similar(data[:, :, 1])
+    tmp = similar(data[1, :, :])
     eps = 1.e-6
-    nx, ny, nz = size(data)
+    nz, nx, ny = size(data)
 
     if abs(dxdz > eps)
         for n=1:nz
@@ -49,7 +49,7 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
             bc = bf + ad
 
             for m=1:ny, l=1:nx
-                tmp[l, m] = data[l, m, n]
+                tmp[l, m] = data[n, l, m]
             end
 
             for l=1:nx
@@ -58,7 +58,7 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
                 lp1 = mod(l + k, nx) + 1
                 lp2 = mod(l + k + 1, nx) + 1
                 for m=1:ny
-                    data[l,m,n] = ac*tmp[lp0,m] + bc*tmp[lp1,m] - ad*tmp[lm1,m] + bd*tmp[lp2,m]
+                    data[n,l,m] = ac*tmp[lp0,m] + bc*tmp[lp1,m] - ad*tmp[lm1,m] + bd*tmp[lp2,m]
                 end
             end
         end
@@ -84,7 +84,7 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
             bc = bf + ad
 
             for m=1:ny, l=1:nx
-                tmp[l, m] = data[l, m, n]
+                tmp[l, m] = data[n, l, m]
             end
 
             for m=1:ny
@@ -93,7 +93,7 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
                 mp1 = mod(m + k, ny) + 1
                 mp2 = mod(m + k + 1, ny) + 1
                 for l=1:nx
-                    data[l,m,n] = ac*tmp[l,mp0] + bc*tmp[l,mp1] - ad*tmp[l,mm1] + bd*tmp[l,mp2]
+                    data[n,l,m] = ac*tmp[l,mp0] + bc*tmp[l,mp1] - ad*tmp[l,mm1] + bd*tmp[l,mp2]
                 end
             end
         end

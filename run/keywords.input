@@ -5,7 +5,7 @@
 # ========================================================================================= #
 #  Path to the atmosphere file                                                              #
 # ========================================================================================= #
-atmosphere_path = "../../../basement/MScProject/Atmospheres/bifrost_cb24bih_s385.hdf5"
+atmosphere_path = "../../../basement/MScProject/Atmospheres/bifrost_cb24bih_s385_fullv.ncdf"
 
 # ========================================================================================= #
 #  The intended number of packets to be created.                                            #

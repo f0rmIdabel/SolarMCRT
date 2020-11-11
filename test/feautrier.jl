@@ -1,5 +1,5 @@
 include("../src/radiation.jl")
-
+include("shift_tools.jl")
 """
 1.5D feautrier calculation.
 """
@@ -8,10 +8,10 @@ function feautrier(atmosphere::Atmosphere, λ::Unitful.Length)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
-    χ = atmosphere.χ
+    x = atmosphere.x
     z = atmosphere.z
+    χ = atmosphere.χ
     temperature = atmosphere.temperature
-    τ = optical_depth(χ, z)
 
     # ===================================================================
     # CALCULATE BB SOURCE FUNCTION
@@ -21,44 +21,45 @@ function feautrier(atmosphere::Atmosphere, λ::Unitful.Length)
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
+
+    pixel_size = abs(x[2] - x[1])
+
     # Using 12 angles
-    μ = [-0.9815606342467192506906
-         -0.9041172563704748566785
-         -0.769902674194304687037
-         -0.5873179542866174472967
-         -0.3678314989981801937527
-         -0.1252334085114689154724
-          0.1252334085114689154724
-          0.3678314989981801937527
-          0.5873179542866174472967
-          0.7699026741943046870369
-          0.9041172563704748566785
-          0.9815606342467192506906] ./2.0 .+ 0.5
+    μ = [-0.7745966692414833770359, 0, 0.7745966692414833770359] ./2.0 .+ 0.5
+    w = [0.5555555555555555555556, 0.8888888888888888888889, 0.555555555555555555556]
 
-    nz, nx, ny = size(τ)
+    ϕ = [0, π/2, π, 3/2π]
+
+    nz, nx, ny = size(χ)
     nμ = length(μ)
+    nϕ = length(ϕ)
 
-    P = Array{Float64,1}(undef,nz)
-    D = Array{Float64,1}(undef,nz-1)
-    E = Array{Float64,1}(undef,nz-1)u"kW / m^2 / sr / nm"
-    P = Array{Float64,1}(undef,nz)u"kW / m^2 / sr / nm"
-    Pμ = Array{Float64,2}(undef,nμ, nz)u"kW / m^2 / sr / nm"
-    J = Array{Float64,3}(undef,nz, nx, ny)u"kW / m^2 / sr / nm"
+    P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+    D = Array{Float64,3}(undef,nz-1, nx, ny)
+    E = Array{Float64,3}(undef,nz-1, nx, ny)u"kW / m^2 / sr / nm"
+
+    J = zeros(nz, nx, ny)u"kW / m^2 / sr / nm"
 
     # ==================================================================
     # FEAUTRIER, COLUMN BY COLUMN
     # ==================================================================
-    for j=1:ny
-        for i=1:nx
-            for m=1:nμ
+    for m=1:nμ
 
-                P[end] = forward(D, E, S[:,i,j], τ[:,i,j], μ[m])
-                backward(P, D, E)
+        #fill!(P, 0.0u"kW / m^2 / sr / nm") #can possibly be removed
 
-                Pμ[m,:] = P
-            end
-            J[:,i,j] .= gauss_legendre12(Pμ, μ)
+        for p=1:nϕ
+            translate!(S, z, pixel_size, μ[m], ϕ[p])
+            translate!(χ, z, pixel_size, μ[m], ϕ[p])
+            τ = optical_depth(χ, z) / μ[m]
+
+            P[end,i,j] = forward(D, E, S[:,i,j], τ[:,i,j], μ[m])
+            backward(P, D, E)
+
+            # Shift back
+            translate!(P, z[1:end-1], pixel_size, -μ[m], -ϕ[p])
         end
+
+        J = J .+ w[m]*P/nϕ
     end
 
     # ==================================================================
@@ -72,30 +73,36 @@ end
 """
 Forward-propagation to find the coefficients.
 """
-function forward(D::Array{Float64, 1},
-                 E::Array{<:Unitful.Quantity,1},
-                 S::Array{<:Unitful.Quantity,1},
-                 τ::Array{Float64, 1},
+function forward(D::Array{Float64, 3},
+                 E::Array{<:Unitful.Quantity,3},
+                 S::Array{<:Unitful.Quantity,3},
+                 τ::Array{Float64, 3},
                  μ::Float64)
 
-    Δτ = τ[2:end] .- τ[1:end-1]
+    nz, nx, ny =  size(τ)
 
-    # From boundary condition at the top
-    E[1] = 0.0 * u"kW / m^2 / sr / nm"
-    D[1] = 1.0/(Δτ[1]/μ + 1.0)
+    for j=1:ny
+        for i=1:nx
+            Δτ = τ[2:end,i,j] .- τ[1:end-1, i,j]
 
-    #forward
-    for i=2:length(Δτ)
-        A = 2μ^2 / (Δτ[i-1]*(Δτ[i-1] + Δτ[i]))
-        B = 1.0 + 2μ^2 / (Δτ[i]*Δτ[i-1]) #use steins trick
-        C = 2μ^2 /(Δτ[i]*(Δτ[i-1] + Δτ[i]))
+            # From boundary condition at the top
+            E[1,i,j] = 0.0u"kW / m^2 / sr / nm"
+            D[1,i,j] = 1.0/(Δτ[1]/μ + 1.0)
 
-        D[i] = C / (B - A*D[i-1])
-        E[i] = (S[i] + A*E[i-1]) / (B - A*D[i-1])
+            #forward
+            for k=2:length(Δτ)
+                A = 2μ^2 / (Δτ[k-1]*(Δτ[k-1] + Δτ[k]))
+                B = 1.0 + 2μ^2 / (Δτ[k]*Δτ[k-1]) #use steins trick
+                C = 2μ^2 /(Δτ[k]*(Δτ[k-1] + Δτ[k]))
+
+                D[i] = C / (B - A*D[k-1,i,j])
+                E[i] = (S[k,i,j] + A*E[k-1,i,j]) / (B - A*D[k-1,i,j])
+            end
+
+            # From boundary condition at the bottom
+            P_end = ( E[end,i,j] + Δτ[end]/μ * S[end,i,j] + (S[end,i,j] - S[end-1,i,j]) ) / (1.0 - D[end,i,j] + Δτ[end]/μ)
+        end
     end
-
-    # From boundary condition at the bottom
-    P_end = ( E[end] + Δτ[end]/μ * S[end] + (S[end] - S[end-1]) ) / (1.0 - D[end] + Δτ[end]/μ)
 
     return P_end
 end
@@ -103,12 +110,17 @@ end
 """
 Back-propagation to find the P.
 """
-function backward(P::Array{<:Unitful.Quantity,1},
-                  D::Array{Float64, 1},
-                  E::Array{<:Unitful.Quantity,1})
-    n = length(D)
-    for i in range(n, step=-1,stop=1)
-        P[i] = D[i]*P[i+1] + E[i]
+function backward(P::Array{<:Unitful.Quantity,3},
+                  D::Array{Float64, 3},
+                  E::Array{<:Unitful.Quantity,3})
+
+    nz, nx, ny = size(D)
+    for j=1:ny
+        for i=1:nz
+            for k in range(nz, step=-1,stop=1)
+                P[k,i,j] = D[k,i,j]*P[k+1,i,j] + E[k,i,j]
+            end
+        end
     end
 end
 
