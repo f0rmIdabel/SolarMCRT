@@ -1,8 +1,8 @@
-include("feautrier.jl")
+include("lambda_iteration.jl")
 
 function run()
     println("\n", "="^83, "\n", " "^20,
-              "FEAUTRIER RT IN A SOLAR ATMOSPHERE MODEL",
+              "INTEGRAL RT IN A SOLAR ATMOSPHERE MODEL",
               "\n", "="^83)
 
       # ==================================================================
@@ -23,9 +23,9 @@ function run()
       # ==================================================================
       # FEAUTRIER CALCULATION
       # ==================================================================
-      print("--Starting Feautrier.......................")
-      feautrier(atmosphere, λ, 3, 4)
-      println(" Feautrier finished.")
+      print("--Starting λ-iteration.......................")
+      lambda_iteration(atmosphere, λ)
+      println(" λ-iteration finished.")
 end
 
 run()

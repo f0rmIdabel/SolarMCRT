@@ -1,24 +1,11 @@
-include("../../src/radiation.jl")
 include("shift_tools.jl")
 using FastGaussQuadrature
 
 """
 1.5D feautrier calculation.
 """
-function feautrier(atmosphere::Atmosphere, λ::Unitful.Length, nμ::Int64, nϕ::Int64)
+function feautrier(S, χ, z, nμ::Int64, nϕ::Int64, pixel_size)
 
-    # ==================================================================
-    # ATMOSPHERE DATA
-    # ==================================================================
-    x = atmosphere.x
-    z = atmosphere.z
-    χ = atmosphere.χ
-    temperature = atmosphere.temperature
-
-    # ===================================================================
-    # CALCULATE BB SOURCE FUNCTION
-    # ===================================================================
-    S = blackbody_lambda.(λ, temperature)
 
     # ===================================================================
     # SET UP VARIABLES
@@ -27,7 +14,6 @@ function feautrier(atmosphere::Atmosphere, λ::Unitful.Length, nμ::Int64, nϕ::
     μ = μ ./2.0 .+ 0.5
     ϕ = range(0, step=2π/nϕ, length=nϕ)
 
-    pixel_size = abs(x[2] - x[1])
     nz, nx, ny = size(χ)
 
     D = Array{Float64,3}(undef,nz-1,nx,ny)
@@ -38,7 +24,7 @@ function feautrier(atmosphere::Atmosphere, λ::Unitful.Length, nμ::Int64, nϕ::
     # ==================================================================
     # FEAUTRIER
     # ==================================================================
-    Threads.@threads for direction=1:nμ*nϕ
+    for direction=1:nμ*nϕ
         m = 1 + (direction - 1)÷nϕ
         p = direction - (m-1)*nϕ
 
@@ -65,12 +51,8 @@ function feautrier(atmosphere::Atmosphere, λ::Unitful.Length, nμ::Int64, nϕ::
         #J = J .+ w[m]*P/nϕ
     end
 
-    # ==================================================================
-    # WRITE TO FILE
-    # ==================================================================
-    out = h5open("../../out/output.hdf5", "cw")
-    write(out, "J_feautrier", ustrip(J))
-    close(out)
+    return J
+
 end
 
 """

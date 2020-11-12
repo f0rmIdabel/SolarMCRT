@@ -88,8 +88,7 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
         temperature = temperature[:,:,end:-1:1]
         χ = χ[:,:,end:-1:1]
         ε = ε[:,:,end:-1:1]
-    endj = 1 + (col-1)÷nx
-        i = col - (j-1)*nx
+    end
 
     # Add endpoints for box calculations
     if length(z) == nz
