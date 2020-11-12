@@ -88,7 +88,8 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
         temperature = temperature[:,:,end:-1:1]
         χ = χ[:,:,end:-1:1]
         ε = ε[:,:,end:-1:1]
-    end
+    endj = 1 + (col-1)÷nx
+        i = col - (j-1)*nx
 
     # Add endpoints for box calculations
     if length(z) == nz
@@ -104,9 +105,10 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
     # ===========================================================
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
-    boundary = optical_depth_boundary(χ, z, τ_max)
+
 
     if cut_off == true
+        boundary = optical_depth_boundary(χ, z, τ_max)
         nz = maximum(boundary)
         z = z[1:nz+1]
         velocity_x = velocity_x[1:nz,:,:]
@@ -115,6 +117,9 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
         temperature = temperature[1:nz,:,:]
         χ = χ[1:nz,:,:]
         ε = ε[1:nz,:,:]
+    else
+        boundary = Array{Int64,2}(undef,nx,ny)
+        fill!(boundary, nz)
     end
 
     return z, x, y, velocity_z, velocity_x, velocity_y,

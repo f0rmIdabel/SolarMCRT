@@ -1,5 +1,4 @@
 include("feautrier.jl")
-include("compare.jl")
 
 function run()
     println("\n", "="^83, "\n", " "^20,
@@ -17,7 +16,7 @@ function run()
       # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
       # ==================================================================
       print("--Loading atmosphere data..................")
-      atmosphere_parameters = collect_atmosphere_data(λ, false)
+      atmosphere_parameters = collect_atmosphere_data(λ, false, false)
       atmosphere = Atmosphere(atmosphere_parameters...)
       println(" Full atmosphere loaded.")
 
@@ -25,7 +24,7 @@ function run()
       # FEAUTRIER CALCULATION
       # ==================================================================
       print("--Starting Feautrier.......................")
-      feautrier(atmosphere, λ)
+      feautrier(atmosphere, λ, 3, 4)
       println(" Feautrier finished.")
 end
 

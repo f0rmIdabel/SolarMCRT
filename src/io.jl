@@ -36,7 +36,7 @@ end
 Reads λ from input file.
 """
 function get_λ()
-    λ = readdlm("../run/wavelengths.input", ' ')[1,:]u"nm"
+    λ = readdlm("/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/wavelengths.input", ' ')[1,:]u"nm"
     return λ
 end
 
@@ -44,7 +44,7 @@ end
 Reads τ from input file.
 """
 function get_τ_max()
-    input_file = open(f->read(f, String), "../run/keywords.input")
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("tau_max", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -57,7 +57,7 @@ end
 Reads location of atmosphere file from input file.
 """
 function get_atmosphere_path()
-    input_file = open(f->read(f, String), "../run/keywords.input")
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("atmosphere_path", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
