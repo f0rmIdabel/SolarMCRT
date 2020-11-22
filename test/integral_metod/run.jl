@@ -1,5 +1,6 @@
 include("lambda_iteration.jl")
 include("shift_tools.jl")
+#include("feautrier2.jl")
 
 function run()
     println("\n", "="^83, "\n", " "^20,
@@ -29,7 +30,11 @@ function run()
       println(" λ-iteration finished.")
 end
 
+run()
 
+
+
+"""
 function run2()
         λ = get_λ()[1]
         atmosphere_parameters = collect_atmosphere_data(λ, false, false)
@@ -63,8 +68,5 @@ function run2()
         T /= 0.5
         """
         println(sum(abs.(T .- T2) ./ T2))
-end
-
-run()
-
+end"""
 #run2()

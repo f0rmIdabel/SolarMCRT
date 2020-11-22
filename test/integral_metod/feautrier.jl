@@ -119,8 +119,8 @@ function forward(D::Array{Float64, 3},
                 B = 1.0 + 2μ^2 / (Δτ[k]*Δτ[k-1])            #should use steins trick here
                 C = 2μ^2 /(Δτ[k]*(Δτ[k-1] + Δτ[k]))
 
-                D[i] = C / (B - A*D[k-1,i,j])
-                E[i] = (S[k,i,j] + A*E[k-1,i,j]) / (B - A*D[k-1,i,j])
+                D[k,i,j] = C / (B - A*D[k-1,i,j])
+                E[k,i,j] = (S[k,i,j] + A*E[k-1,i,j]) / (B - A*D[k-1,i,j])
             end
 
             # From boundary condition at the bottom
