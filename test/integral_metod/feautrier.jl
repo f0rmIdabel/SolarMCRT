@@ -30,8 +30,8 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         println(m)
 
         # Shift atmosphere
-        #shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
-        #shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
+        shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
+        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
 
         χ_ /= μ[m]
         S_ /= μ[m]
@@ -40,10 +40,10 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         τ = optical_depth(χ_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
-        #P += p
+        P += p
 
         # ϕ = π
-        """S_ = reverse(S_, dims = 2)
+        S_ = reverse(S_, dims = 2)
         S_ = reverse(S_, dims = 3)
         χ_ = reverse(χ_, dims = 2)
         χ_ = reverse(χ_, dims = 3)
@@ -80,17 +80,17 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         reverse(p, dims = 2)
         p = permutedims(p, [1,3,2])
         p = reverse(p, dims = 2)
-        P += p"""
+        P += p
 
         # Shift back μ
-        #shift_variable!(P, z[1:end-1], pixel_size, -μ[m])
-        #shift_variable!(P, z[1:end-1], pixel_size, -1.0)
+        shift_variable!(P, z[1:end-1], pixel_size, -μ[m])
+        shift_variable!(P, z[1:end-1], pixel_size, -1.0)
 
         # Add to J
-        J = J .+ w[m]*p #/nφ
+        J = J .+ w[m]*P/nφ
     end
 
-    return p# J
+    return J
 end
 
 """

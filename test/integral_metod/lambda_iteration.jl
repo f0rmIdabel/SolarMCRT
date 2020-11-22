@@ -26,7 +26,7 @@ function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ
 
     J = Array{Float64,3}(undef, nz, nx, ny)
 
-    for n=1:1 #max_iterations
+    for n=1:max_iterations
         println("\nIteration ", n)
         J = feautrier(S, χ, z, nμ, nϕ, pixel_size)
         Snew = (1.0 .- ε) .* J + ε .* B

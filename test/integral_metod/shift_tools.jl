@@ -145,25 +145,3 @@ function translate!(data::Array, height::Array{<:Unitful.Length, 1},
         end
     end
 end
-
-
-"""
-    shift_simulation(data::Dict, μ::Real)
-
-Shift all simulation variables on a dictionary according to a polar angle θ
-given by μ = cos(θ), and an azimuthal angle φ given in radians.
-
-Assumes that `data` will have a key `:height` with a 1D array of heights,
-and a key `:meta` with a dicionary with a key `:xpix_km` that sets the
-length of the horizontal pixel size.
-"""
-function shift_simulation(data::Dict, μ::Real, φ::Real)
-    new_data = deepcopy(data)
-    for (key, value) in new_data
-       if key ∉ [:meta, :height]
-            translate!(value, data[:height], data[:meta][:xpix_km], μ, φ)
-        end
-    end
-    new_data[:height] ./= μ
-    return new_data
-end
