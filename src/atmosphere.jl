@@ -194,7 +194,7 @@ end
 """
 Calculates the vertical optical depth of the atmosphere.
 """
-function optical_depth(χ::Array{PerLength, 3},
+function optical_depth(χ,
                        z::Array{<:Unitful.Length, 1})
     nz, nx, ny = size(χ)
     columns = nx*ny

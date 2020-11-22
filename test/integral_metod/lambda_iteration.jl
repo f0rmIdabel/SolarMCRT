@@ -2,12 +2,11 @@ include("feautrier.jl")
 include("../../src/radiation.jl")
 using LinearAlgebra
 
-
 """
 From Tiago, translated from Python to Julia
 Computes S and J from a lambda iteration.
 """
-function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ=4, max_iterations=1000)
+function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=12, nϕ=4, max_iterations=1000)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
@@ -22,20 +21,23 @@ function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ
     # ===================================================================
     B = blackbody_lambda.(λ, temperature)
     S = copy(B)
+    nz, nx, ny = size(χ)
     pixel_size = abs(x[2] - x[1])
 
-    for n=1:max_iterations
+    J = Array{Float64,3}(undef, nz, nx, ny)
+
+    for n=1:1 #max_iterations
         println("\nIteration ", n)
         J = feautrier(S, χ, z, nμ, nϕ, pixel_size)
         Snew = (1.0 .- ε) .* J + ε .* B
 
         if convergence(S, Snew, 1e-3)
-            println("Convergence at iteration n = %d" %n)
+            S = copy(Snew)
+            println("Convergence at iteration n = ", n)
             break
         else
             S = copy(Snew)
         end
-
     end
 
     # ==================================================================
@@ -45,8 +47,6 @@ function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ
     write(out, "J_integral", ustrip(J))
     write(out, "S_integral", ustrip(S))
     close(out)
-
-    return Snew, J
 end
 
 """

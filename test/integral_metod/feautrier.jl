@@ -4,55 +4,93 @@ using FastGaussQuadrature
 """
 1.5D feautrier calculation.
 """
-function feautrier(S, χ, z, nμ::Int64, nϕ::Int64, pixel_size)
-
+function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
     μ, w = gausslegendre(nμ)
     μ = μ ./2.0 .+ 0.5
-    ϕ = range(0, step=2π/nϕ, length=nϕ)
-
     nz, nx, ny = size(χ)
 
     D = Array{Float64,3}(undef,nz-1,nx,ny)
     E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
+    p = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
     P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
     J = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
 
     # ==================================================================
     # FEAUTRIER
     # ==================================================================
-    for direction=1:nμ*nϕ
-        m = 1 + (direction - 1)÷nϕ
-        p = direction - (m-1)*nϕ
+    for m=1:nμ
 
         S_ = copy(S)
         χ_ = copy(χ)
 
-        println(m, " ", p)
+        println(m)
 
         # Shift atmosphere
-        translate!(S_, z[1:end-1], pixel_size, μ[m], ϕ[p])
-        translate!(χ_, z[1:end-1], pixel_size, μ[m], ϕ[p])
-        τ = optical_depth(χ_, z) / μ[m]
+        #shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
+        #shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
 
-        # Feautrier
-        P[end,:,:] = forward(D, E, S_, τ, μ[m])
-        backward(P, D, E)
+        χ_ /= μ[m]
+        S_ /= μ[m]
 
-        # Shift back
-        translate!(P, z[1:end-1], pixel_size, -μ[m], -ϕ[p])
+        # ϕ = 0
+        τ = optical_depth(χ_, z)
+        p[end,:,:] = forward(D, E, S_, τ, μ[m])
+        backward(p, D, E)
+        #P += p
 
-        # Add contribution to radiation field
-        J += w[m]*P/nϕ
+        # ϕ = π
+        """S_ = reverse(S_, dims = 2)
+        S_ = reverse(S_, dims = 3)
+        χ_ = reverse(χ_, dims = 2)
+        χ_ = reverse(χ_, dims = 3)
 
-        #J = J .+ w[m]*P/nϕ
+        τ = optical_depth(χ_, z)
+        p[end,:,:] = forward(D, E, S_, τ, μ[m])
+        backward(p, D, E)
+        p = reverse(p, dims = 2)
+        p = reverse(p, dims = 3)
+        P += p
+
+        # ϕ = 3π/2
+        S_ = permutedims(S_, [1,3,2])
+        S_ = reverse(S_, dims = 2)
+        χ_ = permutedims(χ_, [1,3,2])
+        χ_ = reverse(χ_, dims = 2)
+
+        τ = optical_depth(χ_, z)
+        p[end,:,:] = forward(D, E, S_, τ, μ[m])
+        backward(p, D, E)
+        p = permutedims(p, [1,3,2])
+        p = reverse(p, dims = 3)
+        P += p
+
+        # ϕ = π/2
+        reverse(S_, dims = 2)
+        reverse(S_, dims = 3)
+        reverse(χ_, dims = 2)
+        reverse(χ_, dims = 3)
+
+        τ = optical_depth(χ_, z)
+        p[end,:,:] = forward(D, E, S_, τ, μ[m])
+        backward(p, D, E)
+        reverse(p, dims = 2)
+        p = permutedims(p, [1,3,2])
+        p = reverse(p, dims = 2)
+        P += p"""
+
+        # Shift back μ
+        #shift_variable!(P, z[1:end-1], pixel_size, -μ[m])
+        #shift_variable!(P, z[1:end-1], pixel_size, -1.0)
+
+        # Add to J
+        J = J .+ w[m]*p #/nφ
     end
 
-    return J
-
+    return p# J
 end
 
 """
@@ -69,7 +107,7 @@ function forward(D::Array{Float64, 3},
 
     for j=1:ny
         for i=1:nx
-            Δτ = τ[2:end,i,j] .- τ[1:end-1, i,j]
+            Δτ = τ[2:end,i,j] .- τ[1:end-1,i,j]
 
             # From boundary condition at the top
             E[1,i,j] = 0.0u"kW / m^2 / sr / nm"
@@ -103,7 +141,7 @@ function backward(P::Array{<:Unitful.Quantity,3},
     nz, nx, ny = size(D)
 
     for j=1:ny
-        for i=1:nz
+        for i=1:nx
             for k in range(nz, step=-1,stop=1)
                 P[k,i,j] = D[k,i,j]*P[k+1,i,j] + E[k,i,j]
             end
