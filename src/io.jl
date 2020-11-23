@@ -70,7 +70,7 @@ end
 Reads the target # of packets to be generated from input file.
 """
 function get_target_packets()
-    input_file = open(f->read(f, String), "../run/keywords.input")
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("target_packets", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -84,7 +84,7 @@ Reads the maximum # of scatterings
 for each packet from input file.
 """
 function get_max_scatterings()
-    input_file = open(f->read(f, String), "../run/keywords.input")
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("max_scatterings", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -98,7 +98,7 @@ Reads the # of escape bins in the polar and
 azimuthal directions from input file.
 """
 function get_escape_bins()
-    input_file = open(f->read(f, String), "../run/keywords.input")
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("escape_bins", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("[", file)[end] + 1

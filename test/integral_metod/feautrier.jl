@@ -13,40 +13,49 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
     μ = μ ./2.0 .+ 0.5
     nz, nx, ny = size(χ)
 
-    D = Array{Float64,3}(undef,nz-1,nx,ny)
-    E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
-    p = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
-    P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
-    J = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+
+    J = Tuple(zeros(nz,nx,ny)u"kW / m^2 / sr / nm" for t=1:Threads.nthreads())
 
     # ==================================================================
     # FEAUTRIER
     # ==================================================================
-    for m=1:nμ
+    Threads.@threads for m=1:nμ
 
-        S_ = copy(S)
-        χ_ = copy(χ)
+        D = Array{Float64,3}(undef,nz-1,nx,ny)
+        E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
+        p = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+        P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
 
         println(m)
 
-        # Shift atmosphere
+        # ϕ = 0
+        #########################################
+        S_ = copy(S)
+        χ_ = copy(χ)
         shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
         shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
-
         χ_ /= μ[m]
         S_ /= μ[m]
 
-        # ϕ = 0
         τ = optical_depth(χ_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
         P += p
 
         # ϕ = π
+        #########################################
+        S_ = copy(S)
+        χ_ = copy(χ)
+
         S_ = reverse(S_, dims = 2)
         S_ = reverse(S_, dims = 3)
         χ_ = reverse(χ_, dims = 2)
         χ_ = reverse(χ_, dims = 3)
+
+        shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
+        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
+        χ_ /= μ[m]
+        S_ /= μ[m]
 
         τ = optical_depth(χ_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
@@ -56,10 +65,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         P += p
 
         # ϕ = 3π/2
+        #########################################
+        S_ = copy(S)
+        χ_ = copy(χ)
+
         S_ = permutedims(S_, [1,3,2])
-        S_ = reverse(S_, dims = 2)
+        S_ = reverse(S_, dims = 3)
         χ_ = permutedims(χ_, [1,3,2])
-        χ_ = reverse(χ_, dims = 2)
+        χ_ = reverse(χ_, dims = 3)
+
+        shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
+        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
+        χ_ /= μ[m]
+        S_ /= μ[m]
 
         τ = optical_depth(χ_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
@@ -69,10 +87,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         P += p
 
         # ϕ = π/2
-        reverse(S_, dims = 2)
-        reverse(S_, dims = 3)
-        reverse(χ_, dims = 2)
-        reverse(χ_, dims = 3)
+        ############################################
+        S_ = copy(S)
+        χ_ = copy(χ)
+
+        S_ = permutedims(S_, [1,3,2])
+        S_ = reverse(S_, dims = 2)
+        χ_ = permutedims(χ_, [1,3,2])
+        χ_ = reverse(χ_, dims = 2)
+
+        shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
+        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
+        χ_ /= μ[m]
+        S_ /= μ[m]
 
         τ = optical_depth(χ_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
@@ -83,12 +110,15 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         P += p
 
         # Shift back μ
+        ################################################
         shift_variable!(P, z[1:end-1], pixel_size, -μ[m])
         shift_variable!(P, z[1:end-1], pixel_size, -1.0)
 
         # Add to J
-        J = J .+ w[m]*P/nφ
+        J[Threads.nthreads()] = w[m]*P/nφ
     end
+
+    J = reduce(+,J)
 
     return J
 end

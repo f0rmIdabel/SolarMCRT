@@ -29,7 +29,6 @@ function mcrt(atmosphere::Atmosphere,
     # SET UP VARIABLES
     # ===================================================================
     nz, nx, ny = size(χ)
-    total_boxes = nx*ny*nz
 
     # Initialise variables
     surface_intensity = zeros(Int64, nx, ny, num_bins...)
@@ -68,7 +67,7 @@ function mcrt(atmosphere::Atmosphere,
                 # Packets in box
                 packets = S[k,i,j]
 
-                if packets < 1
+                if packets == 0
                     continue
                 end
 
