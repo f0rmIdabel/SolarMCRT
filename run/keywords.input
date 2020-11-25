@@ -11,7 +11,7 @@ atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifro
 #  The intended number of packets to be created.                                            #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.         #
 # ========================================================================================= #
-target_packets = 5e8
+target_packets = 1e10
 
 # ========================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                           #

@@ -8,8 +8,6 @@ using Random
 using Printf
 using HDF5
 
-using ProgressBars
-
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 
@@ -20,7 +18,8 @@ function output(S::Array{Int64,3},
                 J::Array{Int64,3},
                 surface_intensity::Array{Int64,4},
                 total_destroyed::Int64,
-                total_scatterings::Int64)
+                total_scatterings::Int64,
+                scatter_height::Array{Int64,1})
     out = h5open("../out/output.hdf5", "w")
     write(out, "S", S)
     write(out, "J", J)
@@ -29,6 +28,7 @@ function output(S::Array{Int64,3},
     write(out, "total_destroyed", total_destroyed)
     write(out, "total_escaped", sum(surface_intensity))
     write(out, "total_scatterings", total_scatterings)
+    write(out, "scatter_height", scatter_height)
     close(out)
 end
 

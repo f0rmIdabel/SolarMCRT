@@ -13,18 +13,16 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
     μ = μ ./2.0 .+ 0.5
     nz, nx, ny = size(χ)
 
-
-    J = Tuple(zeros(nz,nx,ny)u"kW / m^2 / sr / nm" for t=1:Threads.nthreads())
+    D = Array{Float64,3}(undef,nz-1,nx,ny)
+    E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
+    p = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+    P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+    J = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
 
     # ==================================================================
     # FEAUTRIER
     # ==================================================================
-    Threads.@threads for m=1:nμ
-
-        D = Array{Float64,3}(undef,nz-1,nx,ny)
-        E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
-        p = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
-        P = zeros(nz,nx,ny)u"kW / m^2 / sr / nm"
+    for m=1:nμ
 
         println(m)
 
@@ -115,10 +113,8 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         shift_variable!(P, z[1:end-1], pixel_size, -1.0)
 
         # Add to J
-        J[Threads.nthreads()] = w[m]*P/nφ
+        J = J .+ w[m]*P/nφ
     end
-
-    J = reduce(+,J)
 
     return J
 end

@@ -35,6 +35,7 @@ function mcrt(atmosphere::Atmosphere,
     J = zeros(Int64, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
+    scatter_height = zeros(Int64, nz)
 
     # Init rng
     #rng = MersenneTwister(1)
@@ -88,6 +89,7 @@ function mcrt(atmosphere::Atmosphere,
                     for s=1:Int(max_scatterings)
 
                         Threads.atomic_add!(total_scatterings, 1)
+                        scatter_height[k] += 1
 
                         # Scatter packet once
                         box_id, r, lost = scatter_packet(x, y, z, χ,
@@ -115,8 +117,7 @@ function mcrt(atmosphere::Atmosphere,
     # WRITE TO FILE
     # ===================================================================
     println("\n--Writing results to file...\n")
-    output(S, J, surface_intensity, total_destroyed.value, total_scatterings.value)
-
+    output(S, J, surface_intensity, total_destroyed.value, total_scatterings.value, scatter_height)
 end
 
 """
