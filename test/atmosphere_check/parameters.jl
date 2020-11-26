@@ -59,7 +59,7 @@ function parameters()
       p1 = Plots.plot(mean_χ, z, xlabel = "̄χ", ylabel = "z", xscale=:log10)
       p2 = Plots.plot(mean_ε, z, xlabel = "̄ε", ylabel = "z")
       p3 = Plots.plot(mean_T, z, xlabel = "temperature", ylabel = "z" )
-      p4 = Plots.plot(mean_packets, z, xlabel = "packets", ylabel = "z",  xscale=:log10)
+      p4 = Plots.plot(mean_packets, z, xlabel = "packets", ylabel = "z")
       Plots.plot(p1, p2, p3, p4, layout = (2, 2), legend = false)
       Plots.png("parameters")
 

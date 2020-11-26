@@ -6,7 +6,7 @@ using LinearAlgebra
 From Tiago, translated from Python to Julia
 Computes S and J from a lambda iteration.
 """
-function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ=4, max_iterations=1000)
+function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=5, nϕ=4, max_iterations=1000)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
@@ -31,7 +31,7 @@ function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ
         J = feautrier(S, χ, z, nμ, nϕ, pixel_size)
         Snew = (1.0 .- ε) .* J + ε .* B
 
-        if convergence(S, Snew, 1e-3)
+        if convergence(S, Snew, 1e-4)
             S = copy(Snew)
             println("Convergence at iteration n = ", n)
             break
@@ -53,7 +53,7 @@ end
 Check if the relative difference between two arrays
 S1 and S2 is smaller than a given criterion.
 """
-function convergence(S1, S2, criterion = 1e-2)
+function convergence(S1, S2, criterion = 1e-4)
 
     converge = false
     c = norm( abs.(S1 .- S2) ./S1 )
