@@ -14,9 +14,10 @@ atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifro
 target_packets = 1e10
 
 # ========================================================================================= #
-#  Optical depth where atmosphere is cut off for each wavelength.                           #
+#  Optical depth where atmosphere is cut-off for each wavelength.                           #
+#  Set to false for no cut-off                                                              #
 # ========================================================================================= #
-tau_max = 20
+cut_off = 20
 
 # ========================================================================================= #
 #  Maximum number of scatterings before stopping.                                           #

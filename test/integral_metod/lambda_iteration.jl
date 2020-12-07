@@ -6,7 +6,7 @@ using LinearAlgebra
 From Tiago, translated from Python to Julia
 Computes S and J from a lambda iteration.
 """
-function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=5, nϕ=4, max_iterations=1000)
+function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ=4, max_iterations=1000)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================

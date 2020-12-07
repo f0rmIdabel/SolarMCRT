@@ -19,6 +19,7 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
 
     # Calculate escapes per box
     S = packets_per_box(atmosphere, λ, target_packets)
+
     return S, max_scatterings, escape_bins
 end
 

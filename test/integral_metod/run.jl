@@ -11,14 +11,14 @@ function run()
       # LOAD WAVELENGTHS
       # ==================================================================
       print("\n--Loading wavelengths......................")
-      λ = get_λ()[1]
+      λ = get_λ()[2]
       println(@sprintf(" %d wavelength(s) loaded.", length(λ)))
 
       # ==================================================================
       # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
       # ==================================================================
       print("--Loading atmosphere data..................")
-      atmosphere_parameters = collect_atmosphere_data(λ, false, false)
+      atmosphere_parameters = collect_atmosphere_data(λ, true)
       atmosphere = Atmosphere(atmosphere_parameters...)
       println(" Full atmosphere loaded.")
 

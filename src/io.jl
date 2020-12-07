@@ -20,7 +20,7 @@ function output(S::Array{Int64,3},
                 total_destroyed::Int64,
                 total_scatterings::Int64,
                 scatter_height::Array{Int64,1})
-    out = h5open("../out/output.hdf5", "w")
+    out = h5open("../out/output.hdf5", "cw")
     write(out, "S", S)
     write(out, "J", J)
     write(out, "surface_intensity", surface_intensity)
@@ -43,14 +43,22 @@ end
 """
 Reads τ from input file.
 """
-function get_τ_max()
+function get_cut_off()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("tau_max", input_file)[end] + 1
+    i = findfirst("cut_off", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    τ_max = parse(Float64, file[i:j])
-    return τ_max
+
+    cut_off = nothing
+
+    try
+        cut_off = parse(Float64, file[i:j])
+    catch
+        cut_off = parse(Bool, file[i:j])
+    end
+
+    return cut_off
 end
 
 """

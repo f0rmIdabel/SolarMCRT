@@ -16,13 +16,13 @@ end
 """
 Reads atmosphere parameters and reworks them to fit simulation.
 """
-function collect_atmosphere_data(λ, line=false, cut_off=true)
+function collect_atmosphere_data(λ, line=false)
 
     # ===========================================================
     # READ INPUT FILE
     # ===========================================================
     atmosphere_path = get_atmosphere_path()
-    τ_max = get_τ_max()
+    cut_off = get_cut_off()
 
     # ===========================================================
     # READ ATMOSPHERE FILE
@@ -80,6 +80,7 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
         ε = ε[:,end:-1:1,:]
     end
 
+
     if y[1] > y[end]
         y = reverse(y)
         velocity_z = velocity_z[:,:,end:-1:1]
@@ -106,8 +107,11 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
     # ===========================================================
 
 
-    if cut_off == true
-        boundary = optical_depth_boundary(χ, z, τ_max)
+    if cut_off == false
+        boundary = Array{Int64,2}(undef,nx,ny)
+        fill!(boundary, nz)
+    else
+        boundary = optical_depth_boundary(χ, z, cut_off)
         nz = maximum(boundary)
         z = z[1:nz+1]
         velocity_x = velocity_x[1:nz,:,:]
@@ -116,9 +120,6 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
         temperature = temperature[1:nz,:,:]
         χ = χ[1:nz,:,:]
         ε = ε[1:nz,:,:]
-    else
-        boundary = Array{Int64,2}(undef,nx,ny)
-        fill!(boundary, nz)
     end
 
     return z, x, y, velocity_z, velocity_x, velocity_y,
@@ -126,13 +127,13 @@ function collect_atmosphere_data(λ, line=false, cut_off=true)
 end
 
 function χ_ε_line()
-    rh_ray = h5open("../../../basement/MScProject/Atmospheres/output_ray.hdf5", "r")
+    rh_ray = h5open("../../../../basement/MScProject/Atmospheres/output_ray.hdf5", "r")
     χ_l = read(rh_ray, "chi_line")[2,:,:,:]u"m^-1"
     χ_c = read(rh_ray, "chi_continuum")[2,:,:,:]u"m^-1"
     ε_c = read(rh_ray, "epsilon_continuum")[2,:,:,:]
     close(rh_ray)
 
-    rh_aux = h5open("../../../basement/MScProject/Atmospheres/output_aux.hdf5", "r")
+    rh_aux = h5open("../../../../basement/MScProject/Atmospheres/output_aux.hdf5", "r")
     Rji = read(rh_aux, "atom_CA/Rji_line")[:,:,:,4]
     Cji = read(rh_aux, "atom_CA/Cji_line")[:,:,:,4]
     close(rh_aux)
