@@ -17,7 +17,7 @@ function parameters()
       print("--Loading atmosphere data..................")
       atmosphere_parameters = collect_atmosphere_data(λ)
       atmosphere = Atmosphere(atmosphere_parameters...)
-      println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_τ_max()))
+      println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_cut_off()))
 
       # ==================================================================
       # LOAD RADIATION DATA AND CALCULATE # PACKETS

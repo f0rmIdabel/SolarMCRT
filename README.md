@@ -29,12 +29,14 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-    * Source function, S                        (nlambda, nx, ny, nz*)
-    * Mean radiation field, J                   (nlambda, nx, ny, nz*)
-    * Surface intensity, surface_intensity      (nlambda, nx, ny, nz*, phi_bins, theta_bins)
-    * Total packets, total_packets              (nlambda)
-    * Total destroyed packets, total_destroyed  (nlambda)
-    * Total escaped packets, total_escaped      (nlambda)
-    * Total scatterings, total_scatterings      (nlambda)
+    * Source function, S                        (Int32, nz*, nx, ny)
+    * Mean radiation field, J                   (Int32, nz*, nx, ny)
+    * Surface intensity, surface_intensity      (Int32, nx, ny, phi_bins, theta_bins)
+    * Surface boundary, boundary                (Int32, nx, ny)
+    * Energy per packet, rad_per_packet         (kW / sr / nm)
+    * Total packets, total_packets              (Int64)
+    * Total destroyed packets, total_destroyed  (Int64)
+    * Total escaped packets, total_escaped      (Int64)
+    * Total scatterings, total_scatterings      (Int64)
 
-This is collected in the file *output.hdf5* in the out/ directory. For on wavelength in a ~500x500x450 atmosphere with no boundary cut-off, this will be around 2 GBs of data.
+This is collected in the file *output_λ.hdf5* in the out/ directory. For a ~500x500x450 atmosphere with no boundary cut-off, this will be around 2 GBs of data.

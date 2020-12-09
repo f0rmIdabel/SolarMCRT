@@ -8,9 +8,9 @@ struct Atmosphere
     velocity_x::Array{<:Unitful.Velocity, 3}       # (nx, ny, nz)
     velocity_y::Array{<:Unitful.Velocity, 3}       # (nx, ny, nz)
     temperature::Array{<:Unitful.Temperature, 3}   # (nx, ny, nz)
-    χ::Array{PerLength, 3}                         # (λ, nx, ny, nz)
-    ε::Array{Real, 3}                              # (λ, nx, ny, nz)
-    boundary::Array{Int64, 2}                      # (λ, nx, ny)
+    χ::Array{PerLength, 3}                         # (nx, ny, nz)
+    ε::Array{Real, 3}                              # (nx, ny, nz)
+    boundary::Array{Int32, 2}                      # (nx, ny)
 end
 
 """
@@ -106,9 +106,8 @@ function collect_atmosphere_data(λ, line=false)
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
 
-
     if cut_off == false
-        boundary = Array{Int64,2}(undef,nx,ny)
+        boundary = Array{Int32,2}(undef,nx,ny)
         fill!(boundary, nz)
     else
         boundary = optical_depth_boundary(χ, z, cut_off)
@@ -224,7 +223,7 @@ function optical_depth_boundary(χ::Array{<:Unitful.Quantity{<:Real, Unitful.�
                                 τ_max::Real)
     nz, nx, ny = size(χ)
     columns = nx*ny
-    boundary = Array{Int64, 2}(undef, nx, ny)
+    boundary = Array{Int32, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
     Threads.@threads for col=1:columns

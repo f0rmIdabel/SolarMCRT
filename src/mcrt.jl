@@ -15,6 +15,9 @@ function mcrt(atmosphere::Atmosphere,
     z = atmosphere.z
     χ = atmosphere.χ
     ε = atmosphere.ε
+    vx = atmosphere.velocity_x
+    vy = atmosphere.velocity_y
+    vz = atmosphere.velocity_z
     boundary = atmosphere.boundary
 
     # ===================================================================
@@ -22,6 +25,7 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     λ = radiation.λ
     S = radiation.S
+    rad_per_packet = radiation.rad_per_packet
     max_scatterings = radiation.max_scatterings
     num_bins = radiation.escape_bins
 
@@ -31,11 +35,10 @@ function mcrt(atmosphere::Atmosphere,
     nz, nx, ny = size(χ)
 
     # Initialise variables
-    surface_intensity = zeros(Int64, nx, ny, num_bins...)
-    J = zeros(Int64, nz, nx, ny)
+    surface_intensity = zeros(Int32, nx, ny, num_bins...)
+    J = zeros(Int32, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
-    scatter_height = zeros(Int64, nz)
 
     # Init rng
     #rng = MersenneTwister(1)
@@ -89,14 +92,14 @@ function mcrt(atmosphere::Atmosphere,
                     for s=1:Int(max_scatterings)
 
                         Threads.atomic_add!(total_scatterings, 1)
-                        scatter_height[k] += 1
 
                         # Scatter packet once
                         box_id, r, lost = scatter_packet(x, y, z, χ,
                                                          boundary,
                                                          box_id, r,
                                                          J, surface_intensity,
-                                                         num_bins)
+                                                         num_bins, vx, vy, vz)
+
                         # Check if escaped or lost in bottom
                         if lost
                             break
@@ -117,7 +120,7 @@ function mcrt(atmosphere::Atmosphere,
     # WRITE TO FILE
     # ===================================================================
     println("\n--Writing results to file...\n")
-    output(S, J, surface_intensity, total_destroyed.value, total_scatterings.value, scatter_height)
+    output(λ, S, J, surface_intensity, rad_per_packet, total_destroyed.value, boundary, total_scatterings.value)
 end
 
 """
@@ -128,12 +131,13 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
                         χ::Array{PerLength, 3},
-                        boundary::Array{Int64, 2},
+                        boundary::Array{Int32, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{Int64, 3},
-                        surface_intensity::Array{Int64,4},
-                        num_bins::Array{Int64, 1})
+                        J::Array{Int32, 3},
+                        surface_intensity::Array{Int32,4},
+                        num_bins::Array{Int64, 1},
+                        vx, vy, vz)
 
     # Keep track of status
     lost = false

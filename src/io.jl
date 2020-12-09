@@ -14,21 +14,26 @@ using HDF5
 """
 Writes the output from the MC simulation to a HDF5 file.
 """
-function output(S::Array{Int64,3},
-                J::Array{Int64,3},
-                surface_intensity::Array{Int64,4},
+function output(λ::Unitful.Length,
+                S::Array{Int32,3},
+                J::Array{Int32,3},
+                surface_intensity::Array{Int32,4},
+                rad_per_packet::Unitful.Quantity,
+                boundary::Array{Int32,2},
                 total_destroyed::Int64,
-                total_scatterings::Int64,
-                scatter_height::Array{Int64,1})
-    out = h5open("../out/output.hdf5", "cw")
+                total_scatterings::Int64)
+
+    out = h5open("../out/output_" * string(ustrip(λ)) * ".hdf5", "cw")
+    write(out, "λ", λ)
     write(out, "S", S)
     write(out, "J", J)
     write(out, "surface_intensity", surface_intensity)
+    write(out, "rad_per_packet", rad_per_packet)
+    write(out, "boundary", boundary)
     write(out, "total_packets", sum(S))
     write(out, "total_destroyed", total_destroyed)
     write(out, "total_escaped", sum(surface_intensity))
     write(out, "total_scatterings", total_scatterings)
-    write(out, "scatter_height", scatter_height)
     close(out)
 end
 

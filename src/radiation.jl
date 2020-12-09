@@ -1,10 +1,11 @@
 include("atmosphere.jl")
 
 struct Radiation
-    λ::Unitful.Length #Array{Unitful.Length,1}    # (nλ)
-    S::Array{Int64,3}             # (nz*, nx, ny)
-    max_scatterings::Real
-    escape_bins::Array{Int64,1}   # (nϕ, nθ)
+    λ::Unitful.Length                 # 1
+    S::Array{Int32,3}                 # (nz*, nx, ny)
+    rad_per_packet::Unitful.Quantity  # 1
+    max_scatterings::Real             # 1
+    escape_bins::Array{Int64,1}       # (nϕ, nθ)
 end
 
 
@@ -18,9 +19,10 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     escape_bins = get_escape_bins()
 
     # Calculate escapes per box
-    S = packets_per_box(atmosphere, λ, target_packets)
+    S, rad_per_packet = packets_per_box(atmosphere, λ, target_packets)
 
-    return S, max_scatterings, escape_bins
+
+    return S, rad_per_packet, max_scatterings, escape_bins
 end
 
 
@@ -42,7 +44,7 @@ function packets_per_box(atmosphere::Atmosphere,
 
     box_emissivity = blackbody_lambda.(λ, temperature) .* χ
     box_emission = zeros(Float64,nz,nx,ny)u"kW / sr / nm"
-    packets = zeros(Int64,nz,nx,ny)
+    packets = zeros(Int32,nz,nx,ny)
 
     @Threads.threads for j=1:ny
         for i=1:nx
@@ -57,7 +59,9 @@ function packets_per_box(atmosphere::Atmosphere,
     scale_emission = target_packets/total_emission
     packets = Int.(round.(box_emission*scale_emission))
 
-    return packets
+    rad_per_packet = total_emission/sum(packets)
+
+    return packets, rad_per_packet
 end
 
 
