@@ -120,7 +120,7 @@ function mcrt(atmosphere::Atmosphere,
     # WRITE TO FILE
     # ===================================================================
     println("\n--Writing results to file...\n")
-    output(λ, S, J, surface_intensity, rad_per_packet, total_destroyed.value, boundary, total_scatterings.value)
+    output(λ, S, J, surface_intensity, rad_per_packet, boundary, total_destroyed.value, total_scatterings.value)
 end
 
 """

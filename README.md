@@ -39,4 +39,4 @@ The code outputs
     * Total escaped packets, total_escaped      (Int64)
     * Total scatterings, total_scatterings      (Int64)
 
-This is collected in the file *output_λ.hdf5* in the out/ directory. For a ~500x500x450 atmosphere with no boundary cut-off, this will be around 2 GBs of data.
+For each wavelength λ, this is collected in the file *output_λ.hdf5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no boundary cut-off, this will be around 2 GBs of data.
