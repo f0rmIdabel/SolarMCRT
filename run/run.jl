@@ -39,7 +39,6 @@ function run()
         # ==================================================================
         mcrt(atmosphere, radiation)
     end
-
 end
 
 run()

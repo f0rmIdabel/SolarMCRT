@@ -24,11 +24,11 @@ function output(λ::Unitful.Length,
                 total_scatterings::Int64)
 
     out = h5open("../out/output_" * string(ustrip(λ)) * ".hdf5", "cw")
-    write(out, "λ", λ)
+    write(out, "λ", ustrip(λ)) #nm
     write(out, "S", S)
     write(out, "J", J)
     write(out, "surface_intensity", surface_intensity)
-    write(out, "rad_per_packet", rad_per_packet)
+    write(out, "rad_per_packet", ustrip(rad_per_packet))
     write(out, "boundary", boundary)
     write(out, "total_packets", sum(S))
     write(out, "total_destroyed", total_destroyed)
@@ -120,6 +120,95 @@ function get_escape_bins()
     i = j + 2
     j = findfirst("]", file)[end] - 1
     θ_bin = parse(UInt16, file[i:j])
-    escape_bins = [ϕ_bin, θ_bin] #SA[ϕ_bin, θ_bin]
+    escape_bins = [ϕ_bin, θ_bin]
     return escape_bins
+end
+
+function get_step()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("step", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("[", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    dz = parse(UInt16, file[i:j])
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst(",", file)[end] - 1
+    dx = parse(UInt16, file[1:j])
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst("]", file)[end] - 1
+    dy = parse(UInt16, file[1:j])
+    steps = [dz, dx, dy]
+    return steps
+end
+
+function get_stop()
+
+    nz = nothing
+    nx = nothing
+    ny = nothing
+
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("stop", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("[", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+
+    try
+        nz = parse(UInt16, file[i:j])
+    catch
+        nz = nothing
+    end
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst(",", file)[end] - 1
+
+    try
+        nx = parse(UInt16, file[1:j])
+    catch
+        nx = nothing
+    end
+
+    i = j + 2
+    j = findfirst("]", file)[end] - 1
+
+    try
+        ny = parse(UInt16, file[1:j])
+    catch
+        ny = nothing
+    end
+
+    stop = [nz, nx, ny]
+
+    return stop
+end
+
+function get_start()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("start", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("[", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+
+    nz = parse(UInt16, file[i:j])
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst(",", file)[end] - 1
+
+    nx = parse(UInt16, file[1:j])
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst("]", file)[end] - 1
+
+    ny = parse(UInt16, file[1:j])
+
+    start = [nz, nx, ny]
+
+    return start
 end

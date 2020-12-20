@@ -53,7 +53,7 @@ function collect_atmosphere_data(λ, line=false)
     end
 
     # ===========================================================
-    # RE-WORK DIMENSIONS TO FIT SIMULATION
+    # RE-WORK DIMENSIONS
     # ===========================================================
 
     # dimensions of data
@@ -91,17 +91,6 @@ function collect_atmosphere_data(λ, line=false)
         ε = ε[:,:,end:-1:1]
     end
 
-    # Add endpoints for box calculations
-    if length(z) == nz
-        z = push!(z, 2*z[end] - z[end-1])
-    end
-    if length(x) == nx
-        x = push!(x, 2*x[end] - x[end-1])
-    end
-    if length(y) == ny
-        y = push!(y, 2*y[end] - y[end-1])
-    end
-
     # ===========================================================
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
@@ -121,11 +110,147 @@ function collect_atmosphere_data(λ, line=false)
         ε = ε[1:nz,:,:]
     end
 
+    # ===========================================================
+    # CUT ATMOSPHERE
+    # ===========================================================
+
+    ze, xe, ye = get_stop()
+    zs, xs, ys = get_start()
+    dz, dx, dy = get_step()
+
+    # Cut z-direction from below
+    if ze != nothing && ze < nz
+        nz = ze
+        z = z[1:nz+1]
+        velocity_x = velocity_x[1:nz,:,:]
+        velocity_y = velocity_y[1:nz,:,:]
+        velocity_z = velocity_z[1:nz,:,:]
+        temperature = temperature[1:nz,:,:]
+        χ = χ[1:nz,:,:]
+        ε = ε[1:nz,:,:]
+    end
+
+    # Cut  z-direction from up top
+    if zs > 1
+        nz = zs
+        z = z[nz:end]
+        velocity_x = velocity_x[nz:end,:,:]
+        velocity_y = velocity_y[nz:end,:,:]
+        velocity_z = velocity_z[nz:end,:,:]
+        temperature = temperature[nz:end,:,:]
+        χ = χ[nz:end,:,:]
+        ε = ε[nz:end,:,:]
+        boundary = boundary .- nz
+    end
+
+    # Cut x-direction from right
+    if xe != nothing && xe < nx
+        nx = xe
+        x = x[1:nx+1]
+        velocity_x = velocity_x[:,1:nx,:]
+        velocity_y = velocity_y[:,1:nx,:]
+        velocity_z = velocity_z[:,1:nx,:]
+        temperature = temperature[:,1:nx,:]
+        χ = χ[:,1:nx,:]
+        ε = ε[:,1:nx,:]
+        boundary = boundary[1:nx,:]
+    end
+
+    # Cut x-direction from the left
+    if xs > 1
+        nx = xs
+        x = x[nx:end]
+        velocity_x = velocity_x[:,nx:end,:]
+        velocity_y = velocity_y[:,nx:end,:]
+        velocity_z = velocity_z[:,nx:end,:]
+        temperature = temperature[:,nx:end,:]
+        χ = χ[:,nx:end,:]
+        ε = ε[:,nx:end,:]
+        boundary = boundary[nx:end,:]
+    end
+
+    # Cut y-direction from right
+    if ye != nothing && ye < ny
+        ny = ye
+        y = y[1:ny+1]
+        velocity_x = velocity_x[:,:,1:ny]
+        velocity_y = velocity_y[:,:,1:ny]
+        velocity_z = velocity_z[:,:,1:ny]
+        temperature = temperature[:,:,1:ny]
+        χ = χ[:,:,1:ny]
+        ε = ε[:,:,1:ny]
+        boundary = boundary[:,1:ny]
+    end
+
+    # Cut y-direction from the left
+    if ys > 1
+        ny = ys
+        y = y[ny:end]
+        velocity_x = velocity_x[:,:,ny:end]
+        velocity_y = velocity_y[:,:,ny:end]
+        velocity_z = velocity_z[:,:,ny:end]
+        temperature = temperature[:,:,ny:end]
+        χ = χ[:,:,ny:end]
+        ε = ε[:,:,ny:end]
+        boundary[:,ny:end]
+    end
+
+    # Skip
+    if dz > 1
+        z = z[1:dz:end]
+        velocity_x = velocity_x[1:dz:end,:,:]
+        velocity_y = velocity_y[1:dz:end,:,:]
+        velocity_z = velocity_z[1:dz:end,:,:]
+        temperature = temperature[1:dz:end,:,:]
+        χ = χ[1:dz:end,:,:]
+        ε = ε[1:dz:end,:,:]
+        boundary = boundary ./ dz  # fix this
+    end
+
+    if dx > 1
+        x = x[1:dx:end]
+        velocity_x = velocity_x[:,1:dx:end,:]
+        velocity_y = velocity_y[:,1:dx:end,:]
+        velocity_z = velocity_z[:,1:dx:end,:]
+        temperature = temperature[:,1:dx:end,:]
+        χ = χ[:,1:dx:end,:]
+        ε = ε[:,1:dx:end,:]
+        boundary = boundary[1:dx:end,:]
+    end
+
+    if dy > 1
+        y = y[1:dy:end]
+        velocity_x = velocity_x[:,:,1:dy:end]
+        velocity_y = velocity_y[:,:,1:dy:end]
+        velocity_z = velocity_z[:,:,1:dy:end]
+        temperature = temperature[:,:,1:dy:end]
+        χ = χ[:,:,1:dy:end]
+        ε = ε[:,:,1:dy:end]
+        boundary = boundary[:,1:dy:end]
+    end
+
+    nz, nx, ny = size(χ)
+
+    # Add endpoints for box calculations
+    if length(z) == nz
+        z = push!(z, 2*z[end] - z[end-1])
+    end
+    if length(x) == nx
+        x = push!(x, 2*x[end] - x[end-1])
+    end
+    if length(y) == ny
+        y = push!(y, 2*y[end] - y[end-1])
+    end
+
     return z, x, y, velocity_z, velocity_x, velocity_y,
            temperature, χ, ε, boundary
 end
 
-function χ_ε_line()
+
+"""
+To be replaced by Tiago's Transparency functions
+"""
+function χ_ε_line_rh()
     rh_ray = h5open("../../../../basement/MScProject/Atmospheres/output_ray.hdf5", "r")
     χ_l = read(rh_ray, "chi_line")[2,:,:,:]u"m^-1"
     χ_c = read(rh_ray, "chi_continuum")[2,:,:,:]u"m^-1"
@@ -144,6 +269,12 @@ function χ_ε_line()
 
     return χ, ε
 end
+
+
+function χ_ε_line()
+    l
+end
+
 
 function χ_ε_continuum(λ, temperature, electron_density, hydrogen_populations)
 
@@ -173,8 +304,8 @@ function χ_abs(λ::Unitful.Length,
     α = Transparency.hminus_ff_stilley(λ, temperature, h_ground_density, electron_density)
     α += Transparency.hminus_bf_geltman(λ, temperature, h_ground_density, electron_density)
     α += hydrogenic_ff(c_0 / λ, temperature, electron_density, proton_density, 1)
-    #α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
-    #α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
+    α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
+    α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
     return α
 end
 
