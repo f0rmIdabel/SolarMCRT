@@ -1,4 +1,4 @@
-import PhysicalConstants.CODATA2018: c_0, h, k_B
+import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u
 using DelimitedFiles
 using ProgressMeter
 using Transparency
@@ -23,7 +23,7 @@ function output(λ::Unitful.Length,
                 total_destroyed::Int64,
                 total_scatterings::Int64)
 
-    out = h5open("../out/output_" * string(ustrip(λ)) * ".hdf5", "cw")
+    out = h5open("../out/output_" * string(ustrip(λ)) * ".hdf5", "w")
     write(out, "λ", ustrip(λ)) #nm
     write(out, "S", S)
     write(out, "J", J)

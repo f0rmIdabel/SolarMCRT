@@ -11,7 +11,14 @@
 atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_cb24bih_s385_fullv.ncdf"
 
 # ======================================================================================================== #
-#  Optical depth where atmosphere is cut-off for each wavelength.                                          #
+#  List over wavelengths in nm.                                                                            #
+#  Continuum wavelengths are given by themselves, while lines are given in brackets with the format        #
+#  [center wavelength (nm), width (nm), number of wavelengths]                                             #                                       #
+# ======================================================================================================== #
+500.0
+
+# ======================================================================================================== #
+#  Optical depth where atmosphere is cut off for each wavelength.                                          #
 #  Set to false for no cut-off.                                                                            #
 # ======================================================================================================== #
 cut_off = 20
@@ -27,7 +34,7 @@ step = [1, 1, 1]
 #  The intended number of packets to be created.                                                           #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.                        #
 # ======================================================================================================== #
-target_packets = 1e9
+target_packets = 1e8
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #

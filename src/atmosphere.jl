@@ -19,14 +19,9 @@ Reads atmosphere parameters and reworks them to fit simulation.
 function collect_atmosphere_data(λ, line=false)
 
     # ===========================================================
-    # READ INPUT FILE
-    # ===========================================================
-    atmosphere_path = get_atmosphere_path()
-    cut_off = get_cut_off()
-
-    # ===========================================================
     # READ ATMOSPHERE FILE
     # ===========================================================
+    atmosphere_path = get_atmosphere_path()
     atmos = h5open(atmosphere_path, "r")
 
     x = read(atmos, "x")u"m"
@@ -52,12 +47,24 @@ function collect_atmosphere_data(λ, line=false)
         χ, ε = χ_ε_continuum(λ, temperature, electron_density, hydrogen_populations)
     end
 
-    # ===========================================================
-    # RE-WORK DIMENSIONS
-    # ===========================================================
+    """
+    χ_c, ε_c = χ_ε_continuum(λ, temperature, electron_density, hydrogen_populations)
 
-    # dimensions of data
-    nz, nx, ny = size(temperature)
+    if line
+        χ_l, ε_l = χ_ε_line()
+
+        χ = χ_l .+ χ_c
+        ε = ε_l .* (χ_l ./ χ)  .+ ε_c .* (χ_c ./ χ)
+    else
+        χ = χ_c
+        ε = ε_c
+    end
+    """
+
+
+    # ===========================================================
+    # FLIP AXES
+    # ===========================================================
 
     # Make sure x and y are increasing and z decreasing
     if z[1] < z[end]
@@ -95,6 +102,11 @@ function collect_atmosphere_data(λ, line=false)
     # CALCULATE OPTICAL DEPTH BOUNDARY AND CUT OFF DATA
     # ===========================================================
 
+    # dimensions of data
+    nz, nx, ny = size(temperature)
+
+    cut_off = get_cut_off()
+
     if cut_off == false
         boundary = Array{Int32,2}(undef,nx,ny)
         fill!(boundary, nz)
@@ -111,7 +123,7 @@ function collect_atmosphere_data(λ, line=false)
     end
 
     # ===========================================================
-    # CUT ATMOSPHERE
+    # CUT AND SLICE ATMOSPHERE BY INDEX
     # ===========================================================
 
     ze, xe, ye = get_stop()
@@ -195,7 +207,7 @@ function collect_atmosphere_data(λ, line=false)
         boundary[:,ny:end]
     end
 
-    # Skip
+    # Only keep every dz-th box in z-direction
     if dz > 1
         z = z[1:dz:end]
         velocity_x = velocity_x[1:dz:end,:,:]
@@ -207,6 +219,7 @@ function collect_atmosphere_data(λ, line=false)
         boundary = boundary ./ dz  # fix this
     end
 
+    # Only keep every dx-th box in x-direction
     if dx > 1
         x = x[1:dx:end]
         velocity_x = velocity_x[:,1:dx:end,:]
@@ -218,6 +231,7 @@ function collect_atmosphere_data(λ, line=false)
         boundary = boundary[1:dx:end,:]
     end
 
+    # Only keep every dy-th box in y-direction
     if dy > 1
         y = y[1:dy:end]
         velocity_x = velocity_x[:,:,1:dy:end]
@@ -271,8 +285,39 @@ function χ_ε_line_rh()
 end
 
 
-function χ_ε_line()
-    l
+function χ_ε_line(temperature, z, electron_density, hydrogen_populations)
+
+    wavelength =
+
+    # Line data
+    Hα = AtomicLine(97492.304u"cm^-1", 82259.158u"cm^-1", 109677.617u"cm^-1",
+                    18, 8, 6.411e-01, 1.008 * m_u, 1)
+
+    unsold_const = γ_unsold_const(Hα)
+
+    # Compute continuum extinction
+    # α_cont = αcont.(Hα.λ0, temp, electron_density, hpops[:, 1], hpops[:, end])
+    # j_cont = α_cont .* (blackbody_λ.(Hα.λ0, temp) .|> u"kW / (m^2 * nm)")
+
+    # Compute line extinction (van der Waals + natural broadening)
+    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:, 1]) .+ Hα.Aji
+    ΔλD = doppler_width.(Hα.λ0, Hα.atom_weight, temperature)
+    intensity = zeros(length(wavelength))u"kW / (m^2 * nm)"
+
+    for (i, λ) in enumerate(wavelength)
+        a = damping.(γ, λ, ΔλD)
+        v = (λ - Hα.λ0) ./ ΔλD
+        profile = voigt_profile.(a, v, ΔλD)
+        χ = αline_λ.(Ref(Hα), profile, hydrogen_populations[:, 3], hydrogen_populations[:, 2])
+        #ε = Hα.Aji .... lacking data
+
+        #α_total = α_cont .+ αline_λ.(Ref(Hα), profile, hydrogen_populations[:, 3], hydrogen_populations[:, 2])
+        #j_total = j_cont .+ jline_λ.(Ref(Hα), profile, hpops[:, 3])
+        #source_function = j_total ./ α_total
+        #intensity[i] = calc_intensity(-z, α_total, source_function)
+    end
+
+    return χ, ε
 end
 
 
