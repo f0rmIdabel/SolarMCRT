@@ -26,17 +26,18 @@ function mcrt(atmosphere::Atmosphere,
     boundary = radiation.boundary
     S = radiation.S
     rad_per_packet = radiation.rad_per_packet
+
     max_scatterings = radiation.max_scatterings
-    num_bins = radiation.escape_bins
+    # num_bins = radiation.escape_bins
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    nz, nx, ny = size(χ)
+    nλ, nz, nx, ny = size(χ)
 
     # Initialise variables
-    surface_intensity = zeros(Int32, nx, ny, num_bins...)
-    J = zeros(Int32, nz, nx, ny)
+    # surface_intensity = zeros(Int32, nx, ny, num_bins...)
+    J_λ = zeros(Int32, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -49,78 +50,94 @@ function mcrt(atmosphere::Atmosphere,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
-    # Create ProgressMeter working with threads
-    p = Progress(ny)
-    update!(p,0)
-    jj = Threads.Atomic{Int}(0)
-    l = Threads.SpinLock()
+    for l=1:nλ
+        # fill!(surface_intensity, 0.0)
+        fill!(J_λ, 0.0)
+        total_destroyed = Threads.Atomic{Int64}(0)
+        total_scatterings = Threads.Atomic{Int64}(0)
 
-    # Go through all boxes
-    Threads.@threads for j=1:ny
+        S_λ = view(S, l,:,:,:)
+        χ_λ = view(χ, l,:,:,:)
+        boundary_λ = view(boundary, l, :,:)
 
-        # Advance ProgressMeter
-        Threads.atomic_add!(jj, 1)
-        Threads.lock(l)
-        update!(p, jj[])
-        Threads.unlock(l)
+        println("--[",l,"/",nλ, "]  λ = ", λ[l], " ...................")
 
+        # Create ProgressMeter working with threads
+        p = Progress(ny)
+        update!(p,0)
+        jj = Threads.Atomic{Int}(0)
+        l = Threads.SpinLock()
 
-        for i=1:nx
-            for k=1:nz
+        # Go through all boxes
+        Threads.@threads for j=1:ny
 
-                # Packets in box
-                packets = S[k,i,j]
+            # Advance ProgressMeter
+            Threads.atomic_add!(jj, 1)
+            Threads.lock(l)
+            update!(p, jj[])
+            Threads.unlock(l)
 
-                if packets == 0
-                    continue
-                end
+            for i=1:nx
+                for k=1:nz
 
-                # Dimensions of box
-                corner = SA[z[k], x[i], y[j]]
-                box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
+                    # Packets in box
+                    packets = S_λ[k,i,j]
 
-                for packet=1:packets
+                    if packets == 0
+                        continue
+                    end
 
-                    # Initial box
-                    box_id = [k,i,j]
+                    # Dimensions of box
+                    corner = SA[z[k], x[i], y[j]]
+                    box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
 
-                    # Initial position uniformely drawn from box
-                    r = corner .+ (box_dim .* rand(3))
+                    for packet=1:packets
 
-                    # Scatter each packet until destroyed,
-                    # escape or reach max_scatterings
-                    for s=1:Int(max_scatterings)
+                        # Initial box
+                        box_id = [k,i,j]
 
-                        Threads.atomic_add!(total_scatterings, 1)
+                        # Initial position uniformely drawn from box
+                        r = corner .+ (box_dim .* rand(3))
 
-                        # Scatter packet once
-                        box_id, r, lost = scatter_packet(x, y, z, χ,
-                                                         boundary,
-                                                         box_id, r,
-                                                         J, surface_intensity,
-                                                         num_bins, vx, vy, vz)
+                        # Scatter each packet until destroyed,
+                        # escape or reach max_scatterings
+                        for s=1:Int(max_scatterings)
 
-                        # Check if escaped or lost in bottom
-                        if lost
-                            break
-                        # Check if destroyed in next particle interaction
-                        elseif rand() < ε[box_id...]
-                            Threads.atomic_add!(total_destroyed, 1)
-                            break
+                            Threads.atomic_add!(total_scatterings, 1)
+
+                            # Scatter packet once
+                            box_id, r, lost = scatter_packet(x, y, z,
+                                                             χ_λ,
+                                                             boundary_λ,
+                                                             box_id, r,
+                                                             J_λ,
+                                                             #surface_intensity,
+                                                             #num_bins,
+                                                             vx, vy, vz)
+
+                            # Check if escaped or lost in bottom
+                            if lost
+                                break
+                            # Check if destroyed in next particle interaction
+                            elseif rand() < ε[box_id...]
+                                Threads.atomic_add!(total_destroyed, 1)
+                                break
+                            end
                         end
                     end
                 end
             end
         end
+
+        J_λ += S_λ
+
+        # ===================================================================
+        # WRITE TO FILE
+        # ===================================================================
+        println("\n--Writing results to file...\n")
+        #output(λ, S, J, surface_intensity, rad_per_packet, boundary, total_destroyed.value, total_scatterings.value)
+        output(J_λ, total_destroyed.value, total_scatterings.value)
     end
-
-    J = J .+ S
-
-    # ===================================================================
-    # WRITE TO FILE
-    # ===================================================================
-    println("\n--Writing results to file...\n")
-    output(λ, S, J, surface_intensity, rad_per_packet, boundary, total_destroyed.value, total_scatterings.value)
 end
 
 """
@@ -135,8 +152,8 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
-                        surface_intensity::Array{Int32,4},
-                        num_bins::Array{Int64, 1},
+                        #surface_intensity::Array{Int32,4},
+                        #num_bins::Array{Int64, 1},
                         vx, vy, vz)
 
     # Keep track of status
@@ -187,9 +204,9 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         if face == 1
             if box_id[1] == 0
                 lost = true
-                ϕ_bin = 1 + Int(ϕ÷(2π/num_bins[1]))
-                θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:num_bins[2]))))
-                surface_intensity[box_id[2], box_id[3], ϕ_bin, θ_bin] += 1
+                #ϕ_bin = 1 + Int(ϕ÷(2π/num_bins[1]))
+                #θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:num_bins[2]))))
+                #surface_intensity[box_id[2], box_id[3], ϕ_bin, θ_bin] += 1
                 break
             end
         # Handle side escapes with periodic boundary

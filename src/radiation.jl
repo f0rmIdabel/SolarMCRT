@@ -1,14 +1,14 @@
 include("atmosphere.jl")
 
 struct Radiation
-    λ::Unitful.Length                 #1
-    χ
-    ε
-    boundary
-    S::Array{Int32,3}                 # (nz*, nx, ny)
-    rad_per_packet::Unitful.Quantity  # 1
-    max_scatterings::Real             # 1
-    escape_bins::Array{Int64,1}       # (nϕ, nθ)
+    λ::Array{<:Unitful.Length, 1}                  # (nλ)
+    χ::Array{<:Unitful.Quantity, 4}                # (nλ, nz, nx, ny)
+    ε::Array{Float64,4}                            # (nλ, nz, nx, ny)
+    boundary::Array{Int32,3}                       # (nλ, nx, ny)
+    S::Array{Int32,4}                              # (nλ, nz, nx, ny)
+    rad_per_packet::Array{<:Unitful.Quantity, 1}   # (nλ)
+    max_scatterings::Real                          # Int64
+    escape_bins::Array{Int64,1}       # (nϕ, nθ)   # (2)
 end
 
 
@@ -33,14 +33,18 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     hydrogen_populations = atmosphere.hydrogen_populations
 
     # Calculate χ and ε
-    χ, ε =  χ_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
-
+    χ = Array{Float64,4}(undef, 1, nz-1, nx, ny)u"m^-1"
+    ε = Array{Float64,4}(undef, 1, nz-1, nx, ny)
+    χ[1,:,:,:], ε[1,:,:,:] =  χ_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
 
     # Find opticla depth boundary
-    boundary = optical_depth_boundary(χ, z, τ_max)
+    boundary = Array{Int32,3}(undef, 1, nx, ny)
+    boundary[1,:,:] = optical_depth_boundary(χ, z, τ_max)
 
     # Calculate distribuion of packets
-    S, intensity_per_packet = distribute_packets(λ, target_packets, x, y, z,
+    S = Array{Int32,4}(undef, 1, nz, nx, ny)
+    intensity_per_packet = Array{Float64,1}(undef, 1)
+    S[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ, target_packets, x, y, z,
                                                  temperature, χ, boundary)
 
     return λ, χ, ε, boundary, S, intensity_per_packet, max_scatterings, escape_bins
@@ -73,17 +77,18 @@ function collect_radiation_data(atomsphere::Atmosphere, atom::AtomicLine)
     nλ = length(λ)
 
     # Get opacity and destruction probability
+    # For each wavelength, find χ and ε
     χ, ε = χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
 
     # Get boundary and packet distribuion
 
     for l=1:nλ
         # Find opticla depth boundary
-        boundary[l,:] = optical_depth_boundary(χ[l,:], z, τ_max)
+        boundary[l,:] = optical_depth_boundary(χ[l,:,:,:], z, τ_max)
 
         # Calculate distribuion of packets
         S[l,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                     temperature, χ[l,:], boundary[l,:])
+                                                     temperature, χ[l,:,:,:], boundary[l,:,:])
     end
 
     return λ, χ, ε, boundary, S, intensity_per_packet, max_scatterings, escape_bins
