@@ -13,17 +13,17 @@ function mcrt(atmosphere::Atmosphere,
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
-    χ = atmosphere.χ
-    ε = atmosphere.ε
     vx = atmosphere.velocity_x
     vy = atmosphere.velocity_y
     vz = atmosphere.velocity_z
-    boundary = atmosphere.boundary
 
     # ===================================================================
     # RADIATION DATA
     # ===================================================================
     λ = radiation.λ
+    χ = radiation.χ
+    ε = radiation.ε
+    boundary = radiation.boundary
     S = radiation.S
     rad_per_packet = radiation.rad_per_packet
     max_scatterings = radiation.max_scatterings

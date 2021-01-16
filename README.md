@@ -29,12 +29,13 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-    * Source function, S                        (Int32, nz*, nx, ny)
-    * Mean radiation field, J                   (Int32, nz*, nx, ny)
+    * Wavelengths, λ                            (Float64 [nm], nλ)
+    * Source function, S                        (Int32, nλ, nz*, nx, ny)
+    * Mean radiation field, J                   (Int32, nλ, nz*, nx, ny)
     * Surface intensity, surface_intensity      (Int32, nx, ny, phi_bins, theta_bins)
     * Surface boundary, boundary                (Int32, nx, ny)
-    * Energy per packet, rad_per_packet         (kW / sr / nm)
-    * Total packets, total_packets              (Int64)
+    * Energy per packet, intensity_per_packet   (Float64 [kW / m^2 / sr / nm], nλ)
+    * Total packets, total_packets              (Int64, nλ)
     * Total destroyed packets, total_destroyed  (Int64)
     * Total escaped packets, total_escaped      (Int64)
     * Total scatterings, total_scatterings      (Int64)

@@ -6,11 +6,60 @@ function run()
             "\n", "="^83)
 
     # ==================================================================
-    # LOAD WAVELENGTHS
+    # LOAD ATMOSPHERE DATA
     # ==================================================================
-    print("\n--Loading wavelengths......................")
-    λs = get_λ()
-    println(@sprintf(" %d wavelength(s) loaded.", length(λs)))
+    print("--Loading atmosphere data..................")
+    atmosphere_parameters = collect_atmosphere_data()
+    atmosphere = Atmosphere(atmosphere_parameters...)
+    println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
+
+    mode = get_mode()
+
+    if mode == "wave"
+
+        # ==================================================================
+        # LOAD WAVELENGTH
+        # ==================================================================
+
+        print("--Loading wavelength....................")
+        λ = get_test_λ()
+        println("Wavelength λ = ", λ, " nm loaded.")
+
+        # ==================================================================
+        # LOAD RADIATION DATA
+        # ==================================================================
+        print("--Loading radiation data...................")
+        radiation_parameters = collect_radiation_data(atmosphere, λ)
+        radiation = Radiation(λ, radiation_parameters...)
+        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+
+        # ==================================================================
+        # SIMULATION
+        # ==================================================================
+        mcrt(atmosphere, radiation)
+
+    else if mode == "atom"
+
+        # ==================================================================
+        # LOAD ATOM
+        # ==================================================================
+        atom_parameters = collect_atom_data()
+        atom = AtomicLine(collect_atom_data()...)
+
+        # ==================================================================
+        # LOAD RADIATION DATA
+        # ==================================================================
+        print("--Loading radiation data...................")
+        radiation_parameters = collect_radiation_data(atmosphere, atom)
+        radiation = Radiation(λ, radiation_parameters...)
+        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+
+        # ==================================================================
+        # SIMULATION
+        # ==================================================================
+        mcrt(atmosphere, radiation)
+
+    end
 
     # ==================================================================
     # LOOP OVER WAVELENGTHS
@@ -18,13 +67,7 @@ function run()
 
     for λ in λs
         println("\n--λ = " * string(λ) * ".............................")
-        # ==================================================================
-        # LOAD ATMOSPHERE DATA AND CALCULATE BOUNDARY
-        # ==================================================================
-        print("--Loading atmosphere data..................")
-        atmosphere_parameters = collect_atmosphere_data(λ)
-        atmosphere = Atmosphere(atmosphere_parameters...)
-        println(@sprintf(" Atmosphere loaded with tau_max = %.1f.", get_cut_off()))
+
 
         # ==================================================================
         # LOAD RADIATION DATA AND CALCULATE # PACKETS

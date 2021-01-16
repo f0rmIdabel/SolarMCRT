@@ -80,6 +80,19 @@ function get_atmosphere_path()
 end
 
 """
+Reads location of atmosphere file from input file.
+"""
+function get_atom_path()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("atom_path", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    atmosphere_path = string(file[i+1:j-1])
+    return atmosphere_path
+end
+
+"""
 Reads the target # of packets to be generated from input file.
 """
 function get_target_packets()

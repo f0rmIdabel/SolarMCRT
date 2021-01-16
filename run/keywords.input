@@ -4,18 +4,26 @@
 # ======================================================================================================== #
 # ======================================================================================================== #
 
+# ======================================================================================================== #
+#  Choose between "atom" and "wave" running mode, where the atom mode looks at a 2-level atom given in     #
+#  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
+#  while the test mode runs with the continuum opacity at test_λ (nm).                                     #                              #
+# ======================================================================================================== #
+mode = "wave"
+
+# For atom mode
+atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2.hdf5"
+nλ_bb = 51
+nλ_bf = 20
+
+# For wave mode
+wave_λ = 500.0
 
 # ======================================================================================================== #
 #  Path to the atmosphere file.                                                                            #
 # ======================================================================================================== #
 atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_cb24bih_s385_fullv.ncdf"
 
-# ======================================================================================================== #
-#  List over wavelengths in nm.                                                                            #
-#  Continuum wavelengths are given by themselves, while lines are given in brackets with the format        #
-#  [center wavelength (nm), width (nm), number of wavelengths]                                             #                                       #
-# ======================================================================================================== #
-500.0
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -31,10 +39,10 @@ stop = [end, end, end]
 step = [1, 1, 1]
 
 # ======================================================================================================== #
-#  The intended number of packets to be created.                                                           #
+#  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.                        #
 # ======================================================================================================== #
-target_packets = 1e8
+target_packets = 1e10
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #
