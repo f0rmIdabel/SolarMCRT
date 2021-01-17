@@ -26,7 +26,6 @@ function mcrt(atmosphere::Atmosphere,
     boundary = radiation.boundary
     S = radiation.S
     rad_per_packet = radiation.rad_per_packet
-
     max_scatterings = radiation.max_scatterings
     # num_bins = radiation.escape_bins
 
@@ -37,6 +36,13 @@ function mcrt(atmosphere::Atmosphere,
 
     # Initialise variables
     # surface_intensity = zeros(Int32, nx, ny, num_bins...)
+    # Open output file
+    file = h5open("../out/output.h5", "w")
+    J = d_create(file, "J", datatype(Int64), dataspace(nλ,nz,nx,ny), "chunk",(1,nz,nx,ny))
+    write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
+    write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
+
+    # Initialise placeholder variables
     J_λ = zeros(Int32, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
@@ -130,13 +136,13 @@ function mcrt(atmosphere::Atmosphere,
         end
 
         J_λ += S_λ
-
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
         println("\n--Writing results to file...\n")
-        #output(λ, S, J, surface_intensity, rad_per_packet, boundary, total_destroyed.value, total_scatterings.value)
-        output(J_λ, total_destroyed.value, total_scatterings.value)
+        J[l,:,:,:] = J_λ
+        file["total_destroyed"][l] = total_destroyed
+        file["total_scatterings"][l] = total_scatterings
     end
 end
 

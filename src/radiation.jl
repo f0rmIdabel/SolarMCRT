@@ -8,9 +8,8 @@ struct Radiation
     S::Array{Int32,4}                              # (nλ, nz, nx, ny)
     rad_per_packet::Array{<:Unitful.Quantity, 1}   # (nλ)
     max_scatterings::Real                          # Int64
-    escape_bins::Array{Int64,1}       # (nϕ, nθ)   # (2)
+    escape_bins::Array{Int64,1}                    # (2)
 end
-
 
 
 """
@@ -97,10 +96,12 @@ end
 
 
 function get_λ(χl, χu, nλ_bb, nλ_bf)
+    χl = wavenumber_to_energy(χl)
+    χu = wavenumber_to_energy(χu)
 
-    λ_bf_edge_l = energytolambda...#convert(Quantity{T, Unitful.𝐋}, ((h * c_0) / (χu - χl)) |> u"nm")
-    λ_bf_edge_u =
-    λ_bb_center = energytolambda
+    λ_bf_edge_l = convert(Quantity{T, Unitful.𝐋}, ((h * c_0) / χl) |> u"nm")
+    λ_bf_edge_u = convert(Quantity{T, Unitful.𝐋}, ((h * c_0) / χu) |> u"nm")
+    λ_bb_center = convert(Quantity{T, Unitful.𝐋}, ((h * c_0) / (χu - χl)) |> u"nm")
 
     Δλ_bf = 1.0
     Δλ_bb = 0.1
@@ -159,7 +160,7 @@ function χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density,
         a = damping.(γ, λ[l], ΔλD)
         v = (λ[l] - λ0) ./ ΔλD
         profile = voigt_profile.(a, v, ΔλD)
-        χ_line = αline_λ.(Ref(atom), profile, hydrogen_populations[:, 2], hydrogen_populations[:, 1])
+        χ_line = αline_λ.(Ref(atom), profile, hydrogen_populations[:, 3], hydrogen_populations[:, 2])
 
         B = blackbody_lambda(λ[l], temperature)
         Rji = atom.Aji .+ atom.Bji.*B

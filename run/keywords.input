@@ -29,7 +29,7 @@ atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifro
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
 #  Set to false for no cut-off.                                                                            #
 # ======================================================================================================== #
-cut_off = 20
+cut_off = 20.0
 
 # ======================================================================================================== #
 # Start, end and jump in atmosphere data.                                                                  #

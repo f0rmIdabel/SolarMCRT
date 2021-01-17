@@ -23,6 +23,7 @@ function run()
 
         print("--Loading wavelength....................")
         λ = get_test_λ()
+        println(λ)
         println("Wavelength λ = ", λ, " nm loaded.")
 
         # ==================================================================
@@ -30,7 +31,8 @@ function run()
         # ==================================================================
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
-        radiation = Radiation(λ, radiation_parameters...)
+        radiation = Radiation(radiation_parameters...)
+        write_to_file(radition)
         println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
 
         # ==================================================================
@@ -51,7 +53,8 @@ function run()
         # ==================================================================
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, atom)
-        radiation = Radiation(λ, radiation_parameters...)
+        radiation = Radiation(radiation_parameters...)
+        write_to_file(radition)
         println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
 
         # ==================================================================

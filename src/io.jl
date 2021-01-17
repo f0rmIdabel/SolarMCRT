@@ -11,43 +11,34 @@ using HDF5
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 
-"""
-Writes the output from the MC simulation to a HDF5 file.
-"""
-function output(λ::Unitful.Length,
-                S::Array{Int32,3},
-                J::Array{Int32,3},
-                surface_intensity::Array{Int32,4},
-                rad_per_packet::Unitful.Quantity,
-                boundary::Array{Int32,2},
-                total_destroyed::Int64,
-                total_scatterings::Int64)
-
-    out = h5open("../out/output_" * string(ustrip(λ)) * ".hdf5", "w")
-    write(out, "λ", ustrip(λ)) #nm
-    write(out, "S", S)
-    write(out, "J", J)
-    write(out, "surface_intensity", surface_intensity)
-    write(out, "rad_per_packet", ustrip(rad_per_packet))
-    write(out, "boundary", boundary)
-    write(out, "total_packets", sum(S))
-    write(out, "total_destroyed", total_destroyed)
-    write(out, "total_escaped", sum(surface_intensity))
-    write(out, "total_scatterings", total_scatterings)
-    close(out)
+function write_to_file(radiation::Radiation)
+    h5open("../out/output.h5", "w") do file
+        write(file, "lambda", ustrip(radiation.λ))
+        write(file, "chi", ustrip(radiation.χ))
+        write(file, "epsilon", radiation.ε)
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        write(file, "max_scatterings", radiation.max_scatterings)
+        write(file, "escape_bins", radiation.escape_bins)
+    end
 end
 
+
 """
-Reads λ from input file.
+Reads from input file.
 """
-function get_λ()
-    λ = readdlm("/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/wavelengths.input", ' ')[1,:]u"nm"
+function get_test_λ()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("wave_λ", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+
+    λ = parse(Float64, file[i:j])
+
     return λ
 end
 
-"""
-Reads τ from input file.
-"""
 function get_cut_off()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("cut_off", input_file)[end] + 1
@@ -66,9 +57,6 @@ function get_cut_off()
     return cut_off
 end
 
-"""
-Reads location of atmosphere file from input file.
-"""
 function get_atmosphere_path()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("atmosphere_path", input_file)[end] + 1
@@ -79,9 +67,6 @@ function get_atmosphere_path()
     return atmosphere_path
 end
 
-"""
-Reads location of atmosphere file from input file.
-"""
 function get_atom_path()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("atom_path", input_file)[end] + 1
@@ -92,9 +77,6 @@ function get_atom_path()
     return atmosphere_path
 end
 
-"""
-Reads the target # of packets to be generated from input file.
-"""
 function get_target_packets()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("target_packets", input_file)[end] + 1
@@ -105,10 +87,6 @@ function get_target_packets()
     return target_packets
 end
 
-"""
-Reads the maximum # of scatterings
-for each packet from input file.
-"""
 function get_max_scatterings()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("max_scatterings", input_file)[end] + 1
@@ -119,10 +97,6 @@ function get_max_scatterings()
     return max_scatterings
 end
 
-"""
-Reads the # of escape bins in the polar and
-azimuthal directions from input file.
-"""
 function get_escape_bins()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("escape_bins", input_file)[end] + 1
