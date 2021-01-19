@@ -6,15 +6,20 @@ using LinearAlgebra
 From Tiago, translated from Python to Julia
 Computes S and J from a lambda iteration.
 """
-function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ=4, max_iterations=1000)
+function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, nϕ=4, max_iterations=1000)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
     x = atmosphere.x
     z = atmosphere.z
-    χ = atmosphere.χ
-    ε = atmosphere.ε
     temperature = atmosphere.temperature
+
+    # ==================================================================
+    # RADIATION DATA
+    # ==================================================================
+    λ = radiation.λ[1]
+    χ = radiation.χ[1,:,:,:]
+    ε = radiation.ε[1,:,:,:]
 
     # ===================================================================
     # CALCULATE BB SOURCE FUNCTION
@@ -43,7 +48,7 @@ function lambda_iteration(atmosphere::Atmosphere, λ::Unitful.Length, nμ=3, nϕ
     # ==================================================================
     # WRITE TO FILE
     # ==================================================================
-    out = h5open("../../out/output.hdf5", "cw")
+    out = h5open("../../out/output.h5", "cw")
     write(out, "J_integral", ustrip(J))
     write(out, "S_integral", ustrip(S))
     close(out)

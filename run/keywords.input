@@ -7,17 +7,17 @@
 # ======================================================================================================== #
 #  Choose between "atom" and "wave" running mode, where the atom mode looks at a 2-level atom given in     #
 #  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
-#  while the test mode runs with the continuum opacity at test_λ (nm).                                     #                              #
+#  while the test mode runs with the continuum opacity at the test λ (nm).                                     #                              #
 # ======================================================================================================== #
 running_mode = "test"
+
+# For test mode
+test_wavelength = 500.0
 
 # For atom mode
 atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2.hdf5"
 nλ_bb = 51
 nλ_bf = 20
-
-# For test mode
-test_wavelength = 500.0
 
 # ======================================================================================================== #
 #  Path to the atmosphere file.                                                                            #
@@ -35,13 +35,13 @@ cut_off = 20.0
 # ======================================================================================================== #
 start = [180, 1, 1]
 stop = [end, end, end]
-step = [1, 1, 1]
+step = [1, 10, 10]
 
 # ======================================================================================================== #
 #  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.                        #
 # ======================================================================================================== #
-target_packets = 1e10
+target_packets = 1e8
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #

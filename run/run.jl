@@ -31,7 +31,6 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = Radiation(radiation_parameters...)
-        write_to_file(radiation)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.S)))
 
         # ==================================================================
@@ -48,18 +47,30 @@ function run()
         atom = AtomicLine(collect_atom_data()...)
 
         # ==================================================================
-        # LOAD RADIATION DATA
+        # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
-        print("--Loading radiation data...................")
-        radiation_parameters = collect_radiation_data(atmosphere, atom)
-        radiation = Radiation(radiation_parameters...)
-        write_to_file(radition)
-        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+        new_atom_populations = atmosphere.hydrogen_populations[:,:,:,1:2]
+        converged = false
 
-        # ==================================================================
-        # SIMULATION
-        # ==================================================================
-        mcrt(atmosphere, radiation)
+        while !converged
+            atom_populations = new_atom_populations
+            # ==================================================================
+            # LOAD RADIATION DATA
+            # ==================================================================
+            print("--Loading radiation data...................")
+            radiation_parameters = collect_radiation_data(atmosphere, atom, atom_populations)
+            radiation = Radiation(radiation_parameters...)
+            write_to_file(radition)
+            println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+
+            # ==================================================================
+            # SIMULATION
+            # ==================================================================
+            mcrt(atmosphere, radiation)
+
+            new_atom_population = get_revised_populations(atom, J)
+            converged = check_conversion(atom_populations, new_atom_populations)
+        end
 
     end
 end

@@ -21,9 +21,13 @@ function collect_atom_data()
     return χu, χl, χ∞, gu, gl, f_value, atom_weight, Z
 end
 
+# Should be generalised
+function get_initial_populations()
 
-function calculate_population(λ, J)
-    
+end
+
+
+function update_populations(λ, J)
 end
 
 

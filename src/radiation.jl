@@ -52,7 +52,7 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     return λ, χ, ε, boundary, S, intensity_per_packet, max_scatterings, escape_bins
 end
 
-function collect_radiation_data(atomsphere::Atmosphere, atom::AtomicLine)
+function collect_radiation_data(atomsphere::Atmosphere, atom::AtomicLine, populations)
 
     # Read from input file
     max_scatterings = get_max_scatterings()
@@ -80,7 +80,7 @@ function collect_radiation_data(atomsphere::Atmosphere, atom::AtomicLine)
 
     # Get opacity and destruction probability
     # For each wavelength, find χ and ε
-    χ, ε = χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
+    χ, ε = χ_and_ε_atom(atom, atom_populations, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
 
     # Get boundary and packet distribuion
 
@@ -134,7 +134,7 @@ function get_λ(χl, χu, nλ_bb, nλ_bf)
 end
 
 
-function χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
+function χ_and_ε_atom(atom, atom_populations, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
     nz, nx, ny = shape(temperature)
     nλ = length(λ)
 
@@ -163,7 +163,7 @@ function χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density,
         a = damping.(γ, λ[l], ΔλD)
         v = (λ[l] - λ0) ./ ΔλD
         profile = voigt_profile.(a, v, ΔλD)
-        χ_line = αline_λ.(Ref(atom), profile, hydrogen_populations[:, 3], hydrogen_populations[:, 2])
+        χ_line = αline_λ.(Ref(atom), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
 
         B = blackbody_lambda(λ[l], temperature)
         Rji = atom.Aji .+ atom.Bji.*B
@@ -350,7 +350,5 @@ function write_to_file(radiation::Radiation)
         write(file, "epsilon", radiation.ε)
         write(file, "boundary", radiation.boundary)
         write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
-        write(file, "max_scatterings", radiation.max_scatterings)
-        write(file, "escape_bins", radiation.escape_bins)
     end
 end

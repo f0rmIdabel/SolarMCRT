@@ -53,7 +53,7 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # SIMULATION
     # ===================================================================
-    println(@sprintf("--Starting simulation, using %d thread(s)...\n",
+    println(@sprintf("\n--Starting simulation, using %d thread(s)...",
             Threads.nthreads()))
 
     for λi=1:nλ
@@ -67,7 +67,7 @@ function mcrt(atmosphere::Atmosphere,
         boundary_λ = view(boundary, λi, :,:)
         ε_λ = view(ε, λi,:,:,:)
 
-        println("--[",λi,"/",nλ, "]  λ = ", λ[λi], " ...................")
+        println("--[",λi,"/",nλ, "]  λ = ", λ[λi], "......................")
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -145,6 +145,8 @@ function mcrt(atmosphere::Atmosphere,
         file["total_destroyed"][λi] = total_destroyed.value
         file["total_scatterings"][λi] = total_scatterings.value
     end
+    close(file)
+    write_to_file(radiation)
 end
 
 """
