@@ -11,7 +11,7 @@ struct Atmosphere
     temperature::Array{<:Unitful.Temperature, 3}        # (nx, ny, nz)
     electron_density::Array{<:Unitful.Quantity, 3}      # (nx, ny, nz)
 
-    hydrogen_populations::Array{<:Unitful.Quantity, 3}  # (nx, ny, nz, nl)
+    hydrogen_populations::Array{<:Unitful.Quantity, 4}  # (nx, ny, nz, nl)
 end
 
 """

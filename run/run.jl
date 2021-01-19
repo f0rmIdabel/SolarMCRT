@@ -15,16 +15,15 @@ function run()
 
     mode = get_mode()
 
-    if mode == "wave"
+    if mode == "test"
 
         # ==================================================================
         # LOAD WAVELENGTH
         # ==================================================================
 
-        print("--Loading wavelength....................")
+        print("--Loading wavelength.......................")
         λ = get_test_λ()
-        println(λ)
-        println("Wavelength λ = ", λ, " nm loaded.")
+        println("Wavelength λ = ", λ, " loaded.")
 
         # ==================================================================
         # LOAD RADIATION DATA
@@ -32,15 +31,15 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = Radiation(radiation_parameters...)
-        write_to_file(radition)
-        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+        write_to_file(radiation)
+        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.S)))
 
         # ==================================================================
         # SIMULATION
         # ==================================================================
         mcrt(atmosphere, radiation)
 
-    else if mode == "atom"
+    elseif mode == "atom"
 
         # ==================================================================
         # LOAD ATOM
@@ -62,28 +61,6 @@ function run()
         # ==================================================================
         mcrt(atmosphere, radiation)
 
-    end
-
-    # ==================================================================
-    # LOOP OVER WAVELENGTHS
-    # ==================================================================
-
-    for λ in λs
-        println("\n--λ = " * string(λ) * ".............................")
-
-
-        # ==================================================================
-        # LOAD RADIATION DATA AND CALCULATE # PACKETS
-        # ==================================================================
-        print("--Loading radiation data...................")
-        radiation_parameters = collect_radiation_data(atmosphere, λ)
-        radiation = Radiation(λ, radiation_parameters...)
-        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
-
-        # ==================================================================
-        # SIMULATION
-        # ==================================================================
-        mcrt(atmosphere, radiation)
     end
 end
 

@@ -22,6 +22,11 @@ function collect_atom_data()
 end
 
 
+function calculate_population(λ, J)
+    
+end
+
+
 """
 χl = 82259.158u"cm^-1"
 χ∞ = 109677.617u"cm^-1"

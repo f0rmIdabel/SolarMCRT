@@ -11,32 +11,43 @@ using HDF5
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 
-function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "w") do file
-        write(file, "lambda", ustrip(radiation.λ))
-        write(file, "chi", ustrip(radiation.χ))
-        write(file, "epsilon", radiation.ε)
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
-        write(file, "max_scatterings", radiation.max_scatterings)
-        write(file, "escape_bins", radiation.escape_bins)
-    end
+
+function get_mode()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("running_mode", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    mode = string(file[i+1:j-1])
+    return mode
 end
 
-
-"""
-Reads from input file.
-"""
 function get_test_λ()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("wave_λ", input_file)[end] + 1
+    i = findfirst("test_wavelength", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
 
-    λ = parse(Float64, file[i:j])
+    λ = parse(Float64, file[i:j])u"nm"
 
     return λ
+end
+
+function get_nλ()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("nλ_bb", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    nλ_bb = parse(Float64, file[i:j])
+
+    i = findfirst("nλ_bf", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    nλ_bf = parse(Float64, file[i:j])
+    return nλ_bb, nλ_bf
 end
 
 function get_cut_off()

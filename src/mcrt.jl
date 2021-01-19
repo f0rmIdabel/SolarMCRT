@@ -25,7 +25,7 @@ function mcrt(atmosphere::Atmosphere,
     ε = radiation.ε
     boundary = radiation.boundary
     S = radiation.S
-    rad_per_packet = radiation.rad_per_packet
+    rad_per_packet = radiation.intensity_per_packet
     max_scatterings = radiation.max_scatterings
     # num_bins = radiation.escape_bins
 
@@ -38,7 +38,7 @@ function mcrt(atmosphere::Atmosphere,
     # surface_intensity = zeros(Int32, nx, ny, num_bins...)
     # Open output file
     file = h5open("../out/output.h5", "w")
-    J = d_create(file, "J", datatype(Int64), dataspace(nλ,nz,nx,ny), "chunk",(1,nz,nx,ny))
+    J = d_create(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), "chunk",(1,nz,nx,ny))
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
     write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
 
@@ -56,17 +56,18 @@ function mcrt(atmosphere::Atmosphere,
     println(@sprintf("--Starting simulation, using %d thread(s)...\n",
             Threads.nthreads()))
 
-    for l=1:nλ
+    for λi=1:nλ
         # fill!(surface_intensity, 0.0)
         fill!(J_λ, 0.0)
         total_destroyed = Threads.Atomic{Int64}(0)
         total_scatterings = Threads.Atomic{Int64}(0)
 
-        S_λ = view(S, l,:,:,:)
-        χ_λ = view(χ, l,:,:,:)
-        boundary_λ = view(boundary, l, :,:)
+        S_λ = view(S, λi,:,:,:)
+        χ_λ = view(χ, λi,:,:,:)
+        boundary_λ = view(boundary, λi, :,:)
+        ε_λ = view(ε, λi,:,:,:)
 
-        println("--[",l,"/",nλ, "]  λ = ", λ[l], " ...................")
+        println("--[",λi,"/",nλ, "]  λ = ", λ[λi], " ...................")
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -125,7 +126,7 @@ function mcrt(atmosphere::Atmosphere,
                             if lost
                                 break
                             # Check if destroyed in next particle interaction
-                            elseif rand() < ε[box_id...]
+                            elseif rand() < ε_λ[box_id...]
                                 Threads.atomic_add!(total_destroyed, 1)
                                 break
                             end
@@ -140,9 +141,9 @@ function mcrt(atmosphere::Atmosphere,
         # WRITE TO FILE
         # ===================================================================
         println("\n--Writing results to file...\n")
-        J[l,:,:,:] = J_λ
-        file["total_destroyed"][l] = total_destroyed
-        file["total_scatterings"][l] = total_scatterings
+        J[λi,:,:,:] = J_λ
+        file["total_destroyed"][λi] = total_destroyed.value
+        file["total_scatterings"][λi] = total_scatterings.value
     end
 end
 
@@ -153,8 +154,8 @@ Returns new position, box_id and lost-status.
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        χ::Array{PerLength, 3},
-                        boundary::Array{Int32, 2},
+                        χ,
+                        boundary,
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},

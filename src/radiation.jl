@@ -1,14 +1,14 @@
 include("atmosphere.jl")
 
 struct Radiation
-    λ::Array{<:Unitful.Length, 1}                  # (nλ)
-    χ::Array{<:Unitful.Quantity, 4}                # (nλ, nz, nx, ny)
-    ε::Array{Float64,4}                            # (nλ, nz, nx, ny)
-    boundary::Array{Int32,3}                       # (nλ, nx, ny)
-    S::Array{Int32,4}                              # (nλ, nz, nx, ny)
-    rad_per_packet::Array{<:Unitful.Quantity, 1}   # (nλ)
-    max_scatterings::Real                          # Int64
-    escape_bins::Array{Int64,1}                    # (2)
+    λ::Array{<:Unitful.Length, 1}                        # (nλ)
+    χ::Array{<:Unitful.Quantity, 4}                      # (nλ, nz, nx, ny)
+    ε::Array{Float64,4}                                  # (nλ, nz, nx, ny)
+    boundary::Array{Int32,3}                             # (nλ, nx, ny)
+    S::Array{Int32,4}                                    # (nλ, nz, nx, ny)
+    intensity_per_packet::Array{<:Unitful.Quantity, 1}   # (nλ)
+    max_scatterings::Real                                # Int64
+    escape_bins::Array{Int64,1}                          # (2)
 end
 
 
@@ -19,7 +19,6 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     # Read from input file
     max_scatterings = get_max_scatterings()
     escape_bins = get_escape_bins()
-
     target_packets = get_target_packets()
     τ_max = get_cut_off()
 
@@ -31,20 +30,24 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     electron_density = atmosphere.electron_density
     hydrogen_populations = atmosphere.hydrogen_populations
 
+    nz, nx, ny = size(temperature)
+
+    λ = [λ]
+
     # Calculate χ and ε
-    χ = Array{Float64,4}(undef, 1, nz-1, nx, ny)u"m^-1"
-    ε = Array{Float64,4}(undef, 1, nz-1, nx, ny)
+    χ = Array{Float64,4}(undef, 1, nz, nx, ny)u"m^-1"
+    ε = Array{Float64,4}(undef, 1, nz, nx, ny)
     χ[1,:,:,:], ε[1,:,:,:] =  χ_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
 
     # Find opticla depth boundary
     boundary = Array{Int32,3}(undef, 1, nx, ny)
-    boundary[1,:,:] = optical_depth_boundary(χ, z, τ_max)
+    boundary[1,:,:] = optical_depth_boundary(χ[1,:,:,:], z, τ_max)
 
     # Calculate distribuion of packets
     S = Array{Int32,4}(undef, 1, nz, nx, ny)
-    intensity_per_packet = Array{Float64,1}(undef, 1)
-    S[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ, target_packets, x, y, z,
-                                                 temperature, χ, boundary)
+    intensity_per_packet = Array{Float64,1}(undef, 1)u"kW / m^2 / sr / nm"
+    S[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
+                                                             temperature, χ[1,:,:,:], boundary[1,:,:])
 
     return λ, χ, ε, boundary, S, intensity_per_packet, max_scatterings, escape_bins
 end
@@ -141,8 +144,8 @@ function χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density,
 
     # Find bound-free continuum
     for l=1:nλ_bf
-        χ[l,:,;,:], ε[l,:,:,:] =  χ_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
-        χ[l+nλ_bf,:,;,:], ε[l+nλ_bf,:,:,:] =  χ_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
+        χ[l,:,:,:], ε[l,:,:,:] =  χ_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
+        χ[l+nλ_bf,:,:,:], ε[l+nλ_bf,:,:,:] =  χ_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
     end
 
     # Find bound-bound continuum
@@ -168,7 +171,6 @@ function χ_and_ε_atom(atom, λ, nλ_bb, nλ_bf, temperature, electron_density,
         ε_line = Cji ./ (Rji .+ Cji)
         χ[l,:,:,:] = χ_line .+ χ_cont
         ε[l,:,:,:] = ε_line .* (χ_line ./ χ[l,:,:,:])  .+ ε_cont .* (χ_cont ./ χ[l,:,:,:])
-        end
     end
 
     return χ, ε
@@ -177,7 +179,7 @@ end
 
 function χ_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
 
-    proton_density = hydrogen_populations[:,:,;,end]
+    proton_density = hydrogen_populations[:,:,:,end]
     hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1] #unclear if I should use all neutral hydrogen
 
     # continuum
@@ -233,7 +235,6 @@ function χ_cont_scatt(λ::Unitful.Length,
     α += rayleigh_h(λ, h_ground_density)
     return α
 end
-
 
 
 #############################################################################33
@@ -307,10 +308,9 @@ function distribute_packets(λ::Unitful.Length,
 
     nz, nx, ny = size(χ)
 
-    j = blackbody_lambda.(λ, temperature) .* χ
-
+    emissivity = blackbody_lambda.(λ, temperature) .* χ # u"kW / m^3 / sr / nm"
     box_emission = zeros(Float64,nz,nx,ny)u"kW / sr / nm"
-    intensity_per_packet = zeros(Float64,nz,nx,ny)u"kW / m^2 / sr / nm"
+    intensity_per_packet = 0.0u"kW / m^2 / sr / nm"
 
     Δz = (z[1:end-1] .- z[2:end])
     Δx = (x[2:end] .- x[1:end-1])
@@ -319,14 +319,14 @@ function distribute_packets(λ::Unitful.Length,
     @Threads.threads for j=1:ny
         for i=1:nx
             for k=1:boundary[i,j]
-                box_emission[k,i,j] = j[k,i,j]*Δz[k]*Δx[i]*Δy[j]
-                intensity_per_packet = j[k,i,j]/(Δx[i]*Δy[j])
+                box_emission[k,i,j] = emissivity[k,i,j]*Δz[k]*Δx[i]*Δy[j]
+                intensity_per_packet += emissivity[k,i,j]*Δz[k]
             end
         end
     end
 
     packets_per_box = Int.(round.( (box_emission/sum(box_emission)) * target_packets ))
-    intensity_per_packet = sum(rad_per_packet)/sum(packets)
+    intensity_per_packet /= sum(packets_per_box)
 
     return packets_per_box, intensity_per_packet
 end
@@ -341,4 +341,16 @@ Credit: Tiago
 function blackbody_lambda(λ::Unitful.Length,
                           temperature::Unitful.Temperature)
     (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
+end
+
+function write_to_file(radiation::Radiation)
+    h5open("../out/output.h5", "w") do file
+        write(file, "lambda", ustrip(radiation.λ))
+        write(file, "chi", ustrip(radiation.χ))
+        write(file, "epsilon", radiation.ε)
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        write(file, "max_scatterings", radiation.max_scatterings)
+        write(file, "escape_bins", radiation.escape_bins)
+    end
 end
