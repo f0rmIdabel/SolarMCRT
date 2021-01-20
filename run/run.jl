@@ -3,7 +3,7 @@ include("../src/mcrt.jl")
 function run()
     println("\n", "="^83, "\n", " "^30,
             "SOLAR ATMOSPHERE MCRT",
-            "\n", "="^83)
+            "\n", "="^83, "\n")
 
     # ==================================================================
     # LOAD ATMOSPHERE DATA

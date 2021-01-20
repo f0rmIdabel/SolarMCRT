@@ -7,7 +7,7 @@
 # ======================================================================================================== #
 #  Choose between "atom" and "wave" running mode, where the atom mode looks at a 2-level atom given in     #
 #  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
-#  while the test mode runs with the continuum opacity at the test λ (nm).                                     #                              #
+#  while the test mode runs with the continuum opacity at the test λ (nm).                                 #                              #
 # ======================================================================================================== #
 running_mode = "test"
 
@@ -35,13 +35,13 @@ cut_off = 20.0
 # ======================================================================================================== #
 start = [180, 1, 1]
 stop = [end, end, end]
-step = [1, 10, 10]
+step = [1, 1, 1]
 
 # ======================================================================================================== #
 #  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets not perfectly divided between boxes.                        #
 # ======================================================================================================== #
-target_packets = 1e8
+target_packets = 1e10
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #

@@ -38,7 +38,7 @@ function mcrt(atmosphere::Atmosphere,
     # surface_intensity = zeros(Int32, nx, ny, num_bins...)
     # Open output file
     file = h5open("../out/output.h5", "w")
-    J = d_create(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), "chunk",(1,nz,nx,ny))
+    J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
     write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
 
@@ -53,7 +53,7 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # SIMULATION
     # ===================================================================
-    println(@sprintf("\n--Starting simulation, using %d thread(s)...",
+    println(@sprintf("--Starting simulation, using %d thread(s)...",
             Threads.nthreads()))
 
     for λi=1:nλ
@@ -67,7 +67,7 @@ function mcrt(atmosphere::Atmosphere,
         boundary_λ = view(boundary, λi, :,:)
         ε_λ = view(ε, λi,:,:,:)
 
-        println("--[",λi,"/",nλ, "]  λ = ", λ[λi], "......................")
+        println("\n--[",λi,"/",nλ, "]  λ = ", λ[λi], "......................")
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -140,7 +140,6 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        println("\n--Writing results to file...\n")
         J[λi,:,:,:] = J_λ
         file["total_destroyed"][λi] = total_destroyed.value
         file["total_scatterings"][λi] = total_scatterings.value

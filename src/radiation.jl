@@ -344,10 +344,11 @@ function blackbody_lambda(λ::Unitful.Length,
 end
 
 function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "w") do file
+    h5open("../out/output.h5", "cw") do file
         write(file, "lambda", ustrip(radiation.λ))
         write(file, "chi", ustrip(radiation.χ))
         write(file, "epsilon", radiation.ε)
+        write(file, "S", ustrip(radiation.S))
         write(file, "boundary", radiation.boundary)
         write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end
