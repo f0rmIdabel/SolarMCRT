@@ -25,13 +25,14 @@ function run()
         λ = get_test_λ()
         println("Wavelength λ = ", λ, " loaded.")
 
+
         # ==================================================================
         # LOAD RADIATION DATA
         # ==================================================================
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = Radiation(radiation_parameters...)
-        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.S)))
+        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # ==================================================================
         # SIMULATION
@@ -43,8 +44,12 @@ function run()
         # ==================================================================
         # LOAD ATOM
         # ==================================================================
+        print("--Loading atom.............................")
         atom_parameters = collect_atom_data()
         atom = AtomicLine(collect_atom_data()...)
+        nλ_bb, nλ_bf = get_nλ()
+        nλ = nλ_bf*2 + nλ_bb
+        println("Atom loaded with ", nλ, " wavelengths.")
 
         # ==================================================================
         # LOAD INITIAL ATOM POPULATIONS
@@ -60,8 +65,8 @@ function run()
             print("--Loading radiation data...................")
             radiation_parameters = collect_radiation_data(atmosphere, atom, atom_populations)
             radiation = Radiation(radiation_parameters...)
-            write_to_file(radition)
-            println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
+            write_to_file(radiation)
+            println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
 
             # ==================================================================
             # SIMULATION

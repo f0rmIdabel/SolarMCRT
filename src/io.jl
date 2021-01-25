@@ -40,13 +40,13 @@ function get_nλ()
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    nλ_bb = parse(Float64, file[i:j])
+    nλ_bb = parse(Int64, file[i:j])
 
     i = findfirst("nλ_bf", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    nλ_bf = parse(Float64, file[i:j])
+    nλ_bf = parse(Int64, file[i:j])
     return nλ_bb, nλ_bf
 end
 
@@ -106,20 +106,6 @@ function get_max_scatterings()
     j = findfirst("\n", file)[end] - 1
     max_scatterings = parse(Float64, file[i:j])
     return max_scatterings
-end
-
-function get_escape_bins()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("escape_bins", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("[", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-    ϕ_bin = parse(UInt16, file[i:j])
-    i = j + 2
-    j = findfirst("]", file)[end] - 1
-    θ_bin = parse(UInt16, file[i:j])
-    escape_bins = [ϕ_bin, θ_bin]
-    return escape_bins
 end
 
 function get_step()

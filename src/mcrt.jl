@@ -21,22 +21,19 @@ function mcrt(atmosphere::Atmosphere,
     # RADIATION DATA
     # ===================================================================
     λ = radiation.λ
-    χ = radiation.χ
+    α = radiation.α
     ε = radiation.ε
     boundary = radiation.boundary
-    S = radiation.S
+    packets = radiation.packets
     rad_per_packet = radiation.intensity_per_packet
     max_scatterings = radiation.max_scatterings
-    # num_bins = radiation.escape_bins
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    nλ, nz, nx, ny = size(χ)
+    nλ, nz, nx, ny = size(α)
 
-    # Initialise variables
-    # surface_intensity = zeros(Int32, nx, ny, num_bins...)
-    # Open output file
+    # Open output file and initialise variables
     file = h5open("../out/output.h5", "w")
     J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
@@ -46,9 +43,6 @@ function mcrt(atmosphere::Atmosphere,
     J_λ = zeros(Int32, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
     total_scatterings = Threads.Atomic{Int64}(0)
-
-    # Init rng
-    #rng = MersenneTwister(1)
 
     # ===================================================================
     # SIMULATION
@@ -62,12 +56,12 @@ function mcrt(atmosphere::Atmosphere,
         total_destroyed = Threads.Atomic{Int64}(0)
         total_scatterings = Threads.Atomic{Int64}(0)
 
-        S_λ = view(S, λi,:,:,:)
-        χ_λ = view(χ, λi,:,:,:)
+        packets_λ = view(packets, λi,:,:,:)
+        α_λ = view(α, λi,:,:,:)
         boundary_λ = view(boundary, λi, :,:)
         ε_λ = view(ε, λi,:,:,:)
 
-        println("\n--[",λi,"/",nλ, "]  λ = ", λ[λi], "......................")
+        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm...............", ustrip(λ[λi])*1e9))
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -88,9 +82,9 @@ function mcrt(atmosphere::Atmosphere,
                 for k=1:nz
 
                     # Packets in box
-                    packets = S_λ[k,i,j]
+                    pcts = packets_λ[k,i,j]
 
-                    if packets == 0
+                    if pcts == 0
                         continue
                     end
 
@@ -98,7 +92,7 @@ function mcrt(atmosphere::Atmosphere,
                     corner = SA[z[k], x[i], y[j]]
                     box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
 
-                    for packet=1:packets
+                    for pct=1:pcts
 
                         # Initial box
                         box_id = [k,i,j]
@@ -114,12 +108,10 @@ function mcrt(atmosphere::Atmosphere,
 
                             # Scatter packet once
                             box_id, r, lost = scatter_packet(x, y, z,
-                                                             χ_λ,
+                                                             α_λ,
                                                              boundary_λ,
                                                              box_id, r,
                                                              J_λ,
-                                                             #surface_intensity,
-                                                             #num_bins,
                                                              vx, vy, vz)
 
                             # Check if escaped or lost in bottom
@@ -136,7 +128,6 @@ function mcrt(atmosphere::Atmosphere,
             end
         end
 
-        J_λ += S_λ
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
@@ -155,13 +146,11 @@ Returns new position, box_id and lost-status.
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        χ,
+                        α,
                         boundary,
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
-                        #surface_intensity::Array{Int32,4},
-                        #num_bins::Array{Int64, 1},
                         vx, vy, vz)
 
     # Keep track of status
@@ -197,7 +186,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                              r, unit_vector)
 
-    τ_cum = ds * χ[box_id...]
+    τ_cum = ds * α[box_id...]
     r += ds * unit_vector
 
     # ===================================================================
@@ -212,9 +201,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         if face == 1
             if box_id[1] == 0
                 lost = true
-                #ϕ_bin = 1 + Int(ϕ÷(2π/num_bins[1]))
-                #θ_bin = 1 + sum(θ .> ((π/2)/(2 .^(2:num_bins[2]))))
-                #surface_intensity[box_id[2], box_id[3], ϕ_bin, θ_bin] += 1
                 break
             end
         # Handle side escapes with periodic boundary
@@ -245,7 +231,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                                  r, unit_vector)
 
-        τ_cum += ds * χ[box_id...]
+        τ_cum += ds * α[box_id...]
         r += ds * unit_vector
     end
 
@@ -253,7 +239,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # CORRECT FOR OVERSHOOT IN FINAL BOX
     # ===================================================================
     if !lost
-        r -= unit_vector*(τ_cum - τ)/χ[box_id...]
+        r -= unit_vector*(τ_cum - τ)/α[box_id...]
     end
 
     return box_id, r, lost
