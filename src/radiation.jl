@@ -418,7 +418,7 @@ function write_to_file(radiation::Radiation)
         write(file, "lambda", ustrip(radiation.λ))
         write(file, "chi", ustrip(radiation.α))
         write(file, "epsilon", radiation.ε)
-        write(file, "S", ustrip(radiation.packets))
+        write(file, "packets", ustrip(radiation.packets))
         write(file, "boundary", radiation.boundary)
         write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end

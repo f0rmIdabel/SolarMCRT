@@ -13,26 +13,26 @@ The simulation parameters can be changed in the file *keywords.input* in the run
 The code requires an atmosphere file containing
 
     * Dimensions
-        * x (nx)
-        * y (ny)
-        * z (nz)
+        * x [m] (nx)
+        * y [m] (ny)
+        * z [m] (nz)
     * Velocities
-        * velocity_x (nz, nx, ny)
-        * velocity_y (nz, nx, ny)
-        * velocity_z (nz, nx, ny)
+        * velocity_x [m/s] (nz, nx, ny)
+        * velocity_y [m/s] (nz, nx, ny)
+        * velocity_z [m/s] (nz, nx, ny)
     * Temperature
-        * temperature (nz, nx, ny)
+        * temperature [K] (nz, nx, ny)
     * Densities
-        * electron_density (nz, nx, ny)
-        * hydrogen_populations (nz, nx, ny, levels)
+        * electron_density [m^-3] (nz, nx, ny)
+        * hydrogen_populations [m^-3] (nz, nx, ny, levels)
 
 When ran in full *atom mode*,  the program needs a two-level atom file containing
 
-	* Atomic weight, atom_weight
+	* Atomic weight, atom_weight [kg]
 	* Ion charge, Z
-	* Ionisation energy, chi_inf
-	* Ground level energy, chi_l
-	* Second level energy, chi_u
+	* Ionisation wavenumber, chi_inf [cm^-1]
+	* Ground level wavenumber, chi_l [cm^-1]
+	* Second level wavenumber, chi_u [cm^-1]
 	* Ground level statistical weight, gl
 	* Second level statistical weight, gu
 	* Oscillator strength, f_value
@@ -46,16 +46,15 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-    * Wavelengths, λ [nm]       						                (Float64, nλ)
-	* Opacity, chi [m^-1]
-	* Destruction probability
-    * Source function, S                    						    (Int32, nλ, nz, nx, ny)
-    * Mean radiation field, J            						        (Int32, nλ, nz, nx, ny)
-    * Surface boundary, boundary                                        (Int32, nx, ny)
-    * Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm]   (Float64, nλ)
-    * Total packets, total_packets              (Int64, nλ)
-    * Total destroyed packets, total_destroyed  (Int64)
-    * Total escaped packets, total_escaped      (Int64)
-    * Total scatterings, total_scatterings      (Int64)
+    * Wavelengths, λ [nm] (nλ)
+	* Opacity, chi [m^-1] (nλ, nz, nx, ny)
+	* Destruction probability, epsilon (nλ, nz, nx, ny)
+    * Packet distribution, packets (nλ, nz, nx, ny)
+	* Sourface boundary, boundary (nλ, nx, ny)
+	* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)
 
-For each wavelength λ, this is collected in the file *output_λ.hdf5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no boundary cut-off, this will be around 2 GBs of data.
+    * Mean radiation field, J (nλ, nz, nx, ny)
+    * Total destroyed packets, total_destroyed (nλ)
+    * Total scatterings, total_scatterings (nλ)
+
+The get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around 2 GBs of data.
