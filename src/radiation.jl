@@ -59,7 +59,6 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     max_scatterings = get_max_scatterings()
     target_packets = get_target_packets()
     τ_max = get_cut_off()
-    nλ_bb, nλ_bf = get_nλ()
 
     # Get atmosphere data
     x = atmosphere.x
@@ -72,12 +71,12 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     nz, nx, ny = size(temperature)
 
     # Sample wavelengths
-    λ = get_λ(atom, nλ_bb, nλ_bf)
+    λ = get_λ(atom)
     nλ = length(λ)
 
     # Get opacity and destruction probability
     # For each wavelength, find χ and ε
-    α, ε = α_and_ε_atom(atom, populations, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
+    α, ε = α_and_ε_atom(atmosphere, atom, populations, λ)
 
     # Get boundary and packet distribuion
     boundary = Array{Int32,3}(undef, nλ, nx, ny)
@@ -97,7 +96,10 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
 end
 
 
-function get_λ(atom::AtomicLine, nλ_bb, nλ_bf)
+function get_λ(atom::AtomicLine)
+
+    nλ_bb, nλ_bf = get_nλ()
+
     χi = atom.χi
     χj = atom.χj
     χ∞ = atom.χ∞
@@ -109,10 +111,6 @@ function get_λ(atom::AtomicLine, nλ_bb, nλ_bf)
     Δλ_bf = 1.0u"nm"
     Δλ_bb = 0.1u"nm"
 
-    if nλ_bb % 2 == 0
-        nλ_bb += 1
-    end
-
     nλ = nλ_bf*2 + nλ_bb
 
     λ = Array{Float64,1}(undef,nλ)u"m"
@@ -122,19 +120,120 @@ function get_λ(atom::AtomicLine, nλ_bb, nλ_bf)
         λ[l+nλ_bf] = λ_bf_edge_u + Δλ_bf*l
     end
 
-    center = nλ_bf*2 + (nλ_bb÷2) + 1
-    λ[center] = λ_bb_center
+    # If even # of wavelength samplings
+    if nλ_bb % 2 == 0
+        center = nλ_bf*2 + (nλ_bb÷2)
+        λ[center] = λ_bb_center
 
-    for l=1:(nλ_bb÷2)
-        λ[center-l] = λ[center - l + 1] - Δλ_bb
-        λ[center+l] = λ[center + l - 1] + Δλ_bb
+        for l=1:(nλ_bb÷2 - 1)
+            λ[center-l] = λ[center - l + 1] - Δλ_bb
+            λ[center+l] = λ[center + l - 1] + Δλ_bb
+        end
+
+        λ[end] = λ[end-1] + Δλ_bb
+
+    # If odd # of wavelength samplings
+    else
+        center = nλ_bf*2 + (nλ_bb÷2) + 1
+        λ[center] = λ_bb_center
+
+        for l=1:(nλ_bb÷2)
+            λ[center-l] = λ[center - l + 1] - Δλ_bb
+            λ[center+l] = λ[center + l - 1] + Δλ_bb
+        end
+    end
+
+    return λ
+end
+
+function get_λ_fancyspacing(atom::AtomicLine)
+
+    nλ_bb, nλ_bf = get_nλ()
+
+    χi = atom.χi
+    χj = atom.χj
+    χ∞ = atom.χ∞
+
+    λ_bf_edge_l = ((h * c_0) / (χ∞-χi)) |> u"nm"
+    λ_bf_edge_u = ((h * c_0) / (χ∞-χj)) |> u"nm"
+    λ_bb_center = ((h * c_0) / (χj-χi)) |> u"nm"
+
+    nλ = nλ_bf*2 + nλ_bb
+    λ = Array{Float64,1}(undef,nλ)u"m"
+
+
+    # ===============================================
+    # Bound-free transitions
+    # ===============================================
+    Δλ_bf = 1.0u"nm"
+
+    for l=1:nλ_bf
+        λ[l] = λ_bf_edge_l + Δλ_bf*l
+        λ[l+nλ_bf] = λ_bf_edge_u + Δλ_bf*l
+    end
+
+
+    # ===============================================
+    # Bound-bound transition
+    # Follows
+    # https://github.com/ITA-Solar/rh/blob/master/getlambda.c
+    # ===============================================
+
+    qwing = 600.0
+    qcore = 15.0
+    vmicro_char = 2.5u"km/s"
+
+    β = qwing/(2*qcore)
+    y = β + sqrt(β*β + (β - 1.0)*nλ_bb + 2.0 - 3.0*β)
+    b = 2.0*log(y) / (nλ_bb - 1)
+    a = qwing / (nλ_bb - 2.0 + y*y)
+
+    # If even # of wavelength samplings
+    if nλ_bb % 2 == 0
+        center = nλ_bf*2 + (nλ_bb÷2)
+        λ[center] = λ_bb_center
+
+        q_to_λ = λ[center] * vmicro_char / c0
+
+        for l=1:(nλ_bb÷2 - 1)
+            Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
+            λ[center-l] = λ[center] - Δλ
+            λ[center+l] = λ[center] + Δλ_bb
+        end
+
+        l = nλ_bb÷2
+        Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
+        λ[end] = λ[end-1] + Δλ_bb
+
+    # If odd # of wavelength samplings
+    else
+        center = nλ_bf*2 + (nλ_bb÷2) + 1
+        λ[center] = λ_bb_center
+
+        q_to_λ = λ[center] * vmicro_char / c0
+
+        for l=1:(nλ_bb÷2)
+            Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
+            λ[center-l] = λ[center] - Δλ
+            λ[center+l] = λ[center] + Δλ_bb
+        end
     end
 
     return λ
 end
 
 
-function α_and_ε_atom(atom, atom_populations, λ, nλ_bb, nλ_bf, temperature, electron_density, hydrogen_populations)
+function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
+
+    vz = atmosphere,velocity_z
+    vx = atmosphere.velocity_x
+    vy = atmosphere.velocity_y
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    hydrogen_populations = atmosphere.hydrogen_populations
+
+    nλ_bb, nλ_bf = get_nλ()
+
     nz, nx, ny = size(temperature)
     nλ = length(λ)
 
@@ -307,7 +406,6 @@ function α_cont_scatt(λ::Unitful.Length,
 end
 
 
-#############################################################################33
 
 """
 Calculates the vertical optical depth of the atmosphere.
