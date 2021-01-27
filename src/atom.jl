@@ -21,21 +21,20 @@ function collect_atom_data()
     return χu, χl, χ∞, gu, gl, f_value, atom_weight, Z
 end
 
-# Should be generalised
-function get_initial_populations()
+"""
+Only valid for two-level
+This needs to be generalised to read a file for other atoms
+"""
+function collect_initial_populations(hydrogen_populations)
+
+    nz, nx, ny, nl = size(hydrogen_populations)
+    populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
+    populations[:,:,:,1:2] = hydrogen_populations[:,:,:,1:2]
+    populations[:,:,:,3] = hydrogen_populations[:,:,:,end]
+
+    return populations
 end
 
 
 function update_populations(λ, J)
 end
-
-
-"""
-χl = 82259.158u"cm^-1"
-χ∞ = 109677.617u"cm^-1"
-gu = 18
-gl = 8
-f_value = 6.411e-01
-atom_weight = 1.008*m_u
-Z = 1
-"""

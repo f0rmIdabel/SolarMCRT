@@ -13,6 +13,7 @@ function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, n
     x = atmosphere.x
     z = atmosphere.z
     temperature = atmosphere.temperature
+    pixel_size = abs(x[2] - x[1])
 
     # ==================================================================
     # RADIATION DATA
@@ -21,37 +22,53 @@ function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, n
     χ = radiation.χ[1,:,:,:]
     ε = radiation.ε[1,:,:,:]
 
+    nλ, nz, nx, ny = size(χ)
+
     # ===================================================================
     # CALCULATE BB SOURCE FUNCTION
     # ===================================================================
-    B = blackbody_lambda.(λ, temperature)
-    S = copy(B)
-    nz, nx, ny = size(χ)
-    pixel_size = abs(x[2] - x[1])
 
-    J = Array{Float64,3}(undef, nz, nx, ny)
+    J = Array{Float64,3}(undef, nλ, nz, nx, ny)
+    B = Array{Float64,3}(undef, nλ, nz, nx, ny)
+    S = Array{Float64,3}(undef, nλ, nz, nx, ny)
+
+    Threads.@threads for l=1:nλ
+        B[l,:,:,:] = blackbody_lambda.(λ[l], temperature)
+    end
+
+    S = copy(B)
 
     for n=1:max_iterations
         println("\nIteration ", n)
-        J = feautrier(S, χ, z, nμ, nϕ, pixel_size)
-        Snew = (1.0 .- ε) .* J + ε .* B
 
-        if convergence(S, Snew, 1e-4)
-            S = copy(Snew)
+        Threads.@threads for l=1:nλ
+            J[l,:,:,:] = feautrier(S[l,:,:,:], χ[l,:,:,:], z, nμ, nϕ, pixel_size)
+        end
+
+        S_new = (1.0 - ε) .* J + ε .* B
+
+        if convergence(S, S_new, 1e-3)
             println("Convergence at iteration n = ", n)
+            S = S_new
+            iterations = n
             break
         else
-            S = copy(Snew)
+            S = S_new
         end
     end
 
     # ==================================================================
     # WRITE TO FILE
     # ==================================================================
-    out = h5open("../../out/output.h5", "cw")
-    write(out, "J_integral", ustrip(J))
-    write(out, "S_integral", ustrip(S))
-    close(out)
+    if iterations < max_iterations
+        out = h5open("../../out/output_integral.h5", "cw")
+        write(out, "lambda", ustrip(λ))
+        write(out, "J", ustrip(J))
+        write(out, "S", ustrip(S))
+        write(out, "B", ustrip(B))
+        write(out, "iterations", n)
+        close(out)
+    end
 end
 
 """

@@ -71,7 +71,8 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     nz, nx, ny = size(temperature)
 
     # Sample wavelengths
-    λ = get_λ(atom)
+    λ = get_λ_fancyspacing(atom)
+    println(λ)
     nλ = length(λ)
 
     # Get opacity and destruction probability
@@ -161,7 +162,6 @@ function get_λ_fancyspacing(atom::AtomicLine)
     nλ = nλ_bf*2 + nλ_bb
     λ = Array{Float64,1}(undef,nλ)u"m"
 
-
     # ===============================================
     # Bound-free transitions
     # ===============================================
@@ -171,7 +171,6 @@ function get_λ_fancyspacing(atom::AtomicLine)
         λ[l] = λ_bf_edge_l + Δλ_bf*l
         λ[l+nλ_bf] = λ_bf_edge_u + Δλ_bf*l
     end
-
 
     # ===============================================
     # Bound-bound transition
@@ -193,7 +192,7 @@ function get_λ_fancyspacing(atom::AtomicLine)
         center = nλ_bf*2 + (nλ_bb÷2)
         λ[center] = λ_bb_center
 
-        q_to_λ = λ[center] * vmicro_char / c0
+        q_to_λ = λ[center] * vmicro_char / c_0
 
         for l=1:(nλ_bb÷2 - 1)
             Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
@@ -210,12 +209,12 @@ function get_λ_fancyspacing(atom::AtomicLine)
         center = nλ_bf*2 + (nλ_bb÷2) + 1
         λ[center] = λ_bb_center
 
-        q_to_λ = λ[center] * vmicro_char / c0
+        q_to_λ = λ[center] * vmicro_char / c_0
 
         for l=1:(nλ_bb÷2)
             Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
             λ[center-l] = λ[center] - Δλ
-            λ[center+l] = λ[center] + Δλ_bb
+            λ[center+l] = λ[center] + Δλ
         end
     end
 

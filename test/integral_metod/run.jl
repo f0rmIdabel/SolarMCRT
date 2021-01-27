@@ -40,7 +40,6 @@ function run()
         lambda_iteration(atmosphere, radiation)
         println(" λ-iteration finished.")
 
-    # Needs massive fix
     elseif mode == "atom"
 
         # ==================================================================
@@ -52,13 +51,7 @@ function run()
         # ==================================================================
         # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
-        #populations = collect_initial_populations()
-
-        hydrogen_populations = atmosphere.hydrogen_populations
-        nz, ny, nz, nl = size(hydrogen_populations)
-        atom_populations = Array{Float64, 4}(undef, nz, nx, ny, 3)
-        atom_populations[:,:,:,1:2] = atmosphere.hydrogen_populations[:,:,:,1:2]
-        atom_populations[:,:,:,end] = atmosphere.hydrogen_populations[:,:,:,end]
+        populations = collect_initial_populations(atmosphere.hydrogen_populations)
 
         # ==================================================================
         # LOAD RADIATION DATA
@@ -66,8 +59,6 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, atom, populations)
         radiation = Radiation(radiation_parameters...)
-        write_to_file(radition)
-        println(@sprintf(" Radiation loaded with %.2e packets.", sum(radiation.S)))
 
         # ==================================================================
         # FEAUTRIER CALCULATION

@@ -20,11 +20,9 @@ function run()
         # ==================================================================
         # LOAD WAVELENGTH
         # ==================================================================
-
         print("--Loading wavelength.......................")
         λ = get_test_λ()
         println("Wavelength λ = ", λ, " loaded.")
-
 
         # ==================================================================
         # LOAD RADIATION DATA
@@ -54,16 +52,19 @@ function run()
         # ==================================================================
         # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
-        new_atom_populations = atmosphere.hydrogen_populations[:,:,:,1:2]
-        converged = false
+        new_populations =  collect_initial_populations(atmosphere.hydrogen_populations)
+        converged_populations = false
 
-        while !converged
-            atom_populations = new_atom_populations
+        # ==================================================================
+        # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
+        # ==================================================================
+        while !converged_populations
+            populations = new_populations
             # ==================================================================
-            # LOAD RADIATION DATA
+            # LOAD RADIATION DATA WITH CURRENT POPULATIONS
             # ==================================================================
             print("--Loading radiation data...................")
-            radiation_parameters = collect_radiation_data(atmosphere, atom, atom_populations)
+            radiation_parameters = collect_radiation_data(atmosphere, atom, populations)
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation)
             println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
@@ -73,10 +74,12 @@ function run()
             # ==================================================================
             mcrt(atmosphere, radiation)
 
-            new_atom_population = get_revised_populations(atom, J)
-            converged = check_conversion(atom_populations, new_atom_populations)
+            # ==================================================================
+            # CHECK IF POPULATIONS CONVERGE
+            # ==================================================================
+            new_population = get_revised_populations(atom)
+            converged_populations = check_conversion(populations, new_populations)
         end
-
     end
 end
 
