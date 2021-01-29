@@ -1,6 +1,5 @@
 include("lambda_iteration.jl")
 
-
 function run()
     println("\n", "="^83, "\n", " "^30,
             "SOLAR ATMOSPHERE MCRT",
@@ -31,12 +30,11 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = Radiation(radiation_parameters...)
-        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.S)))
+        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # ==================================================================
         # FEAUTRIER CALCULATION
         # ==================================================================
-        print("--Starting λ-iteration.....................")
         lambda_iteration(atmosphere, radiation)
         println(" λ-iteration finished.")
 
@@ -63,10 +61,7 @@ function run()
         # ==================================================================
         # FEAUTRIER CALCULATION
         # ==================================================================
-        print("--Starting λ-iteration.....................")
         lambda_iteration(atmosphere, radiation)
-        println(" λ-iteration finished.")
-
     end
 end
 

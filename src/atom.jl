@@ -35,6 +35,27 @@ function collect_initial_populations(hydrogen_populations)
     return populations
 end
 
+function check_converge(populations, new_populations, error, n, criterion = 1e-3)
 
-function update_populations(λ, J)
+    err = norm( abs.(populations .- new_population) ./populations)
+
+    println(@sprintf("--Relative error = %.2e.", err))
+
+    converged = false
+
+    if err < criterion
+        converged = true
+    end
+
+    return converged
+end
+
+function get_revised_populations(atom, J)
+
+
+    n1 P12 + n1 P13 = n2 P21 + n3 P31
+    n2 P21 + n2 P23 = n1 P12 + n3 P32
+    n3 P31 + n3 P32 = n1 P13 + n2 P23
+
+
 end

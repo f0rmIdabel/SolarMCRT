@@ -6,7 +6,7 @@ using LinearAlgebra
 From Tiago, translated from Python to Julia
 Computes S and J from a lambda iteration.
 """
-function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, nϕ=4, max_iterations=1000)
+function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, nϕ=4, max_iterations=100)
     # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
@@ -18,39 +18,51 @@ function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, n
     # ==================================================================
     # RADIATION DATA
     # ==================================================================
-    λ = radiation.λ[1]
-    χ = radiation.χ[1,:,:,:]
-    ε = radiation.ε[1,:,:,:]
+    λ = radiation.λ
+    α = radiation.α
+    ε = radiation.ε
 
-    nλ, nz, nx, ny = size(χ)
+    nλ, nz, nx, ny = size(α)
+
+    # ==================================================================
+    # SET UP TIMER
+    # ==================================================================
+
+    time = Array{Float64,2}(undef, max_iterations, nλ)
+    error = Array{Float64,2}(undef, max_iterations, nλ)
 
     # ===================================================================
     # CALCULATE BB SOURCE FUNCTION
     # ===================================================================
 
-    J = Array{Float64,3}(undef, nλ, nz, nx, ny)
-    B = Array{Float64,3}(undef, nλ, nz, nx, ny)
-    S = Array{Float64,3}(undef, nλ, nz, nx, ny)
+    J = Array{Float64,4}(undef, nλ, nz, nx, ny)u"kW / m^2 / sr / nm"
+    B = Array{Float64,4}(undef, nλ, nz, nx, ny)u"kW / m^2 / sr / nm"
+    S = Array{Float64,4}(undef, nλ, nz, nx, ny)u"kW / m^2 / sr / nm"
 
     Threads.@threads for l=1:nλ
         B[l,:,:,:] = blackbody_lambda.(λ[l], temperature)
     end
 
     S = copy(B)
-
+    println("--Starting λ-iteration.....................\n")
     for n=1:max_iterations
-        println("\nIteration ", n)
+        print("--Iteration ", n, "..............................")
 
         Threads.@threads for l=1:nλ
-            J[l,:,:,:] = feautrier(S[l,:,:,:], χ[l,:,:,:], z, nμ, nϕ, pixel_size)
+            f = @timed feautrier(S[l,:,:,:], α[l,:,:,:], z, nμ, nϕ, pixel_size)
+            J[l,:,:,:] = f.value
+            time[n,l] = f.time
         end
 
-        S_new = (1.0 - ε) .* J + ε .* B
+        S_new = (1.0 .- ε) .* J + ε .* B
 
-        if convergence(S, S_new, 1e-3)
-            println("Convergence at iteration n = ", n)
+        converged = check_converging(S, S_, error, n)
+
+        if converged
+            println("--Convergence at iteration n = ", n, ". λ-iteration finished.")
             S = S_new
-            iterations = n
+            time = time[1:n,:]
+            error = error[1:n,:]
             break
         else
             S = S_new
@@ -60,31 +72,35 @@ function lambda_iteration(atmosphere::Atmosphere, radiation::Radiation, nμ=3, n
     # ==================================================================
     # WRITE TO FILE
     # ==================================================================
-    if iterations < max_iterations
-        out = h5open("../../out/output_integral.h5", "cw")
-        write(out, "lambda", ustrip(λ))
-        write(out, "J", ustrip(J))
-        write(out, "S", ustrip(S))
-        write(out, "B", ustrip(B))
-        write(out, "iterations", n)
-        close(out)
-    end
+    out = h5open("../../out/output_integral.h5", "w")
+    write(out, "lambda", ustrip(λ))
+    write(out, "J", ustrip(J))
+    write(out, "S", ustrip(S))
+    write(out, "B", ustrip(B))
+    write(out, "time", time)
+    write(out, "error", error)
+    close(out)
 end
 
 """
 Check if the relative difference between two arrays
 S1 and S2 is smaller than a given criterion.
 """
-function convergence(S1, S2, criterion = 1e-4)
-
-    converge = false
-    c = norm( abs.(S1 .- S2) ./S1 )
-
-    if c < criterion
-        converge = true
-    else
-        println("c = ", c)
+function check_converged(S1, S2, error, n, criterion = 1e-4)
+    nλ, nz, nx, ny = size(S1)
+    err = Array{Float64, 1}(undef, nλ)
+    for l=1:nλ
+        err[l] = norm( abs.(S1[l,:,:,:] .- S2[l,:,:,:]) ./S1[l,:,:,:] )
     end
 
-    return converge
+    error[n,:] = err
+    println(@sprintf("Relative error = %.2e.", maximum(err)))
+
+    converged = false
+
+    if maximum(err) < criterion
+        converged = true
+    end
+
+    return converged
 end

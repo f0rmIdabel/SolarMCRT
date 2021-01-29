@@ -5,19 +5,20 @@
 # ======================================================================================================== #
 
 # ======================================================================================================== #
-#  Choose between "atom" and "wave" running mode, where the atom mode looks at a 2-level atom given in     #
+#  Choose between "atom" and "test" running mode, where the atom mode looks at a 2-level atom given in     #
 #  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
 #  while the test mode runs with the continuum opacity at the test λ (nm).                                 #                              #
 # ======================================================================================================== #
-running_mode = "atom"
+running_mode = "test"
 
-# For test mode
-test_wavelength = 500.0
+# For test mode [nm]
+test_wavelength = 25.0
 
 # For atom mode
 atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2.hdf5"
-nλ_bb = 5
-nλ_bf = 2
+nλ_bb = 50
+nλ_bf = 20
+λ_min_bf = [22.794, 91.176]
 
 # ======================================================================================================== #
 #  Path to the atmosphere file.                                                                            #

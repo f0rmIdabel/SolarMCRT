@@ -3,6 +3,7 @@ using DelimitedFiles
 using ProgressMeter
 using Transparency
 using StaticArrays
+using TickTock
 using Unitful
 using Random
 using Printf
@@ -195,4 +196,22 @@ function get_start()
     start = [nz, nx, ny]
 
     return start
+end
+
+function get_λ_min()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("λ_min_bf", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("[", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+
+    λ_min1 = parse(Float64, file[i:j])u"nm"
+
+    i = j + 2
+    file = file[i:end]
+    j = findfirst("]", file)[end] - 1
+
+    λ_min2 = parse(Float64, file[1:j])u"nm"
+
+    return [λ_min1, λ_min2]
 end

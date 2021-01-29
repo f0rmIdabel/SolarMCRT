@@ -54,11 +54,15 @@ function run()
         # ==================================================================
         new_populations =  collect_initial_populations(atmosphere.hydrogen_populations)
         converged_populations = false
+        error = Array{Float64,2}(undef, max_iterations, nλ)
 
         # ==================================================================
         # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
         # ==================================================================
-        while !converged_populations
+        max_iterations = 10
+
+        for n=1:1#max_iterations
+            print("--Iteration ", n, "..............................")
             populations = new_populations
             # ==================================================================
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
@@ -69,7 +73,7 @@ function run()
             write_to_file(radiation)
             println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
 
-            # ==================================================================
+            """# ==================================================================
             # SIMULATION
             # ==================================================================
             mcrt(atmosphere, radiation)
@@ -78,7 +82,13 @@ function run()
             # CHECK IF POPULATIONS CONVERGE
             # ==================================================================
             new_population = get_revised_populations(atom)
-            converged_populations = check_conversion(populations, new_populations)
+            converged = check_converged(populations, new_populations, error, n)
+
+            if converged
+                println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
+                break
+            end"""
+
         end
     end
 end

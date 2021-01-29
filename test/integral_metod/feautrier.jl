@@ -4,14 +4,14 @@ using FastGaussQuadrature
 """
 1.5D feautrier calculation.
 """
-function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
+function feautrier(S, α, z, nμ::Int64, nφ::Int64, pixel_size)
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
     μ, w = gausslegendre(nμ)
     μ = μ ./2.0 .+ 0.5
-    nz, nx, ny = size(χ)
+    nz, nx, ny = size(S)
 
     D = Array{Float64,3}(undef,nz-1,nx,ny)
     E = Array{Float64,3}(undef,nz-1,nx,ny)u"kW / m^2 / sr / nm"
@@ -22,20 +22,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
     # ==================================================================
     # FEAUTRIER
     # ==================================================================
+    
     for m=1:nμ
-
-        println(m)
 
         # ϕ = 0
         #########################################
         S_ = copy(S)
-        χ_ = copy(χ)
+        α_ = copy(α)
         shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
-        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
-        χ_ /= μ[m]
+        shift_variable!(α_, z[1:end-1], pixel_size, μ[m])
+        α_ /= μ[m]
         S_ /= μ[m]
 
-        τ = optical_depth(χ_, z)
+        τ = optical_depth(α_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
         P += p
@@ -43,19 +42,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         # ϕ = π
         #########################################
         S_ = copy(S)
-        χ_ = copy(χ)
+        α_ = copy(α)
 
         S_ = reverse(S_, dims = 2)
         S_ = reverse(S_, dims = 3)
-        χ_ = reverse(χ_, dims = 2)
-        χ_ = reverse(χ_, dims = 3)
+        α_ = reverse(α_, dims = 2)
+        α_ = reverse(α_, dims = 3)
 
         shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
-        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
-        χ_ /= μ[m]
+        shift_variable!(α_, z[1:end-1], pixel_size, μ[m])
+        α_ /= μ[m]
         S_ /= μ[m]
 
-        τ = optical_depth(χ_, z)
+        τ = optical_depth(α_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
         p = reverse(p, dims = 2)
@@ -65,19 +64,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         # ϕ = 3π/2
         #########################################
         S_ = copy(S)
-        χ_ = copy(χ)
+        α_ = copy(α)
 
         S_ = permutedims(S_, [1,3,2])
         S_ = reverse(S_, dims = 3)
-        χ_ = permutedims(χ_, [1,3,2])
-        χ_ = reverse(χ_, dims = 3)
+        α_ = permutedims(α_, [1,3,2])
+        α_ = reverse(α_, dims = 3)
 
         shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
-        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
-        χ_ /= μ[m]
+        shift_variable!(α_, z[1:end-1], pixel_size, μ[m])
+        α_ /= μ[m]
         S_ /= μ[m]
 
-        τ = optical_depth(χ_, z)
+        τ = optical_depth(α_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
         p = permutedims(p, [1,3,2])
@@ -87,19 +86,19 @@ function feautrier(S, χ, z, nμ::Int64, nφ::Int64, pixel_size)
         # ϕ = π/2
         ############################################
         S_ = copy(S)
-        χ_ = copy(χ)
+        α_ = copy(α)
 
         S_ = permutedims(S_, [1,3,2])
         S_ = reverse(S_, dims = 2)
-        χ_ = permutedims(χ_, [1,3,2])
-        χ_ = reverse(χ_, dims = 2)
+        α_ = permutedims(α_, [1,3,2])
+        α_ = reverse(α_, dims = 2)
 
         shift_variable!(S_, z[1:end-1], pixel_size, μ[m])
-        shift_variable!(χ_, z[1:end-1], pixel_size, μ[m])
-        χ_ /= μ[m]
+        shift_variable!(α_, z[1:end-1], pixel_size, μ[m])
+        α_ /= μ[m]
         S_ /= μ[m]
 
-        τ = optical_depth(χ_, z)
+        τ = optical_depth(α_, z)
         p[end,:,:] = forward(D, E, S_, τ, μ[m])
         backward(p, D, E)
         reverse(p, dims = 2)
@@ -149,7 +148,9 @@ function forward(D::Array{Float64, 3},
                 E[k,i,j] = (S[k,i,j] + A*E[k-1,i,j]) / (B - A*D[k-1,i,j])
             end
 
-            # From boundary condition at the bottom
+            # From boundary         p[end,:,:] = forward(D, E, S_, τ, μ[m])
+        p[end,:,:] = forward(D, E, S_, τ, μ[m])
+condition at the bottom
             P_end[i,j] = ( E[end,i,j] + Δτ[end]/μ * S[end,i,j] + (S[end,i,j] - S[end-1,i,j]) ) / (1.0 - D[end,i,j] + Δτ[end]/μ)
         end
     end

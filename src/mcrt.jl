@@ -38,7 +38,7 @@ function mcrt(atmosphere::Atmosphere,
     J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
     write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
-
+    write(file, "time", Array{Float64,1}(undef,nλ))
     # Initialise placeholder variables
     J_λ = zeros(Int32, nz, nx, ny)
     total_destroyed = Threads.Atomic{Int64}(0)
@@ -51,6 +51,9 @@ function mcrt(atmosphere::Atmosphere,
             Threads.nthreads()))
 
     for λi=1:nλ
+        # start a timer for each λ
+        tick()
+
         # fill!(surface_intensity, 0.0)
         fill!(J_λ, 0.0)
         total_destroyed = Threads.Atomic{Int64}(0)
@@ -134,7 +137,9 @@ function mcrt(atmosphere::Atmosphere,
         J[λi,:,:,:] = J_λ
         file["total_destroyed"][λi] = total_destroyed.value
         file["total_scatterings"][λi] = total_scatterings.value
+        file["time"][λi] = tok()
     end
+
     close(file)
     write_to_file(radiation)
 end
