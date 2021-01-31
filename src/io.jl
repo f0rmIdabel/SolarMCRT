@@ -1,9 +1,10 @@
 import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u
 using DelimitedFiles
+using BenchmarkTools
 using ProgressMeter
 using Transparency
 using StaticArrays
-using TickTock
+#using TickTock
 using Unitful
 using Random
 using Printf

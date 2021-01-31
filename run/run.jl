@@ -1,9 +1,9 @@
 include("../src/mcrt.jl")
 
 function run()
-    println("\n", "="^83, "\n", " "^30,
+    println("\n", "="^91, "\n", " "^34,
             "SOLAR ATMOSPHERE MCRT",
-            "\n", "="^83, "\n")
+            "\n", "="^91, "\n")
 
     # ==================================================================
     # LOAD ATMOSPHERE DATA
@@ -65,8 +65,8 @@ function run()
         # ==================================================================
 
         for n=1:1#max_iterations
-            println("\nITERATION ", n)
-            println("="^83)
+            println("\n", " "^34, "ITERATION ", n)
+            println("="^91)
             populations = new_populations
             # ==================================================================
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS

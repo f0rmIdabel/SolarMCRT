@@ -37,10 +37,7 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     ε = Array{Float64,4}(undef, 1, nz, nx, ny)
     α[1,:,:,:], ε[1,:,:,:] =  α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
 
-    #println(α[1,:,1,1])
-
-
-    # Find opticla depth boundary
+    # Find optical depth boundary
     boundary = Array{Int32,3}(undef, 1, nx, ny)
     boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, τ_max)
 
@@ -71,7 +68,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     nz, nx, ny = size(temperature)
 
     # Sample wavelengths
-    λ = get_λ(atom)
+    λ = sample_λ(atom)
     nλ = length(λ)
 
     # Get opacity and destruction probability
@@ -92,129 +89,70 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     end
 
     return λ, α, ε, boundary, packets, intensity_per_packet, max_scatterings
-
 end
 
+function sample_λ(atom::AtomicLine)
 
-function get_λ(atom::AtomicLine)
-
-    nλ_bb, nλ_bf = get_nλ()
-
+    # Get atom data
     χi = atom.χi
     χj = atom.χj
     χ∞ = atom.χ∞
 
+    # Find bf edges and bb center wavelength
     λ_bf_edge_l = ((h * c_0) / (χ∞-χi)) |> u"nm"
     λ_bf_edge_u = ((h * c_0) / (χ∞-χj)) |> u"nm"
     λ_bb_center = ((h * c_0) / (χj-χi)) |> u"nm"
 
-    Δλ_bf = 1.0u"nm"
-    Δλ_bb = 0.1u"nm"
 
-    nλ = nλ_bf*2 + nλ_bb
-
-    λ = Array{Float64,1}(undef,nλ)u"m"
-
-    for l=1:nλ_bf
-        λ[l] = λ_bf_edge_l + Δλ_bf*l
-        λ[l+nλ_bf] = λ_bf_edge_u + Δλ_bf*l
-    end
-
-    # If even # of wavelength samplings
-    if nλ_bb % 2 == 0
-        center = nλ_bf*2 + (nλ_bb÷2)
-        λ[center] = λ_bb_center
-
-        for l=1:(nλ_bb÷2 - 1)
-            λ[center-l] = λ[center - l + 1] - Δλ_bb
-            λ[center+l] = λ[center + l - 1] + Δλ_bb
-        end
-
-        λ[end] = λ[end-1] + Δλ_bb
-
-    # If odd # of wavelength samplings
-    else
-        center = nλ_bf*2 + (nλ_bb÷2) + 1
-        λ[center] = λ_bb_center
-
-        for l=1:(nλ_bb÷2)
-            λ[center-l] = λ[center - l + 1] - Δλ_bb
-            λ[center+l] = λ[center + l - 1] + Δλ_bb
-        end
-    end
-
-    return λ
-end
-
-function get_λ_fancyspacing(atom::AtomicLine)
-
+    # Get # of sample points
     nλ_bb, nλ_bf = get_nλ()
-    λ_bf_min_l, λ_bf_min_u = get_λ_min()
 
-    χi = atom.χi
-    χj = atom.χj
-    χ∞ = atom.χ∞
+    # Make sure odd # of bb wavelengths
+    if nλ_bb > 0 && nλ_bb%2 == 0
+        nλ_bb += 1
+    end
 
-    λ_bf_edge_l = ((h * c_0) / (χ∞-χi)) |> u"nm"
-    λ_bf_edge_u = ((h * c_0) / (χ∞-χj)) |> u"nm"
-    λ_bb_center = ((h * c_0) / (χj-χi)) |> u"nm"
-
+    # Initialise wavelength array
     nλ = nλ_bf*2 + nλ_bb
-    λ = Array{Float64,1}(undef,nλ)u"m"
+    λ = Array{Float64,1}(undef, nλ)u"nm"
 
-    # ===============================================
+    # =================================================
     # Bound-free transitions
-    # ===============================================
-    Δλ_bf_l = (λ_bf_edge_l - λ_bf_min_l)/20
-    Δλ_bf_u = (λ_bf_edge_u - λ_bf_min_u)/20
+    # Linear spacing
+    # =================================================
+    if nλ_bf > 0
+        λ_bf_min_l, λ_bf_min_u = get_λ_min()
 
-    λ[1] = λ_bf_edge_l
-    λ[nλ_bf+1] = λ_bf_edge_u
+        Δλ_bf_l = (λ_bf_edge_l - λ_bf_min_l)/nλ_bf
+        Δλ_bf_u = (λ_bf_edge_u - λ_bf_min_u)/nλ_bf
 
-    for l=2:nλ_bf
-        λ[l] = λ[l-1] + Δλ_bf_l
-        λ[l+nλ_bf] = λ[l+nλ_bf - 1] + Δλ_bf_u
+        λ[1] = λ_bf_min_l
+        λ[nλ_bf+1] = λ_bf_min_u
+
+        for l=2:nλ_bf
+            λ[l] = λ[l-1] + Δλ_bf_l
+            λ[l+nλ_bf] = λ[l+nλ_bf - 1] + Δλ_bf_u
+        end
     end
 
-    # ===============================================
+    # =================================================
     # Bound-bound transition
-    # Follows
-    # https://github.com/ITA-Solar/rh/blob/master/getlambda.c
-    # ===============================================
+    # Follows github.com/ITA-Solar/rh/blob/master/getlambda.c
+    # =================================================
+    if nλ_bb > 0
 
-    qwing = 600.0
-    qcore = 15.0
-    vmicro_char = 2.5u"km/s"
+        qwing = 600.0
+        qcore = 15.0
+        vmicro_char = 2.5u"km/s"
 
-    n = nλ_bb / 2
+        n = nλ_bb/2 # Questionable
+        β = qwing/(2*qcore)
+        y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
+        b = 2.0*log(y) / (n - 1)
+        a = qwing / (n - 2.0 + y*y)
 
-    β = qwing/(2*qcore)
-    y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
-    b = 2.0*log(y) / (n - 1)
-    a = qwing / (n - 2.0 + y*y)
-
-    # If even # of wavelength samplings
-    if nλ_bb % 2 == 0
-        center = nλ_bf*2 + (nλ_bb÷2)
-        λ[center] = λ_bb_center
-
-        q_to_λ = λ[center] * vmicro_char / c_0
-
-        for l=1:(nλ_bb÷2 - 1)
-            Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
-            λ[center-l] = λ[center] - Δλ
-            λ[center+l] = λ[center] + Δλ
-        end
-
-        l = nλ_bb÷2
-        Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
-        λ[end] = λ[end-1] + Δλ
-
-    # If odd # of wavelength samplings
-    else
         center = nλ_bf*2 + (nλ_bb÷2) + 1
         λ[center] = λ_bb_center
-
         q_to_λ = λ[center] * vmicro_char / c_0
 
         for l=1:(nλ_bb÷2)
@@ -296,7 +234,6 @@ function α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
 
     return α_cont, ε_cont
 end
-
 
 """
 DELETE once Cji in Transparency
@@ -439,7 +376,7 @@ end
 """
 Returns 2D array containing the z-indices where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(α::Array{<:Unitful.Quantity{<:Real, Unitful.𝐋^(-1)}, 3},
+function optical_depth_boundary(α,
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
     nz, nx, ny = size(α)
@@ -472,7 +409,7 @@ As well as the scale
 """
 function distribute_packets(λ::Unitful.Length,
                             target_packets::Real,
-                            x,
+                            x::Array{<:Unitful.Length, 1},
                             y,
                             z,
                             temperature,

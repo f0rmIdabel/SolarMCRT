@@ -39,10 +39,9 @@ function mcrt(atmosphere::Atmosphere,
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
     write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
     write(file, "time", Array{Float64,1}(undef,nλ))
-    # Initialise placeholder variables
+
+    # Initialise placeholder variable
     J_λ = zeros(Int32, nz, nx, ny)
-    total_destroyed = Threads.Atomic{Int64}(0)
-    total_scatterings = Threads.Atomic{Int64}(0)
 
     # ===================================================================
     # SIMULATION
@@ -51,20 +50,19 @@ function mcrt(atmosphere::Atmosphere,
             Threads.nthreads()))
 
     for λi=1:nλ
-        # start a timer for each λ
-        tick()
 
-        # fill!(surface_intensity, 0.0)
+        # Reset counters
         fill!(J_λ, 0.0)
         total_destroyed = Threads.Atomic{Int64}(0)
         total_scatterings = Threads.Atomic{Int64}(0)
 
-        packets_λ = view(packets, λi,:,:,:)
-        α_λ = view(α, λi,:,:,:)
-        boundary_λ = view(boundary, λi, :,:)
-        ε_λ = view(ε, λi,:,:,:)
+        # Pick out wavelength data
+        packets_λ = packets[λi,:,:,:]
+        α_λ = α[λi,:,:,:]
+        boundary_λ = boundary[λi,:,:]
+        ε_λ = ε[λi,:,:,:]
 
-        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm...............", ustrip(λ[λi]*1e9)))
+        println("\n--[",λi,"/",nλ, "]       ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -73,7 +71,7 @@ function mcrt(atmosphere::Atmosphere,
         l = Threads.SpinLock()
 
         # Go through all boxes
-        Threads.@threads for j=1:ny
+        et = @elapsed Threads.@threads for j=1:ny
 
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
@@ -111,11 +109,11 @@ function mcrt(atmosphere::Atmosphere,
 
                             # Scatter packet once
                             box_id, r, lost = scatter_packet(x, y, z,
+                                                             vx, vy, vz,
                                                              α_λ,
                                                              boundary_λ,
                                                              box_id, r,
-                                                             J_λ,
-                                                             vx, vy, vz)
+                                                             J_λ)
 
                             # Check if escaped or lost in bottom
                             if lost
@@ -137,7 +135,7 @@ function mcrt(atmosphere::Atmosphere,
         J[λi,:,:,:] = J_λ
         file["total_destroyed"][λi] = total_destroyed.value
         file["total_scatterings"][λi] = total_scatterings.value
-        file["time"][λi] = tok()
+        file["time"][λi] = et
     end
 
     close(file)
@@ -151,12 +149,14 @@ Returns new position, box_id and lost-status.
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
+                        vx::Array{<:Unitful.Velocity, 3},
+                        vy::Array{<:Unitful.Velocity, 3},
+                        vz::Array{<:Unitful.Velocity, 3},
                         α,
-                        boundary,
+                        boundary::Array{Int32, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{Int32, 3},
-                        vx, vy, vz)
+                        J::Array{Int32, 3})
 
     # Keep track of status
     lost = false
