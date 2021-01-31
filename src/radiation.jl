@@ -186,10 +186,12 @@ function get_λ_fancyspacing(atom::AtomicLine)
     qcore = 15.0
     vmicro_char = 2.5u"km/s"
 
+    n = nλ_bb / 2
+
     β = qwing/(2*qcore)
-    y = β + sqrt(β*β + (β - 1.0)*nλ_bb + 2.0 - 3.0*β)
-    b = 2.0*log(y) / (nλ_bb - 1)
-    a = qwing / (nλ_bb - 2.0 + y*y)
+    y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
+    b = 2.0*log(y) / (n - 1)
+    a = qwing / (n - 2.0 + y*y)
 
     # If even # of wavelength samplings
     if nλ_bb % 2 == 0
@@ -201,12 +203,12 @@ function get_λ_fancyspacing(atom::AtomicLine)
         for l=1:(nλ_bb÷2 - 1)
             Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
             λ[center-l] = λ[center] - Δλ
-            λ[center+l] = λ[center] + Δλ_bb
+            λ[center+l] = λ[center] + Δλ
         end
 
         l = nλ_bb÷2
         Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
-        λ[end] = λ[end-1] + Δλ_bb
+        λ[end] = λ[end-1] + Δλ
 
     # If odd # of wavelength samplings
     else
@@ -515,7 +517,7 @@ function blackbody_lambda(λ::Unitful.Length,
 end
 
 function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "cw") do file
+    h5open("../out/output.h5", "w") do file
         write(file, "lambda", ustrip(radiation.λ))
         write(file, "chi", ustrip(radiation.α))
         write(file, "epsilon", radiation.ε)

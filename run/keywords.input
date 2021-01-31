@@ -9,14 +9,14 @@
 #  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
 #  while the test mode runs with the continuum opacity at the test λ (nm).                                 #                              #
 # ======================================================================================================== #
-running_mode = "test"
+running_mode = "atom"
 
 # For test mode [nm]
-test_wavelength = 25.0
+test_wavelength = 500.0
 
 # For atom mode
 atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2.hdf5"
-nλ_bb = 50
+nλ_bb = 100
 nλ_bf = 20
 λ_min_bf = [22.794, 91.176]
 

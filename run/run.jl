@@ -30,6 +30,7 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = Radiation(radiation_parameters...)
+        write_to_file(radiation)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # ==================================================================
@@ -52,6 +53,9 @@ function run()
         # ==================================================================
         # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
+
+        max_iterations = 10
+
         new_populations =  collect_initial_populations(atmosphere.hydrogen_populations)
         converged_populations = false
         error = Array{Float64,2}(undef, max_iterations, nλ)
@@ -59,10 +63,10 @@ function run()
         # ==================================================================
         # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
         # ==================================================================
-        max_iterations = 10
 
         for n=1:1#max_iterations
-            print("--Iteration ", n, "..............................")
+            println("\nITERATION ", n)
+            println("="^83)
             populations = new_populations
             # ==================================================================
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
@@ -73,12 +77,12 @@ function run()
             write_to_file(radiation)
             println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
 
-            """# ==================================================================
+            # ==================================================================
             # SIMULATION
             # ==================================================================
             mcrt(atmosphere, radiation)
 
-            # ==================================================================
+            """# ==================================================================
             # CHECK IF POPULATIONS CONVERGE
             # ==================================================================
             new_population = get_revised_populations(atom)

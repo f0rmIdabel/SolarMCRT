@@ -64,7 +64,7 @@ function mcrt(atmosphere::Atmosphere,
         boundary_λ = view(boundary, λi, :,:)
         ε_λ = view(ε, λi,:,:,:)
 
-        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm...............", ustrip(λ[λi])*1e9))
+        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm...............", ustrip(λ[λi]*1e9)))
 
         # Create ProgressMeter working with threads
         p = Progress(ny)

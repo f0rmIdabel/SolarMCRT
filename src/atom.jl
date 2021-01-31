@@ -49,7 +49,7 @@ function check_converge(populations, new_populations, error, n, criterion = 1e-3
 
     return converged
 end
-
+"""
 function get_revised_populations(atom, J)
 
 
@@ -58,4 +58,4 @@ function get_revised_populations(atom, J)
     n3 P31 + n3 P32 = n1 P13 + n2 P23
 
 
-end
+end"""
