@@ -48,6 +48,7 @@ function run()
         atom = AtomicLine(collect_atom_data()...)
         nλ_bb, nλ_bf = get_nλ()
         nλ = nλ_bf*2 + nλ_bb
+        nλ += 1-nλ%2
         println("Atom loaded with ", nλ, " wavelengths.")
 
         # ==================================================================
@@ -65,7 +66,7 @@ function run()
         # ==================================================================
 
         for n=1:1#max_iterations
-            println("\n", " "^34, "ITERATION ", n)
+            println("\n  ITERATION ", n)
             println("="^91)
             populations = new_populations
             # ==================================================================

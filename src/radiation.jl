@@ -165,7 +165,6 @@ function sample_λ(atom::AtomicLine)
     return λ
 end
 
-
 function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
 
     vz = atmosphere,velocity_z
@@ -218,6 +217,77 @@ function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populatio
 
     return α, ε
 end
+
+
+function α_and_ε_atom_test(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
+
+    vz = atmosphere,velocity_z
+    vx = atmosphere.velocity_x
+    vy = atmosphere.velocity_y
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    hydrogen_populations = atmosphere.hydrogen_populations
+
+    nλ_bb, nλ_bf = get_nλ()
+
+    nz, nx, ny = size(temperature)
+    nλ = length(λ)
+
+    # For each wavelength, find χ and ε
+    α_cont = Array{Float64,4}(undef, nλ, nz, nx, ny)u"m^-1"
+    ε_cont = Array{Float64,4}(undef, nλ, nz, nx, ny)
+    ε_line = Array{Float64,4}(undef, nλ, nz, nx, ny)
+
+    # Find bound-free continuum
+    @Threads.threads for l=1:nλ_bf
+        α_cont[l,:,:,:], ε_cont[l,:,:,:] =  α_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
+        α_cont[l+nλ_bf,:,:,:], ε_cont[l+nλ_bf,:,:,:] =  α_and_ε_cont(λ[l+nλ_bf], temperature, electron_density, hydrogen_populations)
+    end
+
+    # Find bound-bound continuum
+    # assume continuum constant over line
+    center = nλ_bf*2 + (nλ_bb÷2)
+    α_cont_line, ε_cont_line =  α_and_ε_cont(λ[center], temperature, electron_density, hydrogen_populations)
+
+    # Compute line extinction (van der Waals + natural broadening)
+    unsold_const = γ_unsold_const(atom)
+    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:,:,:,1]) .+ atom.Aji
+    ΔλD = doppler_width.(λ[center], atom.atom_weight, temperature)
+
+    Cji = Cji_RH()                          # replace with atom.Cij
+
+    @Threads.threads for l=(nλ_bf*2+1):nλ
+
+        α_cont[l,:,:,:] = α_cont_line
+
+        a = damping.(γ, λ[l], ΔλD)
+
+        v = (λ[l] - λ[center]) ./ ΔλD
+        profile = voigt_profile.(a, ustrip(v), ΔλD)
+
+        αC = αline_λ.(Ref(atom), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1]) ./ profile
+
+        B = blackbody_lambda.(λ[l], temperature)
+        Rji = atom.Aji .+ atom.Bji.*B
+        ε_line = Cji ./ (Rji .+ Cji)
+
+    end
+
+    return α_cont, ε_cont, ε_line, αC, ΔλD, a
+end
+
+
+function α_line(λ, αC, ΔλD, a, vlos)
+
+    v = (λ[l] - λ[center]) ./ ΔλD
+    profile = voigt_profile.(a, ustrip(v), ΔλD)
+
+    α = αC*profile
+
+    return α
+
+end
+
 
 
 function α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
@@ -346,8 +416,6 @@ function α_cont_scatt(λ::Unitful.Length,
     α += rayleigh_h(λ, h_ground_density)
     return α
 end
-
-
 
 """
 Calculates the vertical optical depth of the atmosphere.

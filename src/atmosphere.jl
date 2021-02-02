@@ -5,7 +5,7 @@ struct Atmosphere
     x::Array{<:Unitful.Length, 1}                       # (nx + 1)
     y::Array{<:Unitful.Length, 1}                       # (ny + 1)
 
-    velocity_z::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
+    velocity_z::Array{Array{<:Unitful.Velocity, 1}, 3}  # (nx, ny, nz)
     velocity_x::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
     velocity_y::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
     temperature::Array{<:Unitful.Temperature, 3}        # (nx, ny, nz)
@@ -207,6 +207,19 @@ function collect_atmosphere_data()
         y = push!(y, 2*y[end] - y[end-1])
     end
 
-    return z, x, y, velocity_z, velocity_x, velocity_y,
-           temperature, electron_density, hydrogen_populations
+    # ===========================================================
+    # COLLECT VELOCITY IN ONE VARIABLE
+    # ===========================================================
+
+    velocity = Array{Array{<:Unitful.Velocity, 1}, 3}(undef,nz,nx,ny)
+
+    for k=1:nz
+        for i=1:nx
+            for j=1:ny
+                velocity[k,i,j] = [velocity_z[i,j,k], velocity_x[i,j,k], velocity_y[i,j,k]]
+            end
+        end
+    end
+
+    return z, x, y, velocity, temperature, electron_density, hydrogen_populations
 end

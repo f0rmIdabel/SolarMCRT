@@ -4,7 +4,6 @@ using BenchmarkTools
 using ProgressMeter
 using Transparency
 using StaticArrays
-#using TickTock
 using Unitful
 using Random
 using Printf

@@ -50,12 +50,31 @@ function check_converge(populations, new_populations, error, n, criterion = 1e-3
     return converged
 end
 """
-function get_revised_populations(atom, J)
+function get_revised_populations(atom, atomsphere, J)
 
+    n3 = atmosphere.electron_density
+    T = atmosphere.temperature
 
     n1 P12 + n1 P13 = n2 P21 + n3 P31
     n2 P21 + n2 P23 = n1 P12 + n3 P32
     n3 P31 + n3 P32 = n1 P13 + n2 P23
 
+
+    Pij = Rij + Cij
+    Pij = Aij + Bij*J + Cij
+
+
+    # Rad rates
+    Rij  = ∫4π/(hν) σij J dν
+    Rji  = ∫4π/(hν) σij Gij (2hν^3/c^2 + J)dν
+
+
+    # BB
+    σij = h*νij/(4π)*Bij ϕνμ
+    Gij = [ni/nj]LTE exp(-hν/kT)
+
+    #BF
+    σij = σic(ν)
+    Gij = [ni/nc]LTE exp(-hν/kT)
 
 end"""
