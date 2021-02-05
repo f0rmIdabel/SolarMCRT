@@ -4,26 +4,28 @@
 # ======================================================================================================== #
 # ======================================================================================================== #
 
-# ======================================================================================================== #
-#  Choose between "atom" and "test" running mode, where the atom mode looks at a 2-level atom given in     #
-#  the .atom file (including the bound-bound transition and the two bound-free edges),                     #
-#  while the test mode runs with the continuum opacity at the test λ (nm).                                 #                              #
-# ======================================================================================================== #
-running_mode = "atom"
 
-# For test mode [nm]
-test_wavelength = 500.0
+# ======================================================================================================== #
+#  When the test mode is set to "true", the MC simulation is run with the background opacity at the        #
+#  given λ (nm). A convenient quick test, without going into the involved population-iteration routine.    #
+# ======================================================================================================== #
+test_mode = "true"
+background_wavelength = 500.0
 
-# For atom mode
-atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2.hdf5"
+# ======================================================================================================== #
+#  Paths to atmosphere and atom data, as well as the initial atom populations.                             #
+#  bifrost_cb24bih_s385_fullv.ncdf                                                                         #
+# ======================================================================================================== #
+atmosphere_path           = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
+atom_path                 = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl.h5"
+initial_populations_path  = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl_LTE_populations.hdf5"
+
+# ======================================================================================================== #
+#  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
+#  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
+# ======================================================================================================== #
 nλ_bb = 100
 nλ_bf = 20
-λ_min_bf = [22.794, 91.176]
-
-# ======================================================================================================== #
-#  Path to the atmosphere file.                                                                            #
-# ======================================================================================================== #
-atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/"
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -32,11 +34,11 @@ atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/"
 cut_off = 20.0
 
 # ======================================================================================================== #
-# Start, end and jump in atmosphere data.                                                                  #
+# Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].                              #
 # ======================================================================================================== #
-start = [180, 1, 1]
+start = [1, 1, 1]
 stop = [end, end, end]
-step = [1, 10, 10]
+step = [1, 1, 1]
 
 # ======================================================================================================== #
 #  The intended number of packets to be created for each wavelength.                                       #

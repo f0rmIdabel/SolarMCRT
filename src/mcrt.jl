@@ -30,7 +30,7 @@ function mcrt(atmosphere::Atmosphere,
     nλ, nz, nx, ny = size(α)
 
     # Open output file and initialise variables
-    file = h5open("../out/output.h5", "w")
+    file = h5open("../out/output.h5", "cw")
     J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
     write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
     write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
@@ -58,7 +58,7 @@ function mcrt(atmosphere::Atmosphere,
         boundary_λ = boundary[λi,:,:]
         ε_λ = ε[λi,:,:,:]
 
-        println("\n--[",λi,"/",nλ, "]       ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
+        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
         p = Progress(ny)
@@ -136,7 +136,7 @@ function mcrt(atmosphere::Atmosphere,
     close(file)
 end
 
-
+"""
 function mcrt2(atmosphere::Atmosphere,
                radiation::Radiation)
 
@@ -476,7 +476,7 @@ function scatter_packet2(x::Array{<:Unitful.Length, 1},
     end
 
     return box_id, r, lost, destroyed
-end
+end"""
 
 """
 Scatters photon packet once.
@@ -485,7 +485,7 @@ Returns new position, box_id and lost-status.
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        α,
+                        α::Array{<:PerLength, 3},
                         boundary::Array{Int32, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},

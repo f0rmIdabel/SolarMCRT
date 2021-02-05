@@ -1,4 +1,7 @@
-import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u
+"""
+Collection of all imports and funcitons to read simulation input.
+"""
+
 using DelimitedFiles
 using BenchmarkTools
 using ProgressMeter
@@ -9,30 +12,19 @@ using Random
 using Printf
 using HDF5
 
+import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u, m_e
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
+@derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
-
-function get_mode()
+function test_mode()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("running_mode", input_file)[end] + 1
+    i = findfirst("test_mode", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
     j = findfirst("\"", file[i+1:end])[end] + i
-    mode = string(file[i+1:j-1])
-    return mode
-end
-
-function get_test_λ()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("test_wavelength", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-
-    λ = parse(Float64, file[i:j])u"nm"
-
-    return λ
+    tm = parse(Bool, file[i+1:j-1])
+    return tm
 end
 
 function get_nλ()
@@ -49,6 +41,18 @@ function get_nλ()
     j = findfirst("\n", file)[end] - 1
     nλ_bf = parse(Int64, file[i:j])
     return nλ_bb, nλ_bf
+end
+
+function get_background_λ()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("background_wavelength", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+
+    λ = parse(Float64, file[i:j])u"nm"
+
+    return λ
 end
 
 function get_cut_off()
@@ -87,6 +91,16 @@ function get_atom_path()
     j = findfirst("\"", file[i+1:end])[end] + i
     atmosphere_path = string(file[i+1:j-1])
     return atmosphere_path
+end
+
+function get_initial_populations_path()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("initial_populations_path", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    initial_populations_path = string(file[i+1:j-1])
+    return initial_populations_path
 end
 
 function get_target_packets()

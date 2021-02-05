@@ -13,15 +13,13 @@ function run()
     atmosphere = Atmosphere(atmosphere_parameters...)
     println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
 
-    mode = get_mode()
-
-    if mode == "test"
+    if test_mode()
 
         # ==================================================================
         # LOAD WAVELENGTH
         # ==================================================================
         print("--Loading wavelength.......................")
-        λ = get_test_λ()
+        λ = get_background_λ()
         println("Wavelength λ = ", λ, " loaded.")
 
         # ==================================================================
@@ -38,29 +36,22 @@ function run()
         # ==================================================================
         mcrt(atmosphere, radiation)
 
-    elseif mode == "atom"
+    else
 
         # ==================================================================
         # LOAD ATOM
         # ==================================================================
         print("--Loading atom.............................")
-        atom_parameters = collect_atom_data()
-        atom = AtomicLine(collect_atom_data()...)
-        nλ_bb, nλ_bf = get_nλ()
-        nλ = nλ_bf*2 + nλ_bb
-        nλ += 1-nλ%2
-        println("Atom loaded with ", nλ, " wavelengths.")
+        atom = Atom(collect_atom_data()...)
+        println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
 
         # ==================================================================
         # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
-
-        max_iterations = 10
-
-        new_populations =  collect_initial_populations(atmosphere.hydrogen_populations)
+        new_populations =  collect_initial_populations(atmosphere, atom)
         converged_populations = false
-        error = Array{Float64,2}(undef, max_iterations, nλ)
 
+        #error = Array{Float64,2}(undef, max_iterations, nλ)
         # ==================================================================
         # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
         # ==================================================================

@@ -3,25 +3,30 @@ include("atom.jl")
 
 struct Radiation
     λ::Array{<:Unitful.Length, 1}                        # (nλ)
-    α::Array{<:Unitful.Quantity, 4}                      # (nλ, nz, nx, ny)
+    α::Array{<:PerLength, 4}                             # (nλ, nz, nx, ny)
     ε::Array{Float64,4}                                  # (nλ, nz, nx, ny)
     boundary::Array{Int32,3}                             # (nλ, nx, ny)
     packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
-    intensity_per_packet::Array{<:Unitful.Quantity, 1}   # (nλ)
-    max_scatterings::Real                                # Int64
+    intensity_per_packet::Array{<:UnitsIntensity_λ, 1}   # (nλ)
+    max_scatterings::Int64                               # Int64
 end
 
-
 """
-Collects radition data to go into structure.
+TEST MODE: BACKGROUND PROCESSES
+Collects radition data for background processes at a single wavelength
+Returns data to go into structure.
 """
 function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
-    # Read from input file
+    # ==================================================================
+    # GET KEYWORD INPUT
+    # ==================================================================
     max_scatterings = get_max_scatterings()
     target_packets = get_target_packets()
     τ_max = get_cut_off()
 
-    # Get atmosphere data
+    # ==================================================================
+    # GET ATMOSPHERE DATA AND WAVELENGTH
+    # ==================================================================
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
@@ -31,33 +36,57 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
 
     nz, nx, ny = size(temperature)
     λ = [λ]
-
-    # Calculate χ and ε
+    # ==================================================================
+    # INITIALISE VARIABLES
+    # ==================================================================
     α = Array{Float64,4}(undef, 1, nz, nx, ny)u"m^-1"
     ε = Array{Float64,4}(undef, 1, nz, nx, ny)
-    α[1,:,:,:], ε[1,:,:,:] =  α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
-
-    # Find optical depth boundary
     boundary = Array{Int32,3}(undef, 1, nx, ny)
-    boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, τ_max)
-
-    # Calculate distribuion of packets
     packets = Array{Int32,4}(undef, 1, nz, nx, ny)
     intensity_per_packet = Array{Float64,1}(undef, 1)u"kW / m^2 / sr / nm"
+
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION PROBABILITY FOR BACKGROUND PROCESSES
+    # ==================================================================
+    proton_density = hydrogen_populations[:,:,:,end]
+    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+
+    α_cont_a = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_cont_s = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
+
+    α[1,:,:,:] = α_cont_a .+ α_cont_s
+    ε[1,:,:,:] = α_cont_a ./ α[1,:,:,:]
+
+    # ==================================================================
+    # FIND OPTICAL DEPTH BOUNDARY
+    # ==================================================================
+    boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, τ_max)
+
+    # ==================================================================
+    # FIND DISTRIBUTION OF PACKETS
+    # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
                                                                    temperature, α[1,:,:,:], boundary[1,:,:])
 
     return λ, α, ε, boundary, packets, intensity_per_packet, max_scatterings
 end
 
+"""
+FULL MODE: POPULATION ITERATION
+Collects radition data wavelength associated with bound-bound and bound-free processes.
+Returns data to go into structure.
+"""
 function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, populations)
-
-    # Read from input file
+   # ==================================================================
+   # GET KEYWORD INPUT
+   # ==================================================================
     max_scatterings = get_max_scatterings()
     target_packets = get_target_packets()
     τ_max = get_cut_off()
 
-    # Get atmosphere data
+    # ==================================================================
+    # GET ATMOSPHERE DATA
+    # ==================================================================
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
@@ -67,23 +96,30 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
 
     nz, nx, ny = size(temperature)
 
-    # Sample wavelengths
+    # ==================================================================
+    # SAMPLE WAVELENGTHS
+    # ==================================================================
     λ = sample_λ(atom)
     nλ = length(λ)
 
-    # Get opacity and destruction probability
-    # For each wavelength, find χ and ε
-    α, ε = α_and_ε_atom(atmosphere, atom, populations, λ)
-
-    # Get boundary and packet distribuion
+    # ==================================================================
+    # INITIALISE VARIABLES
+    # ==================================================================
     boundary = Array{Int32,3}(undef, nλ, nx, ny)
     packets = Array{Int32,4}(undef, nλ, nz, nx, ny)
     intensity_per_packet =  Array{Float64,1}(undef, nλ)u"kW / m^2 / sr / nm"
 
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
+    # ==================================================================
+    α, ε = α_and_ε_atom(atmosphere, atom, populations, λ)
+
+
+    # ==================================================================
+    # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
+    # ==================================================================
     for l=1:nλ
-        # Find opticla depth boundary
         boundary[l,:,:] = optical_depth_boundary(α[l,:,:,:], z, τ_max)
-        # Calculate distribuion of packets
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α[l,:,:,:], boundary[l,:,:])
     end
@@ -91,21 +127,23 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     return λ, α, ε, boundary, packets, intensity_per_packet, max_scatterings
 end
 
-function sample_λ(atom::AtomicLine)
+function sample_λ(atom::Atom)
 
     # Get atom data
-    χi = atom.χi
-    χj = atom.χj
+    χl = atom.χl
+    χu = atom.χu
     χ∞ = atom.χ∞
-
-    # Find bf edges and bb center wavelength
-    λ_bf_edge_l = ((h * c_0) / (χ∞-χi)) |> u"nm"
-    λ_bf_edge_u = ((h * c_0) / (χ∞-χj)) |> u"nm"
-    λ_bb_center = ((h * c_0) / (χj-χi)) |> u"nm"
-
-
-    # Get # of sample points
-    nλ_bb, nλ_bf = get_nλ()
+    nλ_bb = atom.nλ_bb
+    nλ_bf = atom.nλ_bf
+    bfl_min = atom.bfl_min
+    bfu_min = atom.bfu_min
+    λ_bf_l_min = atom.λ_bf_l_min
+    λ_bf_l_max = atom.λ_bf_l_max
+    λ_bf_u_min = atom.λ_bf_u_min
+    λ_bf_u_max = atom.λ_bf_u_max
+    λ_bb_center = atom.λ_bb_center
+    qwing = atom.qwing
+    qcore = atom.qcore
 
     # Make sure odd # of bb wavelengths
     if nλ_bb > 0 && nλ_bb%2 == 0
@@ -121,13 +159,11 @@ function sample_λ(atom::AtomicLine)
     # Linear spacing
     # =================================================
     if nλ_bf > 0
-        λ_bf_min_l, λ_bf_min_u = get_λ_min()
+        Δλ_bf_l = (λ_bf_l_max - λ_bf_l_min)/nλ_bf
+        Δλ_bf_u = (λ_bf_u_max - λ_bf_u_min)/nλ_bf
 
-        Δλ_bf_l = (λ_bf_edge_l - λ_bf_min_l)/nλ_bf
-        Δλ_bf_u = (λ_bf_edge_u - λ_bf_min_u)/nλ_bf
-
-        λ[1] = λ_bf_min_l
-        λ[nλ_bf+1] = λ_bf_min_u
+        λ[1] = λ_bf_l_min
+        λ[nλ_bf+1] = λ_bf_u_min
 
         for l=2:nλ_bf
             λ[l] = λ[l-1] + Δλ_bf_l
@@ -140,9 +176,6 @@ function sample_λ(atom::AtomicLine)
     # Follows github.com/ITA-Solar/rh/blob/master/getlambda.c
     # =================================================
     if nλ_bb > 0
-
-        qwing = 600.0
-        qcore = 15.0
         vmicro_char = 2.5u"km/s"
 
         n = nλ_bb/2 # Questionable
@@ -164,6 +197,8 @@ function sample_λ(atom::AtomicLine)
 
     return λ
 end
+
+
 
 function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
 
@@ -208,8 +243,9 @@ function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populatio
         profile = voigt_profile.(a, ustrip(v), ΔλD)
         α_line = αline_λ.(Ref(atom), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
 
+
         B = blackbody_lambda.(λ[l], temperature)
-        Rji = atom.Aji .+ atom.Bji.*B
+        Rji = atom.Aji .+ atom.Bji.*B #should I use J in later iterations
         ε_line = Cji ./ (Rji .+ Cji)
         α[l,:,:,:] = α_line .+ α_cont
         ε[l,:,:,:] = ε_line .* (α_line ./ α[l,:,:,:])  .+ ε_cont .* (α_cont ./ α[l,:,:,:])
@@ -217,6 +253,7 @@ function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populatio
 
     return α, ε
 end
+
 
 
 function α_and_ε_atom_test(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
@@ -276,7 +313,6 @@ function α_and_ε_atom_test(atmosphere::Atmosphere, atom::AtomicLine, atom_popu
     return α_cont, ε_cont, ε_line, αC, ΔλD, a
 end
 
-
 function α_line(λ, αC, ΔλD, a, vlos)
 
     v = (λ[l] - λ[center]) ./ ΔλD
@@ -285,25 +321,8 @@ function α_line(λ, αC, ΔλD, a, vlos)
     α = αC*profile
 
     return α
-
 end
 
-
-
-function α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
-
-    proton_density = hydrogen_populations[:,:,:,end]
-    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1] #unclear if I should use all neutral hydrogen
-
-    # continuum
-    α_cont_a = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_cont_s = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
-
-    α_cont = α_cont_a .+ α_cont_s
-    ε_cont = α_cont_a ./ α_cont
-
-    return α_cont, ε_cont
-end
 
 """
 DELETE once Cji in Transparency
@@ -385,6 +404,23 @@ function Cji_RH()
 end
 
 
+
+""" DELETE
+function α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
+
+    proton_density = hydrogen_populations[:,:,:,end]
+    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+
+    # continuum
+    α_cont_a = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_cont_s = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
+
+    α_cont = α_cont_a .+ α_cont_s
+    ε_cont = α_cont_a ./ α_cont
+
+    return α_cont, ε_cont
+end"""
+
 """
 The extinction from continuum absorption processes for a given λ.
 Includes H- ff, H- bf, H ff, H2+ ff and H2+ bf.
@@ -409,8 +445,8 @@ The extincion from Thomson and Rayleigh scattering for a given λ.
 Credit: Tiago
 """
 function α_cont_scatt(λ::Unitful.Length,
-                 electron_density::NumberDensity,
-                 h_ground_density::NumberDensity)
+                      electron_density::NumberDensity,
+                      h_ground_density::NumberDensity)
 
     α = thomson(electron_density)
     α += rayleigh_h(λ, h_ground_density)
@@ -420,15 +456,14 @@ end
 """
 Calculates the vertical optical depth of the atmosphere.
 """
-function optical_depth(α,
+function optical_depth(α::Array{<:PerLength, 3},
                        z::Array{<:Unitful.Length, 1})
     nz, nx, ny = size(α)
-    columns = nx*ny
 
     τ = Array{Float64,3}(undef, nz-1, nx, ny)
 
     # Calculate vertical optical depth for each column
-    Threads.@threads for col=1:columns
+    Threads.@threads for col=1:nx*ny
         j = 1 + (col-1)÷nx
         i = col - (j-1)*nx
         τ[1,i,j] = 0.5(z[1] - z[2]) * (α[1,i,j] + α[2,i,j])
@@ -442,9 +477,10 @@ function optical_depth(α,
 end
 
 """
-Returns 2D array containing the z-indices where the optical depth reaches τ_max.
+Returns 2D array containing the z-indices
+where the optical depth reaches τ_max.
 """
-function optical_depth_boundary(α,
+function optical_depth_boundary(α::Array{<:PerLength, 3},
                                 z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
     nz, nx, ny = size(α)
@@ -478,11 +514,11 @@ As well as the scale
 function distribute_packets(λ::Unitful.Length,
                             target_packets::Real,
                             x::Array{<:Unitful.Length, 1},
-                            y,
-                            z,
-                            temperature,
-                            α,
-                            boundary)
+                            y::Array{<:Unitful.Length, 1},
+                            z::Array{<:Unitful.Length, 1},
+                            temperature::Array{<:Unitful.Temperature, 3},
+                            α::Array{<:PerLength, 3},
+                            boundary::Array{Int32,2})
 
     nz, nx, ny = size(α)
 
@@ -520,6 +556,7 @@ function blackbody_lambda(λ::Unitful.Length,
                           temperature::Unitful.Temperature)
     (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
 end
+
 
 function write_to_file(radiation::Radiation)
     h5open("../out/output.h5", "w") do file

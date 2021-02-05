@@ -4,78 +4,38 @@ struct Atmosphere
     z::Array{<:Unitful.Length, 1}                       # (nz + 1)
     x::Array{<:Unitful.Length, 1}                       # (nx + 1)
     y::Array{<:Unitful.Length, 1}                       # (ny + 1)
-
-    velocity_z::Array{Array{<:Unitful.Velocity, 1}, 3}  # (nx, ny, nz)
-    velocity_x::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
-    velocity_y::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
+    velocity::Array{Array{<:Unitful.Velocity, 1}, 3}    # (nx, ny, nz)
     temperature::Array{<:Unitful.Temperature, 3}        # (nx, ny, nz)
-    electron_density::Array{<:Unitful.Quantity, 3}      # (nx, ny, nz)
-
-    hydrogen_populations::Array{<:Unitful.Quantity, 4}  # (nx, ny, nz, nl)
+    electron_density::Array{<:NumberDensity, 3}      # (nx, ny, nz)
+    hydrogen_populations::Array{<:NumberDensity, 4}  # (nx, ny, nz, nl)
 end
 
 """
-Reads atmosphere parameters and reworks them to fit simulation.
+Reads and slices atmosphere parameters accoring to inputs.
 """
+
 function collect_atmosphere_data()
 
     # ===========================================================
     # READ ATMOSPHERE FILE
     # ===========================================================
     atmos = h5open(get_atmosphere_path(), "r")
-
     x = read(atmos, "x")u"m"
     y = read(atmos, "y")u"m"
-    z = read(atmos, "z")[:,1]u"m"  # slice due to snapshot
+    z = read(atmos, "z")u"m"
 
-    velocity_x = read(atmos, "velocity_x")[:,:,:,1]u"m/s"
-    velocity_y = read(atmos, "velocity_y")[:,:,:,1]u"m/s"
-    velocity_z = read(atmos, "velocity_z")[:,:,:,1]u"m/s"
+    # Change to single variable
+    velocity_x = read(atmos, "velocity_x")u"m/s"
+    velocity_y = read(atmos, "velocity_y")u"m/s"
+    velocity_z = read(atmos, "velocity_z")u"m/s"
 
-    temperature = read(atmos, "temperature")[:,:,:,1]u"K"
-    electron_density = read(atmos, "electron_density")[:,:,:,1]u"m^-3"
-    hydrogen_populations = read(atmos, "hydrogen_populations")[:,:,:,:,1]u"m^-3"
-
+    temperature = read(atmos, "temperature")u"K"
+    electron_density = read(atmos, "electron_density")u"m^-3"
+    hydrogen_populations = read(atmos, "hydrogen_populations")u"m^-3"
     close(atmos)
 
     # original dimensions of data
     nz, nx, ny = size(temperature)
-
-    # ===========================================================
-    # FLIP AXES
-    # ===========================================================
-
-    # Make sure x and y are increasing and z decreasing
-    if z[1] < z[end]
-        z = reverse(z)
-        velocity_z = velocity_z[end:-1:1,:,:]
-        velocity_x = velocity_x[end:-1:1,:,:]
-        velocity_y = velocity_y[end:-1:1,:,:]
-        temperature = temperature[end:-1:1,:,:]
-        electron_density = electron_density[end:-1:1,:,:]
-        hydrogen_populations = hydrogen_populations[end:-1:1,:,:,:]
-    end
-
-    if x[1] > x[end]
-        x = reverse(x)
-        velocity_z = velocity_z[:,end:-1:1,:]
-        velocity_x = velocity_x[:,end:-1:1,:]
-        velocity_y = velocity_y[:,end:-1:1,:]
-        temperature = temperature[:,end:-1:1,:]
-        electron_density = electron_density[:,end:-1:1,:]
-        hydrogen_populations = hydrogen_populations[:,end:-1:1,:,:]
-    end
-
-    if y[1] > y[end]
-        y = reverse(y)
-        velocity_z = velocity_z[:,:,end:-1:1]
-        velocity_x = velocity_x[:,:,end:-1:1]
-        velocity_y = velocity_y[:,:,end:-1:1]
-        temperature = temperature[:,:,end:-1:1]
-        electron_density = electron_density[:,:,end:-1:1]
-        hydrogen_populations = hydrogen_populations[:,:,end:-1:1,:]
-    end
-
 
     # ===========================================================
     # CUT AND SLICE ATMOSPHERE BY INDEX
@@ -194,7 +154,7 @@ function collect_atmosphere_data()
     nz, nx, ny = size(temperature)
 
     # ===========================================================
-    # ADD BOX END POINTS
+    # ADD BOX END POINTS IN CASE LOST AFTER CUTTING
     # ===========================================================
 
     if length(z) == nz
@@ -208,7 +168,7 @@ function collect_atmosphere_data()
     end
 
     # ===========================================================
-    # COLLECT VELOCITY IN ONE VARIABLE
+    # COLLECT VELOCITY IN ONE VARIABLE, MOVE TO TEST
     # ===========================================================
 
     velocity = Array{Array{<:Unitful.Velocity, 1}, 3}(undef,nz,nx,ny)
@@ -216,7 +176,7 @@ function collect_atmosphere_data()
     for k=1:nz
         for i=1:nx
             for j=1:ny
-                velocity[k,i,j] = [velocity_z[i,j,k], velocity_x[i,j,k], velocity_y[i,j,k]]
+                velocity[k,i,j] = [velocity_z[k,i,j], velocity_x[k,i,j], velocity_y[k,i,j]]
             end
         end
     end
