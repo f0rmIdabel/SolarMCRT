@@ -30,14 +30,21 @@ When ran in full *atom mode*,  the program needs a two-level atom file containin
 
 	* Atomic weight, atom_weight [kg]
 	* Ion charge, Z
-	* Ionisation wavenumber, chi_inf [cm^-1]
 	* Ground level wavenumber, chi_l [cm^-1]
 	* Second level wavenumber, chi_u [cm^-1]
+	* Ionisation wavenumber, chi_inf [cm^-1]
 	* Ground level statistical weight, gl
 	* Second level statistical weight, gu
+	* Ionised level statistical weight, ginf
 	* Oscillator strength, f_value
+	* Doppler width core, qcore (?)
+	* Doppler width wing, qwing (?)
+	* Minimum λ to be sampled for lower bf-transition, bfl_min [nm]
+	* Minimum λ to be sampled for upper bf-transition, bfl_min [nm]
 
-For other atoms than hydrogen, the initial atom populations is required as well.
+The initial atom populations are required as well.
+
+	* Initial atom populations, initial_populations [m^-3] (nz, nx, ny, levels=3)
 
 ## Running the code
 With appropriate input parameters, the code can be executed from the run/ directory with *julia run.jl*.

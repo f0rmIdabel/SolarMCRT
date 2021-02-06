@@ -12,7 +12,9 @@ using Random
 using Printf
 using HDF5
 
-import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u, m_e
+import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u, m_e, R_∞
+const E_∞ = R_∞ * c_0 * h
+
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
 @derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3

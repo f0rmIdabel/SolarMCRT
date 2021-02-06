@@ -168,7 +168,7 @@ function collect_atmosphere_data()
     end
 
     # ===========================================================
-    # COLLECT VELOCITY IN ONE VARIABLE, MOVE TO TEST
+    # COLLECT VELOCITY IN ONE VARIABLE
     # ===========================================================
 
     velocity = Array{Array{<:Unitful.Velocity, 1}, 3}(undef,nz,nx,ny)

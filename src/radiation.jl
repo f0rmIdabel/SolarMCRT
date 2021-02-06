@@ -11,6 +11,19 @@ struct Radiation
     max_scatterings::Int64                               # Int64
 end
 
+struct RadiationAtom
+    λ::Array{<:Unitful.Length, 1}                        # (nλ)
+    α_continuum::Array{<:PerLength, 4}                             # (nλ, nz, nx, ny)
+    ε::Array{Float64,4}                                  # (nλ, nz, nx, ny)
+    boundary::Array{Int32,3}                             # (nλ, nx, ny)
+    packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
+    intensity_per_packet::Array{<:UnitsIntensity_λ, 1}   # (nλ)
+    max_scatterings::Int64                               # Int64
+    a::Array
+    ΔλD::Array
+end
+
+
 """
 TEST MODE: BACKGROUND PROCESSES
 Collects radition data for background processes at a single wavelength
@@ -51,11 +64,11 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     proton_density = hydrogen_populations[:,:,:,end]
     hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
 
-    α_cont_a = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_cont_s = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
+    α_abs = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_scat = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
 
-    α[1,:,:,:] = α_cont_a .+ α_cont_s
-    ε[1,:,:,:] = α_cont_a ./ α[1,:,:,:]
+    α[1,:,:,:] = α_abs .+ α_scat
+    ε[1,:,:,:] = α_abs ./ α[1,:,:,:]
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY
@@ -112,8 +125,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     # ==================================================================
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
     # ==================================================================
-    α, ε = α_and_ε_atom(atmosphere, atom, populations, λ)
-
+    #α, α_line, ε, a, ΔλD  = atom_extinction_data(atmosphere, atom, populations, λ)
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
@@ -124,8 +136,105 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
                                                                        temperature, α[l,:,:,:], boundary[l,:,:])
     end
 
-    return λ, α, ε, boundary, packets, intensity_per_packet, max_scatterings
+    α[2nλ_bf+1:end,:,:,:] -= α_line
+
+    return λ, α_continuum, ε, boundary, packets, intensity_per_packet, max_scatterings, a, ΔλD
 end
+
+
+function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
+
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    hydrogen_populations = atmosphere.hydrogen_populations
+
+    nλ_bb, nλ_bf = get_nλ()
+
+    nz, nx, ny = size(temperature)
+    nλ = length(λ)
+
+    λ0 = λ[nλ_bf*2 + (nλ_bb÷2) + 1]
+
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION PROBABILITY FROM BACKGROUND PROCESSES
+    # ==================================================================
+    α_background = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
+    ε_background = Array{Float64,4}(undef, nλ, nz, nx, ny)
+    α = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
+    ε = Array{Float64,4}(undef, nλ, nz, nx, ny)
+    α_line = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
+
+    proton_density = hydrogen_populations[:,:,:,end]
+    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+
+    # Background at bound-free wavelengths
+    @Threads.threads for l=1:2*nλ_bf
+        α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+        α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_popuplation)
+
+        α_background[l,:,:,:] = α_scatt + α_abs
+        ε_background[l,:,:,:] = α_abs/ α_background
+    end
+
+    # Assume constant background over line profile wavelengths
+    α_abs = α_cont_abs.(λ0, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_scatt =  α_cont_scatt.(λ0, electron_density, hydrogen_ground_popuplation)
+
+    @Threads.threads for l=2*nλ_bf+1:nλ
+        α_background[l,:,:,:] = α_scatt + α_abs
+        ε_background[l,:,:,:] = α_abs/ α_background
+    end
+
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION FROM BOUND-FREE PROCESSES
+    # ==================================================================
+    ν = c_0 ./ λ
+    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
+
+    @Threads.threads for l=1:nλ_bf
+        α_bf_l = hydrogenic_bf(ν[l], ν[nλ_bf],
+                               temperature,  hydrogen_populations[:,:,:,1],
+                               1.0, n_eff)
+
+        α_bf_u = hydrogenic_bf(ν[l+nλ_bf], ν[2*nλ_bf],
+                               temperature, hydrogen_populations[:,:,:,2],
+                               1.0, n_eff)
+
+        ## ε_bf_l = Cji_bf ./ (Rji_bf .+ Cji_bf)   Needs to be added to Transparency
+        ## ε_bf_u = Cji_bf ./ (Rji_bf .+ Cji_bf)
+
+        α[l,:,:,:] = α_background[l,:,:,:] + α_bf_l
+        ε[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_bf_l .* α_bf_l ) ./ α[l,:,:,:]
+
+        α[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] + α_bf_u
+        ε[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ α[l+nλ_bf,:,:,:]
+    end
+
+    # ==================================================================
+    # EXTINCTION FROM BOUND-BOUND PROCESSES
+    # ==================================================================
+
+    unsold_const = γ_unsold_const(line)
+    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:,:,:,1]) .+ atom.Aji
+    ΔλD = doppler_width.(λ[center], atom.atom_weight, temperature)
+    a = Array{Float64, 4}(nλ, nz, nx, ny)
+
+    @Threads.threads for l=(nλ_bf*2+1):nλ
+        a[l,:,:,:] = damping.(γ, λ[l], ΔλD)
+        v = (λ[l] - λ[center]) ./ ΔλD
+        profile = voigt_profile.(a, ustrip(v), ΔλD)
+
+        α_line[l,:,:,:] = αline_λ.(Ref(line), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
+        #ε_line = Cji ./ (Rji[l] .+ Cji)
+
+        α[l,:,:,:] = α_background[l,:,:,:] + α_line
+        ε[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_line .* α_line) ./ α[l,:,:,:]
+    end
+
+    return α, ε, α_line, a, ΔλD
+end
+
+
 
 function sample_λ(atom::Atom)
 
@@ -200,226 +309,15 @@ end
 
 
 
-function α_and_ε_atom(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
+function α_line(line::AtomicLine, λ, λ0, ΔλD, a, vlos)
 
-    vz = atmosphere,velocity_z
-    vx = atmosphere.velocity_x
-    vy = atmosphere.velocity_y
-    temperature = atmosphere.temperature
-    electron_density = atmosphere.electron_density
-    hydrogen_populations = atmosphere.hydrogen_populations
-
-    nλ_bb, nλ_bf = get_nλ()
-
-    nz, nx, ny = size(temperature)
-    nλ = length(λ)
-
-    # For each wavelength, find χ and ε
-    α = Array{Float64,4}(undef, nλ, nz, nx, ny)u"m^-1"
-    ε = Array{Float64,4}(undef, nλ, nz, nx, ny)
-
-    # Find bound-free continuum
-    @Threads.threads for l=1:nλ_bf
-        α[l,:,:,:], ε[l,:,:,:] =  α_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
-        α[l+nλ_bf,:,:,:], ε[l+nλ_bf,:,:,:] =  α_and_ε_cont(λ[l+nλ_bf], temperature, electron_density, hydrogen_populations)
-    end
-
-    # Find bound-bound continuum
-    # assume continuum constant over line
-    center = nλ_bf*2 + (nλ_bb÷2)
-    α_cont, ε_cont =  α_and_ε_cont(λ[center], temperature, electron_density, hydrogen_populations)
-
-    # Compute line extinction (van der Waals + natural broadening)
-    unsold_const = γ_unsold_const(atom)
-    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:,:,:,1]) .+ atom.Aji
-    ΔλD = doppler_width.(λ[center], atom.atom_weight, temperature)
-
-    Cji = Cji_RH()                          # replace with atom.Cij
-
-    @Threads.threads for l=(nλ_bf*2+1):nλ
-
-        a = damping.(γ, λ[l], ΔλD)
-        v = (λ[l] - λ[center]) ./ ΔλD
-        profile = voigt_profile.(a, ustrip(v), ΔλD)
-        α_line = αline_λ.(Ref(atom), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
-
-
-        B = blackbody_lambda.(λ[l], temperature)
-        Rji = atom.Aji .+ atom.Bji.*B #should I use J in later iterations
-        ε_line = Cji ./ (Rji .+ Cji)
-        α[l,:,:,:] = α_line .+ α_cont
-        ε[l,:,:,:] = ε_line .* (α_line ./ α[l,:,:,:])  .+ ε_cont .* (α_cont ./ α[l,:,:,:])
-    end
-
-    return α, ε
-end
-
-
-
-function α_and_ε_atom_test(atmosphere::Atmosphere, atom::AtomicLine, atom_populations, λ)
-
-    vz = atmosphere,velocity_z
-    vx = atmosphere.velocity_x
-    vy = atmosphere.velocity_y
-    temperature = atmosphere.temperature
-    electron_density = atmosphere.electron_density
-    hydrogen_populations = atmosphere.hydrogen_populations
-
-    nλ_bb, nλ_bf = get_nλ()
-
-    nz, nx, ny = size(temperature)
-    nλ = length(λ)
-
-    # For each wavelength, find χ and ε
-    α_cont = Array{Float64,4}(undef, nλ, nz, nx, ny)u"m^-1"
-    ε_cont = Array{Float64,4}(undef, nλ, nz, nx, ny)
-    ε_line = Array{Float64,4}(undef, nλ, nz, nx, ny)
-
-    # Find bound-free continuum
-    @Threads.threads for l=1:nλ_bf
-        α_cont[l,:,:,:], ε_cont[l,:,:,:] =  α_and_ε_cont(λ[l], temperature, electron_density, hydrogen_populations)
-        α_cont[l+nλ_bf,:,:,:], ε_cont[l+nλ_bf,:,:,:] =  α_and_ε_cont(λ[l+nλ_bf], temperature, electron_density, hydrogen_populations)
-    end
-
-    # Find bound-bound continuum
-    # assume continuum constant over line
-    center = nλ_bf*2 + (nλ_bb÷2)
-    α_cont_line, ε_cont_line =  α_and_ε_cont(λ[center], temperature, electron_density, hydrogen_populations)
-
-    # Compute line extinction (van der Waals + natural broadening)
-    unsold_const = γ_unsold_const(atom)
-    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:,:,:,1]) .+ atom.Aji
-    ΔλD = doppler_width.(λ[center], atom.atom_weight, temperature)
-
-    Cji = Cji_RH()                          # replace with atom.Cij
-
-    @Threads.threads for l=(nλ_bf*2+1):nλ
-
-        α_cont[l,:,:,:] = α_cont_line
-
-        a = damping.(γ, λ[l], ΔλD)
-
-        v = (λ[l] - λ[center]) ./ ΔλD
-        profile = voigt_profile.(a, ustrip(v), ΔλD)
-
-        αC = αline_λ.(Ref(atom), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1]) ./ profile
-
-        B = blackbody_lambda.(λ[l], temperature)
-        Rji = atom.Aji .+ atom.Bji.*B
-        ε_line = Cji ./ (Rji .+ Cji)
-
-    end
-
-    return α_cont, ε_cont, ε_line, αC, ΔλD, a
-end
-
-function α_line(λ, αC, ΔλD, a, vlos)
-
-    v = (λ[l] - λ[center]) ./ ΔλD
+    v = (λ - λ0 + λ0*v_los/c_0 ) ./ ΔλD
     profile = voigt_profile.(a, ustrip(v), ΔλD)
-
-    α = αC*profile
+    α_line = αline_λ.(Ref(line), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
 
     return α
 end
 
-
-"""
-DELETE once Cji in Transparency
-"""
-function Cji_RH()
-    rh_aux = h5open("/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/Cij_aux.h5", "r")
-    Cji = read(rh_aux, "Cij")[:,:,:,4]u"s^-1"
-    close(rh_aux)
-
-    # original dimensions of data
-    nz, nx, ny = size(Cji)
-
-    # ===========================================================
-    # FLIP AXES
-    # ===========================================================
-
-    Cji = Cji[:,:,end:-1:1]
-    # ===========================================================
-    # CUT AND SLICE ATMOSPHERE BY INDEX
-    # ===========================================================
-
-    ze, xe, ye = get_stop()
-    zs, xs, ys = get_start()
-    dz, dx, dy = get_step()
-
-    # Cut z-direction from below
-
-    if ze != nothing && ze < nz
-        nz = ze
-        Cji = Cji[1:nz,:,:]
-    end
-
-    # Cut  z-direction from up top
-    if zs > 1
-        nz = zs
-        Cji = Cji[nz:end,:,:]
-    end
-
-    # Cut x-direction from right
-    if xe != nothing && xe < nx
-        nx = xe
-        Cji = Cji[:,1:nx,:]
-    end
-
-    # Cut x-direction from the left
-    if xs > 1
-        nx = xs
-        Cji = Cji[:,nx:end,:]
-    end
-
-    # Cut y-direction from right
-    if ye != nothing && ye < ny
-        ny = ye
-        Cij = Cij[:,:,1:ny]
-    end
-
-    # Cut y-direction from the left
-    if ys > 1
-        ny = ys
-        Cji = Cji[:,:,ny:end]
-    end
-
-    # Only keep every dz-th box in z-direction
-    if dz > 1
-        Cji = Cji[1:dz:end,:,:]
-    end
-
-    # Only keep every dx-th box in x-direction
-    if dx > 1
-        Cji = Cji[:,1:dx:end,:]
-    end
-
-    # Only keep every dy-th box in y-direction
-    if dy > 1
-        Cji = Cji[:,:,1:dy:end]
-    end
-
-    return Cji
-end
-
-
-
-""" DELETE
-function α_and_ε_cont(λ, temperature, electron_density, hydrogen_populations)
-
-    proton_density = hydrogen_populations[:,:,:,end]
-    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
-
-    # continuum
-    α_cont_a = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_cont_s = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
-
-    α_cont = α_cont_a .+ α_cont_s
-    ε_cont = α_cont_a ./ α_cont
-
-    return α_cont, ε_cont
-end"""
 
 """
 The extinction from continuum absorption processes for a given λ.
