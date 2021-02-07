@@ -292,7 +292,6 @@ function mcrt(atmosphere::Atmosphere,
     # Initialise placeholder variable
     J_λ = zeros(Int32, nz, nx, ny)
 
-        velocity_los = velocity[box_id...] * unit_vector
     # ===================================================================
     # SIMULATION
     # ===================================================================
@@ -534,7 +533,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                              r, unit_vector)
 
-    velocity_los = velocity[box_id...] * unit_vector
+    velocity_los = sum(velocity[box_id...] * unit_vector)
     α = α_continuum[box_id...] + α_line(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
 
     τ_cum = ds * α
@@ -582,7 +581,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                                  r, unit_vector)
 
-        velocity_los = velocity[box_id...] * unit_vector
+        velocity_los = sum(velocity[box_id...] * unit_vector)
         α = α_continuum[box_id...] + α_line(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
 
         τ_cum += ds * α
@@ -598,10 +597,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 
     return box_id, r, lost
 end
-
-
-
-
 
 
 """

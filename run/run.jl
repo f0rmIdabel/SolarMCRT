@@ -49,9 +49,9 @@ function run()
         # LOAD INITIAL ATOM POPULATIONS
         # ==================================================================
         new_populations =  collect_initial_populations(atmosphere, atom)
+        atom_density = sum(new_populations, dims=4)[:,:,:,1]
         converged_populations = false
 
-        #error = Array{Float64,2}(undef, max_iterations, nλ)
         # ==================================================================
         # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
         # ==================================================================
@@ -74,16 +74,16 @@ function run()
             # ==================================================================
             mcrt(atmosphere, radiation)
 
-            """# ==================================================================
+            # ==================================================================
             # CHECK IF POPULATIONS CONVERGE
             # ==================================================================
-            new_population = get_revised_populations(atom)
+            new_population = get_revised_populations(atomsphere, atom, atom_density)
             converged = check_converged(populations, new_populations, error, n)
 
             if converged
                 println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
                 break
-            end"""
+            end
 
         end
     end

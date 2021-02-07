@@ -28,19 +28,21 @@ The code requires an atmosphere file containing
 
 When ran in full *atom mode*,  the program needs a two-level atom file containing
 
-	* Atomic weight, atom_weight [kg]
-	* Ion charge, Z
-	* Ground level wavenumber, chi_l [cm^-1]
-	* Second level wavenumber, chi_u [cm^-1]
-	* Ionisation wavenumber, chi_inf [cm^-1]
-	* Ground level statistical weight, gl
-	* Second level statistical weight, gu
-	* Ionised level statistical weight, ginf
-	* Oscillator strength, f_value
-	* Doppler width core, qcore (?)
-	* Doppler width wing, qwing (?)
-	* Minimum λ to be sampled for lower bf-transition, bfl_min [nm]
-	* Minimum λ to be sampled for upper bf-transition, bfl_min [nm]
+	* Physical properties
+		* Atomic weight, atom_weight [kg]
+		* Ion charge, Z
+		* Ground level wavenumber, chi_l [cm^-1]
+		* Second level wavenumber, chi_u [cm^-1]
+		* Ionisation wavenumber, chi_inf [cm^-1]
+		* Ground level statistical weight, gl
+		* Second level statistical weight, gu
+		* Ionised level statistical weight, ginf
+		* Oscillator strength, f_value
+	* λ-sampling parameters
+		* Doppler width core, qcore (?)
+		* Doppler width wing, qwing (?)
+		* Minimum λ to be sampled for lower bf-transition, bfl_min [nm]
+		* Minimum λ to be sampled for upper bf-transition, bfl_min [nm]
 
 The initial atom populations are required as well.
 
