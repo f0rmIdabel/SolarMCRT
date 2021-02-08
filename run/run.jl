@@ -37,29 +37,23 @@ function run()
         mcrt(atmosphere, radiation)
 
     else
-
-        # ==================================================================
+        # =======================================================================
         # LOAD ATOM
-        # ==================================================================
+        # =======================================================================
         print("--Loading atom.............................")
-        atom = Atom(collect_atom_data()...)
+        atom_parameters = collect_atom_data(atmosphere)
+        atom = Atom(atom_parameters...)
         println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
 
-        # ==================================================================
-        # LOAD INITIAL ATOM POPULATIONS
-        # ==================================================================
-        new_populations =  collect_initial_populations(atmosphere, atom)
-        atom_density = sum(new_populations, dims=4)[:,:,:,1]
+        # =======================================================================
+        # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POPULATIONS CONVERGE
+        # =======================================================================
+        atom_density = sum(atom.populations, dims=4)[:,:,:,1]
+        LTE_populations = LTE_populations(atom, atom_density, atmosphere.temperature, atmosphere.electron_density)
         converged_populations = false
 
-        # ==================================================================
-        # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
-        # ==================================================================
-
         for n=1:1#max_iterations
-            println("\n  ITERATION ", n)
-            println("="^91)
-            populations = new_populations
+            println("\n  ITERATION ", n, "\n", "="^91)
             # ==================================================================
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
             # ==================================================================
@@ -67,7 +61,8 @@ function run()
             radiation_parameters = collect_radiation_data(atmosphere, atom, populations)
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation)
-            println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
+            println(@sprintf("Radiation loaded with %.2e packets.",
+                    sum(radiation.packets[1,:,:,:])))
 
             # ==================================================================
             # SIMULATION
@@ -77,12 +72,16 @@ function run()
             # ==================================================================
             # CHECK IF POPULATIONS CONVERGE
             # ==================================================================
-            new_population = get_revised_populations(atomsphere, atom, atom_density)
-            converged = check_converged(populations, new_populations, error, n)
+            new_population = get_revised_populations(atom, LTE_populations, atmosphere.temperature)
+            converged = check_converged(atom.populations, new_populations, error, n)
 
             if converged
                 println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
                 break
+            else
+                # Update populations
+                atom.populations = copy(new_population)
+                atom.αlc = α_line_const(atom.line, new_populations[:,:,:,1], new_populations[:,:,:,2])
             end
 
         end

@@ -248,7 +248,7 @@ end
 ATOM MODE
 """
 function mcrt(atmosphere::Atmosphere,
-              radiation::RadiationAtom,
+              radiation::Radiation,
               atom::Atom)
 
     # ==================================================================
@@ -268,14 +268,16 @@ function mcrt(atmosphere::Atmosphere,
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = radiation.max_scatterings
-    a = radition.a
-    ΔλD = radition.ΔλD
 
     # ===================================================================
     # ATOM DATA
     # ===================================================================
     nλ_bf = atom.nλ_bf
     line = atom.line
+    dc = atom.dc
+    ΔλD = atom.ΔλD
+    αlc = atom.αlc
+    λ0 = line.λ0
 
     # ===================================================================
     # SET UP VARIABLES
@@ -448,14 +450,13 @@ function mcrt(atmosphere::Atmosphere,
 
                             # Scatter packet once
                             box_id, r, lost = scatter_packet(x, y, z,
-                                                             velocity
+                                                             velocity,
                                                              α_continuum_λ,
                                                              boundary_λ,
                                                              box_id, r,
                                                              J_λ,
-                                                             a, ΔλD,
-                                                             line,
-                                                             λ[λi])
+                                                             dc, ΔλD, αlc,
+                                                             λ0, λ[λi])
 
                             # Check if escaped or lost in bottom
                             if lost
@@ -489,15 +490,16 @@ ATOM MODE
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        velocity::Array{<:Unitful.velocity, 1}
+                        velocity::Array{<:Unitful.velocity, 1},
                         α_continuum::Array{<:PerLength, 3},
                         boundary::Array{Int32, 2},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
-                        a::Array{Float64, 3},
+                        dc::Array{Float64, 3},
                         ΔλD::Array{Float64, 3},
-                        line::AtomicLine.
+                        αlc::Array{Float64, 3},
+                        λ0::Unitful.Length,
                         λ::Unitful.Length)
 
     # Keep track of status
@@ -534,7 +536,9 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                              r, unit_vector)
 
     velocity_los = sum(velocity[box_id...] * unit_vector)
-    α = α_continuum[box_id...] + α_line(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
+
+
+    α = α_continuum[box_id...] + α_line_perturbed(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
 
     τ_cum = ds * α
     r += ds * unit_vector
@@ -582,7 +586,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                                  r, unit_vector)
 
         velocity_los = sum(velocity[box_id...] * unit_vector)
-        α = α_continuum[box_id...] + α_line(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
+        α = α_continuum[box_id...] + α_line_perturbed(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
 
         τ_cum += ds * α
         r += ds * unit_vector

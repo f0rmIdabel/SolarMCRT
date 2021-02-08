@@ -24,7 +24,7 @@ The code requires an atmosphere file containing
         * temperature [K] (nz, nx, ny)
     * Densities
         * electron_density [m^-3] (nz, nx, ny)
-        * hydrogen_populations [m^-3] (nz, nx, ny, levels)
+        * hydrogen_populations [m^-3] (nz, nx, ny, levels>=3)
 
 When ran in full *atom mode*,  the program needs a two-level atom file containing
 

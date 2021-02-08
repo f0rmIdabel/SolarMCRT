@@ -11,19 +11,6 @@ struct Radiation
     max_scatterings::Int64                               # Int64
 end
 
-struct RadiationAtom
-    λ::Array{<:Unitful.Length, 1}                        # (nλ)
-    α_continuum::Array{<:PerLength, 4}                   # (nλ, nz, nx, ny)
-    ε::Array{Float64,4}                                  # (nλ, nz, nx, ny)
-    boundary::Array{Int32,3}                             # (nλ, nx, ny)
-    packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
-    intensity_per_packet::Array{<:UnitsIntensity_λ, 1}   # (nλ)
-    max_scatterings::Int64                               # Int64
-    a::Array
-    ΔλD::Array
-end
-
-
 """
 TEST MODE: BACKGROUND PROCESSES
 Collects radition data for background processes at a single wavelength
@@ -84,6 +71,7 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
     return λ, α, ε, boundary, packets, intensity_per_packet, max_scatterings
 end
 
+
 """
 FULL MODE: POPULATION ITERATION
 Collects radition data wavelength associated with bound-bound and bound-free processes.
@@ -125,7 +113,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     # ==================================================================
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
     # ==================================================================
-    α, α_line, ε, a, ΔλD  = atom_extinction_data(atmosphere, atom, populations, λ)
+    α, ε, α_line  = atom_extinction_data(atmosphere, atom, populations, λ)
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
@@ -136,28 +124,26 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
                                                                        temperature, α[l,:,:,:], boundary[l,:,:])
     end
 
+    # Substract line extinction, as this will depend on line-of-sight velocity in simulation
     α[2nλ_bf+1:end,:,:,:] -= α_line
 
-    return λ, α_continuum, ε, boundary, packets, intensity_per_packet, max_scatterings, a, ΔλD
+    return λ, α_continuum, ε, boundary, packets, intensity_per_packet, max_scatterings
 end
 
-function sample_λ(atom::Atom)
+function sample_λ(atom)
 
-    # Get atom data
-    χl = atom.χl
-    χu = atom.χu
-    χ∞ = atom.χ∞
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
-    bfl_min = atom.bfl_min
-    bfu_min = atom.bfu_min
-    λ_bf_l_min = atom.λ_bf_l_min
-    λ_bf_l_max = atom.λ_bf_l_max
-    λ_bf_u_min = atom.λ_bf_u_min
-    λ_bf_u_max = atom.λ_bf_u_max
-    λ_bb_center = atom.λ_bb_center
-    qwing = atom.qwing
-    qcore = atom.qcore
+    nλ_bb, nλ_bf = get_nλ()
+
+    atom_file = h5open(get_atom_path(), "r")
+    λ_bf_l_min = read(atom_file, "bfl_min")u"nm"
+    λ_bf_u_min = read(atom_file, "bfu_min")u"nm"
+    qwing = read(atom_file, "qwing")
+    qcore = read(atom_file, "qcore")
+    close(atom_file)
+
+    λ_bf_l_max = transition_λ(atom.χl, atom.χ∞)
+    λ_bf_u_max = transition_λ(atom.χu, atom.χ∞)
+    λ_bb_center = transition_λ(atom.χl, atom.χu)
 
     # Make sure odd # of bb wavelengths
     if nλ_bb > 0 && nλ_bb%2 == 0
@@ -212,13 +198,20 @@ function sample_λ(atom::Atom)
     return λ
 end
 
+function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
+    ((h * c_0) / (χ2-χ1)) |> u"nm"
+end
+
 function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_populations::Array{<:PerLength,4}, λ::Array{<:Unitful.Length, 1})
 
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
     hydrogen_populations = atmosphere.hydrogen_populations
 
-    nλ_bb, nλ_bf = get_nλ()
+    nλ_bf = atom.nλ_bf
+    nλ_bb = atom.nλ_bb
+    ΔλD = atom.ΔλD
+    dc = atom.dc
 
     nz, nx, ny = size(temperature)
     nλ = length(λ)
@@ -284,15 +277,11 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
     # EXTINCTION FROM BOUND-BOUND PROCESSES
     # ==================================================================
 
-    unsold_const = γ_unsold_const(line)
-    γ = γ_unsold.(unsold_const, temperature, hydrogen_populations[:,:,:,1]) .+ atom.Aji
-    ΔλD = doppler_width.(λ[center], atom.atom_weight, temperature)
-    a = Array{Float64, 4}(nλ, nz, nx, ny)
-
     @Threads.threads for l=(nλ_bf*2+1):nλ
-        a[l,:,:,:] = damping.(γ, λ[l], ΔλD)
+        #a[l,:,:,:] = damping.(γ, λ[l], ΔλD)
+        damp = dc*λ[l]^2 |> u"m/m"
         v = (λ[l] - λ[center]) ./ ΔλD
-        profile = voigt_profile.(a, ustrip(v), ΔλD)
+        profile = voigt_profile.(damp, ustrip(v), ΔλD)
 
         α_line[l,:,:,:] = αline_λ.(Ref(line), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
         #ε_line = Cji ./ (Rji[l] .+ Cji)
@@ -301,18 +290,16 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
         ε[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_line .* α_line) ./ α[l,:,:,:]
     end
 
-    return α, ε, α_line, a, ΔλD
+    return α, ε, α_line
 end
 
-function α_line(line::AtomicLine, λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, a::Float64, vlos::Unitful.Velocity)
-
+function α_line_perturbed(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity)
+    damp = dc*λ^2 |> u"m/m"
     v = (λ - λ0 + λ0*v_los/c_0 ) ./ ΔλD
-    profile = voigt_profile.(a, ustrip(v), ΔλD)
-    α_line = αline_λ.(Ref(line), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
-
+    profile = voigt_profile.(damp, ustrip(v), ΔλD)
+    α = αlc * profile
     return α
 end
-
 
 """
 The extinction from continuum absorption processes for a given λ.
