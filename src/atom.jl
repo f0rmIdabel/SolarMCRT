@@ -142,7 +142,13 @@ function get_revised_populations(atom::Atom, LTE_populations::Array{<:NumberDens
     end
 
     σ12 = ...
+    σ13 =
+
+    G12 = ...
+
+
     P12 = Rij(J, σ12, ν) + C12
+    P21 = Rji(J, σ12, G12, ν) + C21
     ...
 
     # BB
@@ -192,12 +198,23 @@ function Rji(Jν, σij, Gij, ν)
     reurn R
 end
 
-function σij(Bij, νij, profile)
+function σij(Bij, νij, ϕ)
     # σij = h*νij/(4π)*Bij ϕνμ
+
+    for l=1:nν_bb
+        σ[l,:,:,:] = ν[l]*Bij*ϕ[l]
+    end
     σ *= h/4π
+    return σ
 end
 
-function Gij(...)
+function Gij(ni_LTE, nj_LTE, temperature, ν)
+    # Gij = [ni/nj]LTE exp(-hν/kT)
+
+    for n=1:nν
+        Gij[l,:,:,:] = ni_LTE ./nj_LTE * exp.(-h*ν[l]/k/temperature)
+    end
+    return Gij
 end
 
 function n3(N, n3, P12, P13, P21, P23, P31, P32)
