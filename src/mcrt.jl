@@ -19,8 +19,8 @@ function mcrt(atmosphere::Atmosphere,
     # RADIATION DATA
     # ===================================================================
     λ = radiation.λ
-    α = radiation.α
-    ε = radiation.ε
+    α = radiation.α_continuum
+    ε = radiation.ε_continuum
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = radiation.max_scatterings
@@ -264,7 +264,7 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     λ = radiation.λ
     α_continuum = radiation.α_continuum
-    ε = radiation.ε
+    ε_continuum = radiation.ε_continuum
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = radiation.max_scatterings

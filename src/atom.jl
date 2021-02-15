@@ -125,7 +125,11 @@ function check_converge(populations::Array{<:PerLength, 4}, new_populations::Arr
     return converged
 end
 
-function get_revised_populations(atom::Atom, LTE_populations::Array{<:NumberDensity,4}, λ::Array{<:Untiful.Length,1}, temperature::Array{<:Unitful.Temperature, 3})
+function get_revised_populations(atom::Atom,
+                                 LTE_populations::Array{<:NumberDensity,4},
+                                 λ::Array{<:Untiful.Length,1},
+                                 temperature::Array{<:Unitful.Temperature,3},
+                                 electron_density::Array{<:NumberDensity,3})
 
     # Read output from simulation
     out = h5open("../out/output.h5", "r")
@@ -141,37 +145,53 @@ function get_revised_populations(atom::Atom, LTE_populations::Array{<:NumberDens
         J[l,:,:,:] *= frequency_per_packet[l]
     end
 
-    σ12 = ...
-    σ13 =
-
-    G12 = ...
-
-
-    P12 = Rij(J, σ12, ν) + C12
-    P21 = Rji(J, σ12, G12, ν) + C21
-    ...
+    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
 
     # BB
-    # Pij = Rij + Cij
-    # Pij = Aij + Bij*J + Cij
+    σ12 = σij(B12, ν, ϕ???) #fix profile
+    G12 = Gij(1, 2, ν, temperature, LTE_populations)
 
-    # Rad rates
+    # BF
+    σ13 = σic(1, ν, charge, n_eff)
+    σ23 = σic(2, ν, charge, n_eff)
+    G13 = Gij(1, 3, ν, temperature, LTE_populations)
+    G23 = Gij(2, 3, ν, temperature, LTE_populations)
 
-    # BB
-    # σij = h*νij/(4π)*Bij ϕνμ
-    # Gij = [ni/nj]LTE exp(-hν/kT)
+    # Radiative rates
+    R12 = Rij(J, σ12, ν)
+    R13 = Rij(J, σ13, ν)
+    R23 = Rij(J, σ23, ν)
+    R21 = Rji(J, σ12, G12, ν)
+    R31 = Rji(J, σ13, G13, ν)
+    R32 = Rji(J, σ23, G23, ν)
 
-    #BF
-    # σij = σic(ν)
-    # Gij = [ni/nc]LTE exp(-hν/kT)
+    # Collisional rates (nz, nx, ny)
+    C12 = Cij(1, 2, electron_density, temperature, LTE_populations)
+    C13 = Cij(1, 3, electron_density, temperature, LTE_populations)
+    C23 = Cij(2, 3, electron_density, temperature, LTE_populations)
+    C21 = Cij(2, 1, electron_density, temperature, LTE_populations)
+    C31 = Cij(3, 1, electron_density, temperature, LTE_populations)
+    C32 = Cij(3, 2, electron_density, temperature, LTE_populations)
 
-    revised_populations[:,:,:,3] = n3(atom_density, n3, P12, P13, P21, P23, P31, P32)
-    revised_populations[:,:,:,2] = n2(atom_density, n3, P12, P21, P23, P32)
-    revised_populations[:,:,:,1] = n1(atom_density, n3, n2)
+    # Transition probabilities
+    P12 = R12 .+ C12
+    P13 = R13 .+ C13
+    P23 = R23 .+ C23
+    P21 = R21 .+ C21
+    P31 = R31 .+ C31
+    P32 = R32 .+ C32
+
+    # Revised populations
+    atom_density = sum(LTE_populations, dims=4)[:,:,:,1]
+    revised_populations[:,:,:,3] = n3(atom_density, P12, P13, P21, P23, P31, P32)
+    revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
+    revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
+
+    return revised_populations
 end
 
 function Rij(Jν, σij, ν)
-    # Rij  = ∫4π/(hν) σij J dν
+    # Rij  = ∫4π/(hν) σij J dν    # 1 / J * J / s / nm / m^2 / sr
     R = zeros(Float64, nz,nx,ny)
 
     for i=nν
@@ -186,6 +206,9 @@ end
 function Rji(Jν, σij, Gij, ν)
     # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
 
+    # m^2 sr
+    [1 / s / m^2 / sr]
+
     R = zeros(Float64, nz,nx,ny)
 
     for i=nν
@@ -198,26 +221,77 @@ function Rji(Jν, σij, Gij, ν)
     reurn R
 end
 
-function σij(Bij, νij, ϕ)
+function σij(Bij, ν, ϕ)
     # σij = h*νij/(4π)*Bij ϕνμ
 
+    # [sr Hz m^2 / J] =  [Bij]
+
     for l=1:nν_bb
-        σ[l,:,:,:] = ν[l]*Bij*ϕ[l]
+        σ[l,:,:,:] = h/4π * ν[l]*Bij*ϕ[l]
     end
-    σ *= h/4π
+
     return σ
 end
 
-function Gij(ni_LTE, nj_LTE, temperature, ν)
+function σic(i, ν, charge, n_eff)
+    # σij = σic(ν)
+    c = 2.815*10e29 * charge^4/ i^5
+
+    for l=1:nν_bf
+        gbf = gaunt_bf(ν[l], charge, n_eff)
+        σ[l,:,:,:] = c * gbf / ν[l]^3
+    end
+
+    return
+end
+
+function Gij(i, j, ν, temperature, LTE_populations)
     # Gij = [ni/nj]LTE exp(-hν/kT)
 
-    for n=1:nν
-        Gij[l,:,:,:] = ni_LTE ./nj_LTE * exp.(-h*ν[l]/k/temperature)
+    for l=1:nν
+        Gij[l,:,:,:] = LTE_populations[:,:,:,i] ./LTE_populations[:,:,:,j]  * exp.(-h*ν[l]/k/temperature)
     end
+
     return Gij
 end
 
-function n3(N, n3, P12, P13, P21, P23, P31, P32)
+"""
+General for all ij
+Excitation/Ionisation
+De-excitation/Re-combination
+"""
+function Cij(n_i::Integer,
+             n_j::Integer,
+             electron_density::NumberDensity,
+             temperature::Unitful.Temperature,
+             LTE_populations::Array{<:NumberDensity,4})
+
+    ionisation_level = size(LTE_populations)[end]
+
+    # If UP
+    if n_i < n_j
+        if n_j < ionisation_level
+            C = coll_exc_hydrogen_johnson(n_i, n_j, electron_density, temperature)
+        elseif n_j == ionisation_level
+            C = coll_ion_hydrogen_johnson(n_i, electron_density, temperature)
+        end
+
+    # If DOWN
+    elseif n_i > n_j
+        if n_i < ionisation_level
+            C = coll_exc_hydrogen_johnson(n_j, n_i, electron_density, temperature)
+        elseif n_i == ionisation_level
+            C = coll_ion_hydrogen_johnson(n_j, electron_density, temperature)
+        end
+
+        C *= LTE_populations[:,:,:,n_i] ./ LTE_populations[:,:,:,n_j]
+    end
+
+    return C
+end
+
+
+function n3(N, P12, P13, P21, P23, P31, P32)
     a = N .* P12 ./ (P21 .+ P23 .+ P12)
     b = (P32 .- P12) ./ (P21 .+ P23 .+ P12)
 

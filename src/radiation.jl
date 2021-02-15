@@ -3,8 +3,9 @@ include("atom.jl")
 
 struct Radiation
     λ::Array{<:Unitful.Length, 1}                        # (nλ)
-    α::Array{<:PerLength, 4}                             # (nλ, nz, nx, ny)
-    ε::Array{Float64,4}                                  # (nλ, nz, nx, ny)
+    α_continuum::Array{<:PerLength, 4}                   # (nλ, nz, nx, ny)
+    ε_continuum::Array{Float64,4}                        # (nλ, nz, nx, ny)
+    #ε_line::Array{Float64,4}
     boundary::Array{Int32,3}                             # (nλ, nx, ny)
     packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
     intensity_per_packet::Array{<:UnitsIntensity_λ, 1}   # (nλ)
@@ -113,8 +114,9 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     # ==================================================================
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
     # ==================================================================
-    α, ε, α_line  = atom_extinction_data(atmosphere, atom, populations, λ)
+    α, ε, α_line_stationary  = atom_extinction_data(atmosphere, atom, populations, λ)
 
+    α = α_continuum[box_id...] + α_line_perturbed(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
@@ -125,7 +127,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     end
 
     # Substract line extinction, as this will depend on line-of-sight velocity in simulation
-    α[2nλ_bf+1:end,:,:,:] -= α_line
+    α[2nλ_bf+1:end,:,:,:] -= α_line_stationary
 
     return λ, α_continuum, ε, boundary, packets, intensity_per_packet, max_scatterings
 end
@@ -198,9 +200,6 @@ function sample_λ(atom)
     return λ
 end
 
-function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
-    ((h * c_0) / (χ2-χ1)) |> u"nm"
-end
 
 function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_populations::Array{<:PerLength,4}, λ::Array{<:Unitful.Length, 1})
 
@@ -278,7 +277,6 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
     # ==================================================================
 
     @Threads.threads for l=(nλ_bf*2+1):nλ
-        #a[l,:,:,:] = damping.(γ, λ[l], ΔλD)
         damp = dc*λ[l]^2 |> u"m/m"
         v = (λ[l] - λ[center]) ./ ΔλD
         profile = voigt_profile.(damp, ustrip(v), ΔλD)
@@ -293,7 +291,7 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
     return α, ε, α_line
 end
 
-function α_line_perturbed(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity)
+function α_line_perturbed(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity=0.0u"m/s")
     damp = dc*λ^2 |> u"m/m"
     v = (λ - λ0 + λ0*v_los/c_0 ) ./ ΔλD
     profile = voigt_profile.(damp, ustrip(v), ΔλD)
@@ -387,6 +385,37 @@ function optical_depth_boundary(α::Array{<:PerLength, 3},
 end
 
 """
+Returns 2D array containing the z-indices
+where the optical depth reaches τ_max.
+"""
+function optical_depth_boundary(α::Array{<:PerLength, 3},
+                                z::Array{<:Unitful.Length, 1},
+                                velocity_z::Array{<:Unitful.Length, 1},
+                                τ_max::Real)
+    nz, nx, ny = size(α)
+    columns = nx*ny
+    boundary = Array{Int32, 2}(undef, nx, ny)
+
+    # Calculate vertical optical depth for each column
+    Threads.@threads for col=1:columns
+        j = 1 + (col-1)÷nx
+        i = col - (j-1)*nx
+
+        τ = 0
+        k = 0
+
+        while τ < τ_max && k < nz
+            k += 1
+            # Trapezoidal rule
+            τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
+        end
+        boundary[i,j] = k
+    end
+
+    return boundary
+end
+
+"""
 Returns a 3D array of the # of packets to be
 generated in each box above the boundary.
 As well as the scale
@@ -434,6 +463,10 @@ Credit: Tiago
 function blackbody_lambda(λ::Unitful.Length,
                           temperature::Unitful.Temperature)
     (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
+end
+
+function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
+    ((h * c_0) / (χ2-χ1)) |> u"nm"
 end
 
 function write_to_file(radiation::Radiation)
