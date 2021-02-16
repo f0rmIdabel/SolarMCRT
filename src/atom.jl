@@ -33,7 +33,6 @@ struct TransitionRates
     C32::Array{<:Unitful.Frequency,3}
 end
 
-
 """
 Collection of 2 level atoms.
 """
@@ -98,7 +97,6 @@ function α_line_const(line::AtomicLine, n_u::NumberDensity, n_l::NumberDensity)
     (h * c_0 / (4 * π * line.λ0) * (n_l * line.Bij - n_u * line.Bji)) |> u"m/m"
 end
 
-
 function LTE_populations(atom::Atom, atom_density::NumberDensity, temperature::Unitful.Temperature, electron_density::NumberDensity)
 
     χl = atom.χi
@@ -126,7 +124,7 @@ function LTE_populations(atom::Atom, atom_density::NumberDensity, temperature::U
     return ustrip(populations)
 end
 
-function check_converge(populations::Array{<:PerLength, 4}, new_populations::Array{<:PerLength, 4}, criterion = 1e-3)
+function check_population_convergence(populations::Array{<:PerLength, 4}, new_populations::Array{<:PerLength, 4}, criterion = 1e-3)
     N = length(populations)
     error = norm( abs.(populations .- new_population) ./populations ./N)
 
@@ -141,61 +139,20 @@ function check_converge(populations::Array{<:PerLength, 4}, new_populations::Arr
     return converged
 end
 
-
 function get_revised_populations(atom::Atom,
+                                 rates::TransitionRates,
                                  LTE_populations::Array{<:NumberDensity,4},
                                  λ::Array{<:Untiful.Length,1},
                                  temperature::Array{<:Unitful.Temperature,3},
                                  electron_density::Array{<:NumberDensity,3})
 
-    # Read output from simulation
-    out = h5open("../out/output.h5", "r")
-    J = read(out, "J")
-    intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
-    close(out)
-
-    # Convert to Frequency
-    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
-    ν = c_0/λ
-    nλ = length(intensity_per_packet)
-    frequency_per_packet = ...
-    for l=1:nλ
-        J[l,:,:,:] *= frequency_per_packet[l]
-    end
-
-    # BB
-    σ12 = σij(B12, ν, ϕ???) #fix profile
-    G12 = Gij(1, 2, ν, temperature, LTE_populations)
-
-    # BF
-    σ13 = σic(1, ν, charge, n_eff)
-    σ23 = σic(2, ν, charge, n_eff)
-    G13 = Gij(1, 3, ν, temperature, LTE_populations)
-    G23 = Gij(2, 3, ν, temperature, LTE_populations)
-
-    # Radiative rates
-    R12 = Rij(J, σ12, ν)
-    R13 = Rij(J, σ13, ν)
-    R23 = Rij(J, σ23, ν)
-    R21 = Rji(J, σ12, G12, ν)
-    R31 = Rji(J, σ13, G13, ν)
-    R32 = Rji(J, σ23, G23, ν)
-
-    # Collisional rates (nz, nx, ny)
-    C12 = Cij(1, 2, electron_density, temperature, LTE_populations)
-    C13 = Cij(1, 3, electron_density, temperature, LTE_populations)
-    C23 = Cij(2, 3, electron_density, temperature, LTE_populations)
-    C21 = Cij(2, 1, electron_density, temperature, LTE_populations)
-    C31 = Cij(3, 1, electron_density, temperature, LTE_populations)
-    C32 = Cij(3, 2, electron_density, temperature, LTE_populations)
-
     # Transition probabilities
-    P12 = R12 .+ C12
-    P13 = R13 .+ C13
-    P23 = R23 .+ C23
-    P21 = R21 .+ C21
-    P31 = R31 .+ C31
-    P32 = R32 .+ C32
+    P12 = rates.R12 .+ rates.C12
+    P13 = rates.R13 .+ rates.C13
+    P23 = rates.R23 .+ rates.C23
+    P21 = rates.R21 .+ rates.C21
+    P31 = rates.R31 .+ rates.C31
+    P32 = rates.R32 .+ rates.C32
 
     # Revised populations
     atom_density = sum(LTE_populations, dims=4)[:,:,:,1]
@@ -251,7 +208,6 @@ function calculate_transition_rates(atom, LTE_populations, temperature, electron
 
     return R12, R13, R23, R21, R31, R32,
            C12, C13, C23, C21, C31, C32
-
 end
 
 function Rij(Jν, σij, ν)

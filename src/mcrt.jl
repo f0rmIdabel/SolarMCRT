@@ -244,8 +244,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 end
 
 
-
-
 """
 ATOM MODE
 """

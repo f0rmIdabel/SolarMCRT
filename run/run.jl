@@ -51,7 +51,7 @@ function run()
         atom_density = sum(atom.populations, dims=4)[:,:,:,1]
         LTE_populations = LTE_populations(atom, atom_density, atmosphere.temperature, atmosphere.electron_density)
         tr = calculate_transition_rates(atom, LTE_populations, atomsphere.temperature, atmosphere.electron_density)
-        transitionRates = TransitionRates(tr...)
+        rates = TransitionRates(tr...)
         converged_populations = false
 
         for n=1:1#max_iterations
@@ -60,7 +60,7 @@ function run()
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
             # ==================================================================
             print("--Loading radiation data...................")
-            radiation_parameters = collect_radiation_data(atmosphere, atom, transitionRates, populations)
+            radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation)
             println(@sprintf("Radiation loaded with %.2e packets.",
@@ -76,8 +76,8 @@ function run()
             # ==================================================================
             tr = calculate_transition_rates(atom, LTE_populations, atomsphere.temperature, atmosphere.electron_density)
             rates = TransitionRates(tr...)
-            new_population = get_revised_populations(atom, LTE_populations, atmosphere.temperature)
-            converged = check_converged(atom.populations, new_populations, error, n)
+            new_population = get_revised_populations(atom, rates, LTE_populations, atmosphere.temperature)
+            converged = check_population_convergence(atom.populations, new_populations, error, n)
 
             if converged
                 println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
