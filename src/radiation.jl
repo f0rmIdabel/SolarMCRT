@@ -5,7 +5,7 @@ struct Radiation
     λ::Array{<:Unitful.Length, 1}                        # (nλ)
     α_continuum::Array{<:PerLength, 4}                   # (nλ, nz, nx, ny)
     ε_continuum::Array{Float64,4}                        # (nλ, nz, nx, ny)
-    #ε_line::Array{Float64,4}
+    ε_line::Array{Float64,4}
     boundary::Array{Int32,3}                             # (nλ, nx, ny)
     packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
     intensity_per_packet::Array{<:UnitsIntensity_λ, 1}   # (nλ)
@@ -57,6 +57,7 @@ function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
 
     α[1,:,:,:] = α_abs .+ α_scat
     ε[1,:,:,:] = α_abs ./ α[1,:,:,:]
+    ε_line = ε*0.0
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY
@@ -78,7 +79,7 @@ FULL MODE: POPULATION ITERATION
 Collects radition data wavelength associated with bound-bound and bound-free processes.
 Returns data to go into structure.
 """
-function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, populations::Array{<:PerLength,4})
+function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, rates::TransitionRates, populations::Array{<:PerLength,4})
    # ==================================================================
    # GET KEYWORD INPUT
    # ==================================================================
@@ -95,6 +96,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
     hydrogen_populations = atmosphere.hydrogen_populations
+    velocity_z = atmosphere.velocity_z
 
     nz, nx, ny = size(temperature)
 
@@ -103,6 +105,7 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     # ==================================================================
     λ = sample_λ(atom)
     nλ = length(λ)
+    nλ_bf = atom.nλ_bf
 
     # ==================================================================
     # INITIALISE VARIABLES
@@ -114,22 +117,31 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, popula
     # ==================================================================
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
     # ==================================================================
-    α, ε, α_line_stationary  = atom_extinction_data(atmosphere, atom, populations, λ)
+    α_continuum, ε_continuum = continuum_extinction_destruction(atmosphere, atom, rates, populations, λ)
+    ε_line = line_destruction(rates)
 
-    α = α_continuum[box_id...] + α_line_perturbed(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
-    for l=1:nλ
-        boundary[l,:,:] = optical_depth_boundary(α[l,:,:,:], z, τ_max)
+
+    for l=1:2nλ_bf
+        boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                       temperature, α[l,:,:,:], boundary[l,:,:])
+                                                                      temperature, α_continuum[l,:,:,:], boundary[l,:,:])
     end
 
-    # Substract line extinction, as this will depend on line-of-sight velocity in simulation
-    α[2nλ_bf+1:end,:,:,:] -= α_line_stationary
+    for l=2nλ_bf+1:nλ
+        v_los = velocity_z
+        α = α_continuum[l,:,:,:] .+ line_extinction(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
+        boundary[l,:,:] = optical_depth_boundary(α, z, τ_max)
 
-    return λ, α_continuum, ε, boundary, packets, intensity_per_packet, max_scatterings
+        fill!(v_los, 0u"m/s")
+        α = α_continuum[l,:,:,:] .+ line_extinction(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
+        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
+                                                                      temperature, α, boundary[l,:,:])
+    end
+
+    return λ, α_continuum, ε_continuum, ε_line, boundary, packets, intensity_per_packet, max_scatterings
 end
 
 function sample_λ(atom)
@@ -200,8 +212,7 @@ function sample_λ(atom)
     return λ
 end
 
-
-function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_populations::Array{<:PerLength,4}, λ::Array{<:Unitful.Length, 1})
+function continuum_extinction_destruction(atmosphere::Atmosphere, atom::AtomicLine, rates::TransitionRates, atom_populations::Array{<:PerLength,4}, λ::Array{<:Unitful.Length, 1})
 
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
@@ -209,12 +220,9 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
 
     nλ_bf = atom.nλ_bf
     nλ_bb = atom.nλ_bb
-    ΔλD = atom.ΔλD
-    dc = atom.dc
 
     nz, nx, ny = size(temperature)
     nλ = length(λ)
-
     λ0 = λ[nλ_bf*2 + (nλ_bb÷2) + 1]
 
     # ==================================================================
@@ -222,9 +230,9 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
     # ==================================================================
     α_background = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
     ε_background = Array{Float64,4}(undef, nλ, nz, nx, ny)
-    α = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
-    ε = Array{Float64,4}(undef, nλ, nz, nx, ny)
-    α_line = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
+    α_continuum = Array{<:PerLength, 4}(undef, nλ, nz, nx, ny)
+    ε_continuum = Array{Float64,4}(undef, nλ, nz, nx, ny)
+    ε_line = Array{Float64,4}(undef, nλ_bb, nz, nx, ny)
 
     proton_density = hydrogen_populations[:,:,:,end]
     hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
@@ -248,10 +256,18 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
     end
 
     # ==================================================================
-    # EXTINCTION AND DESTRUCTION FROM BOUND-FREE PROCESSES
+    # EXTINCTION AND DESTRUCTION FROM ATOM BOUND-FREE
     # ==================================================================
     ν = c_0 ./ λ
     n_eff = sqrt(E∞ / (atom.χu - atom.χl))
+
+    C31 = rates.C31
+    R31 = rates.R31
+    C32 = rates.C32
+    R32 = rates.R32
+
+    ε_bf_l = C31 ./ (R31.+ C31)
+    ε_bf_u = C32 ./ (R32 .+ C32)
 
     @Threads.threads for l=1:nλ_bf
         α_bf_l = hydrogenic_bf(ν[l], ν[nλ_bf],
@@ -262,41 +278,28 @@ function atom_extinction_data(atmosphere::Atmosphere, atom::AtomicLine, atom_pop
                                temperature, hydrogen_populations[:,:,:,2],
                                1.0, n_eff)
 
-        ## ε_bf_l = Cji_bf ./ (Rji_bf .+ Cji_bf)   Needs to be added to Transparency
-        ## ε_bf_u = Cji_bf ./ (Rji_bf .+ Cji_bf)
+        α_continuum[l,:,:,:] = α_background[l,:,:,:] + α_bf_l
+        ε_continuum[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_bf_l .* α_bf_l ) ./ α[l,:,:,:]
 
-        α[l,:,:,:] = α_background[l,:,:,:] + α_bf_l
-        ε[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_bf_l .* α_bf_l ) ./ α[l,:,:,:]
-
-        α[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] + α_bf_u
-        ε[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ α[l+nλ_bf,:,:,:]
+        α_continuum[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] + α_bf_u
+        ε_continuum[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ α[l+nλ_bf,:,:,:]
     end
 
-    # ==================================================================
-    # EXTINCTION FROM BOUND-BOUND PROCESSES
-    # ==================================================================
-
-    @Threads.threads for l=(nλ_bf*2+1):nλ
-        damp = dc*λ[l]^2 |> u"m/m"
-        v = (λ[l] - λ[center]) ./ ΔλD
-        profile = voigt_profile.(damp, ustrip(v), ΔλD)
-
-        α_line[l,:,:,:] = αline_λ.(Ref(line), profile, atom_populations[:,:,:,2], atom_populations[:,:,:,1])
-        #ε_line = Cji ./ (Rji[l] .+ Cji)
-
-        α[l,:,:,:] = α_background[l,:,:,:] + α_line
-        ε[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_line .* α_line) ./ α[l,:,:,:]
-    end
-
-    return α, ε, α_line
+    return α_continuum, ε_continuum
 end
 
-function α_line_perturbed(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity=0.0u"m/s")
+function line_extinction(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity)
     damp = dc*λ^2 |> u"m/m"
-    v = (λ - λ0 + λ0*v_los/c_0 ) ./ ΔλD
+    v = (λ - λ0 .+ λ0 .* v_los ./ c_0) ./ ΔλD
     profile = voigt_profile.(damp, ustrip(v), ΔλD)
     α = αlc * profile
     return α
+end
+
+function line_destruction(rates::TransitionRates)
+    C21 = rates.C21
+    R21 = rates.R21
+    return C21 ./ (R21 .+ C21)
 end
 
 """
@@ -360,37 +363,6 @@ where the optical depth reaches τ_max.
 """
 function optical_depth_boundary(α::Array{<:PerLength, 3},
                                 z::Array{<:Unitful.Length, 1},
-                                τ_max::Real)
-    nz, nx, ny = size(α)
-    columns = nx*ny
-    boundary = Array{Int32, 2}(undef, nx, ny)
-
-    # Calculate vertical optical depth for each column
-    Threads.@threads for col=1:columns
-        j = 1 + (col-1)÷nx
-        i = col - (j-1)*nx
-
-        τ = 0
-        k = 0
-
-        while τ < τ_max && k < nz
-            k += 1
-            # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
-        end
-        boundary[i,j] = k
-    end
-
-    return boundary
-end
-
-"""
-Returns 2D array containing the z-indices
-where the optical depth reaches τ_max.
-"""
-function optical_depth_boundary(α::Array{<:PerLength, 3},
-                                z::Array{<:Unitful.Length, 1},
-                                velocity_z::Array{<:Unitful.Length, 1},
                                 τ_max::Real)
     nz, nx, ny = size(α)
     columns = nx*ny

@@ -17,6 +17,7 @@ const E_∞ = R_∞ * c_0 * h
 
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
+@derived_dimension PerTime Unitful.𝐓^-1
 @derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
 function test_mode()

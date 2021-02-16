@@ -244,6 +244,8 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 end
 
 
+
+
 """
 ATOM MODE
 """
@@ -265,6 +267,7 @@ function mcrt(atmosphere::Atmosphere,
     λ = radiation.λ
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
+    ε_line = radiation.ε_line
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = radiation.max_scatterings
@@ -312,7 +315,7 @@ function mcrt(atmosphere::Atmosphere,
         packets_λ = packets[λi,:,:,:]
         α_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
-        ε_λ = ε[λi,:,:,:]
+        ε_λ = ε_continuum[λi,:,:,:]
 
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
@@ -401,7 +404,8 @@ function mcrt(atmosphere::Atmosphere,
         packets_λ = packets[λi,:,:,:]
         α_continuum_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
-        ε_λ = ε[λi,:,:,:]
+        ε_continuum_λ = ε_continuum[λi,:,:,:]
+        ε_line_λ = ε_line[λi-2nλ_bf,:,:,:]
 
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
@@ -449,7 +453,7 @@ function mcrt(atmosphere::Atmosphere,
                             Threads.atomic_add!(total_scatterings, 1)
 
                             # Scatter packet once
-                            box_id, r, lost = scatter_packet(x, y, z,
+                            box_id, r, lost, α = scatter_packet(x, y, z,
                                                              velocity,
                                                              α_continuum_λ,
                                                              boundary_λ,
@@ -462,7 +466,11 @@ function mcrt(atmosphere::Atmosphere,
                             if lost
                                 break
                             # Check if destroyed in next particle interaction
-                            elseif rand() < ε_λ[box_id...]
+                            α_line_λ = α -  α_continuum_λ[box_id...]
+                            ε = (ε_continuum_λ[box_id...] * α_continuum_λ[box_id...] +
+                                 ε_line_λ[box_id...] * α_line_λ) / α
+
+                            elseif rand() < ε
                                 Threads.atomic_add!(total_destroyed, 1)
                                 break
                             end
@@ -491,14 +499,18 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
                         velocity::Array{<:Unitful.velocity, 1},
+
                         α_continuum::Array{<:PerLength, 3},
                         boundary::Array{Int32, 2},
+
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
+
                         dc::Array{Float64, 3},
                         ΔλD::Array{Float64, 3},
                         αlc::Array{Float64, 3},
+
                         λ0::Unitful.Length,
                         λ::Unitful.Length)
 
@@ -537,8 +549,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 
     velocity_los = sum(velocity[box_id...] * unit_vector)
 
-
-    α = α_continuum[box_id...] + α_line_perturbed(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
+    α = α_continuum[box_id...] + line_extinction(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
 
     τ_cum = ds * α
     r += ds * unit_vector
@@ -586,7 +597,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
                                  r, unit_vector)
 
         velocity_los = sum(velocity[box_id...] * unit_vector)
-        α = α_continuum[box_id...] + α_line_perturbed(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
+        α = α_continuum[box_id...] + line_extinction(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
 
         τ_cum += ds * α
         r += ds * unit_vector
@@ -599,7 +610,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         r -= unit_vector*(τ_cum - τ)/α[box_id...]
     end
 
-    return box_id, r, lost
+    return box_id, r, lost, α
 end
 
 

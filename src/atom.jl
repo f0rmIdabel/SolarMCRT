@@ -18,6 +18,22 @@ struct Atom
     populations::Array{<:Unitful.Length, 4}           # (nz, nx, ny, nl)
 end
 
+struct TransitionRates
+    R12::Array{<:Unitful.Frequency,3}
+    R13::Array{<:Unitful.Frequency,3}
+    R23::Array{<:Unitful.Frequency,3}
+    R21::Array{<:Unitful.Frequency,3}
+    R31::Array{<:Unitful.Frequency,3}
+    R32::Array{<:Unitful.Frequency,3}
+    C12::Array{<:Unitful.Frequency,3}
+    C13::Array{<:Unitful.Frequency,3}
+    C23::Array{<:Unitful.Frequency,3}
+    C21::Array{<:Unitful.Frequency,3}
+    C31::Array{<:Unitful.Frequency,3}
+    C32::Array{<:Unitful.Frequency,3}
+end
+
+
 """
 Collection of 2 level atoms.
 """
@@ -125,6 +141,7 @@ function check_converge(populations::Array{<:PerLength, 4}, new_populations::Arr
     return converged
 end
 
+
 function get_revised_populations(atom::Atom,
                                  LTE_populations::Array{<:NumberDensity,4},
                                  λ::Array{<:Untiful.Length,1},
@@ -138,14 +155,13 @@ function get_revised_populations(atom::Atom,
     close(out)
 
     # Convert to Frequency
+    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
     ν = c_0/λ
-    frequency_per_packet = ...
     nλ = length(intensity_per_packet)
+    frequency_per_packet = ...
     for l=1:nλ
         J[l,:,:,:] *= frequency_per_packet[l]
     end
-
-    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
 
     # BB
     σ12 = σij(B12, ν, ϕ???) #fix profile
@@ -188,6 +204,54 @@ function get_revised_populations(atom::Atom,
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
 
     return revised_populations
+end
+
+function calculate_transition_rates(atom, LTE_populations, temperature, electron_density)
+
+    # Read output from simulation
+    out = h5open("../out/output.h5", "r")
+    J = read(out, "J")
+    intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
+    close(out)
+
+    # Convert to Frequency
+    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
+    ν = c_0/λ
+    nλ = length(intensity_per_packet)
+    frequency_per_packet = ...
+    for l=1:nλ
+        J[l,:,:,:] *= frequency_per_packet[l]
+    end
+
+    # BB
+    σ12 = σij(B12, ν, ϕ???) #fix profile
+    G12 = Gij(1, 2, ν, temperature, LTE_populations)
+
+    # BF
+    σ13 = σic(1, ν, charge, n_eff)
+    σ23 = σic(2, ν, charge, n_eff)
+    G13 = Gij(1, 3, ν, temperature, LTE_populations)
+    G23 = Gij(2, 3, ν, temperature, LTE_populations)
+
+    # Radiative rates
+    R12 = Rij(J, σ12, ν)
+    R13 = Rij(J, σ13, ν)
+    R23 = Rij(J, σ23, ν)
+    R21 = Rji(J, σ12, G12, ν)
+    R31 = Rji(J, σ13, G13, ν)
+    R32 = Rji(J, σ23, G23, ν)
+
+    # Collisional rates (nz, nx, ny)
+    C12 = Cij(1, 2, electron_density, temperature, LTE_populations)
+    C13 = Cij(1, 3, electron_density, temperature, LTE_populations)
+    C23 = Cij(2, 3, electron_density, temperature, LTE_populations)
+    C21 = Cij(2, 1, electron_density, temperature, LTE_populations)
+    C31 = Cij(3, 1, electron_density, temperature, LTE_populations)
+    C32 = Cij(3, 2, electron_density, temperature, LTE_populations)
+
+    return R12, R13, R23, R21, R31, R32,
+           C12, C13, C23, C21, C31, C32
+
 end
 
 function Rij(Jν, σij, ν)

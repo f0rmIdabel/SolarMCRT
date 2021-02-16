@@ -5,6 +5,7 @@ struct Atmosphere
     x::Array{<:Unitful.Length, 1}                       # (nx + 1)
     y::Array{<:Unitful.Length, 1}                       # (ny + 1)
     velocity::Array{Array{<:Unitful.Velocity, 1}, 3}    # (nx, ny, nz)
+    velocity_z::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
     temperature::Array{<:Unitful.Temperature, 3}        # (nx, ny, nz)
     electron_density::Array{<:NumberDensity, 3}      # (nx, ny, nz)
     hydrogen_populations::Array{<:NumberDensity, 4}  # (nx, ny, nz, nl)
@@ -181,5 +182,5 @@ function collect_atmosphere_data()
         end
     end
 
-    return z, x, y, velocity, temperature, electron_density, hydrogen_populations
+    return z, x, y, velocity, velocity_z, temperature, electron_density, hydrogen_populations
 end
