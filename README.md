@@ -39,8 +39,8 @@ When ran in full *atom mode*,  the program needs a two-level atom file containin
 		* Ionised level statistical weight, ginf
 		* Oscillator strength, f_value
 	* λ-sampling parameters
-		* Doppler width core, qcore (?)
-		* Doppler width wing, qwing (?)
+		* Doppler width core, qcore
+		* Doppler width wing, qwing
 		* Minimum λ to be sampled for lower bf-transition, bfl_min [nm]
 		* Minimum λ to be sampled for upper bf-transition, bfl_min [nm]
 
@@ -66,4 +66,4 @@ The code outputs
     * Total destroyed packets, total_destroyed (nλ)
     * Total scatterings, total_scatterings (nλ)
 
-The get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around 2 GBs of data.
+To get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around 2 GBs of data.

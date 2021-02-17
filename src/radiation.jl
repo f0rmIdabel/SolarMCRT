@@ -79,7 +79,10 @@ FULL MODE: POPULATION ITERATION
 Collects radition data wavelength associated with bound-bound and bound-free processes.
 Returns data to go into structure.
 """
-function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, rates::TransitionRates, populations::Array{<:PerLength,4})
+function collect_radiation_data(atmosphere::Atmosphere,
+                                atom::AtomicLine,
+                                rates::TransitionRates,
+                                populations::Array{<:PerLength,4})
    # ==================================================================
    # GET KEYWORD INPUT
    # ==================================================================
@@ -132,11 +135,11 @@ function collect_radiation_data(atmosphere::Atmosphere, atom::AtomicLine, rates:
 
     for l=2nλ_bf+1:nλ
         v_los = velocity_z
-        α = α_continuum[l,:,:,:] .+ line_extinction(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
+        α = α_continuum[l,:,:,:] .+ line_extinction.(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
         boundary[l,:,:] = optical_depth_boundary(α, z, τ_max)
 
         fill!(v_los, 0u"m/s")
-        α = α_continuum[l,:,:,:] .+ line_extinction(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
+        α = α_continuum[l,:,:,:] .+ line_extinction.(λ[2nλ_bf+1:end], λ0, atom.ΔλD, atom.dc, atom.αlc, v_los)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                       temperature, α, boundary[l,:,:])
     end
@@ -212,7 +215,11 @@ function sample_λ(atom)
     return λ
 end
 
-function continuum_extinction_destruction(atmosphere::Atmosphere, atom::AtomicLine, rates::TransitionRates, atom_populations::Array{<:PerLength,4}, λ::Array{<:Unitful.Length, 1})
+function continuum_extinction_destruction(atmosphere::Atmosphere,
+                                          atom::AtomicLine,
+                                          rates::TransitionRates,
+                                          atom_populations::Array{<:PerLength,4},
+                                          λ::Array{<:Unitful.Length, 1})
 
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
@@ -288,7 +295,12 @@ function continuum_extinction_destruction(atmosphere::Atmosphere, atom::AtomicLi
     return α_continuum, ε_continuum
 end
 
-function line_extinction(λ::Unitful.Length, λ0::Unitful.Length, ΔλD::Float64, dc::Float64, αlc::Float64, v_los::Unitful.Velocity)
+function line_extinction(λ::Unitful.Length,
+                         λ0::Unitful.Length,
+                         ΔλD::Float64,
+                         dc::Float64,
+                         αlc::Float64,
+                         v_los::Unitful.Velocity)
     damp = dc*λ^2 |> u"m/m"
     v = (λ - λ0 .+ λ0 .* v_los ./ c_0) ./ ΔλD
     profile = voigt_profile.(damp, ustrip(v), ΔλD)

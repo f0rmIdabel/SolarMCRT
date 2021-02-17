@@ -54,7 +54,9 @@ function run()
         rates = TransitionRates(tr...)
         converged_populations = false
 
-        for n=1:1#max_iterations
+        max_iterations = get_max_iterations()
+
+        for n=1:max_iterations
             println("\n  ITERATION ", n, "\n", "="^91)
             # ==================================================================
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
@@ -87,7 +89,6 @@ function run()
                 atom.populations = copy(new_population)
                 atom.αlc = α_line_const(atom.line, new_populations[:,:,:,1], new_populations[:,:,:,2])
             end
-
         end
     end
 end

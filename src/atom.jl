@@ -181,7 +181,7 @@ function calculate_transition_rates(atom, LTE_populations, temperature, electron
     end
 
     # BB
-    σ12 = σij(B12, ν, ϕ???) #fix profile
+    σ12 = σij(atom, B12, ν)
     G12 = Gij(1, 2, ν, temperature, LTE_populations)
 
     # BF
@@ -211,7 +211,7 @@ function calculate_transition_rates(atom, LTE_populations, temperature, electron
 end
 
 function Rij(Jν, σij, ν)
-    # Rij  = ∫4π/(hν) σij J dν    # 1 / J * J / s / nm / m^2 / sr
+    # Rij  = ∫4π/(hν) σij J dν
     R = zeros(Float64, nz,nx,ny)
 
     for i=nν
@@ -241,13 +241,18 @@ function Rji(Jν, σij, Gij, ν)
     reurn R
 end
 
-function σij(Bij, ν, ϕ)
+function σij(atom, λ, Bij, ν)
     # σij = h*νij/(4π)*Bij ϕνμ
-
-    # [sr Hz m^2 / J] =  [Bij]
+    dc = atom.dc
+    ΔλD = atom.ΔλD
+    λ0 = atom.line.λ0
+    nλ_bb = atom.nλ_bb
 
     for l=1:nν_bb
-        σ[l,:,:,:] = h/4π * ν[l]*Bij*ϕ[l]
+        damp = dc*λ[l]^2 |> u"m/m"
+        v = (λ[l] - λ0) ./ ΔλD
+        ϕ = voigt_profile.(damp, ustrip(v), ΔλD)
+        σ[l,:,:,:] = h/4π * ν[l]*Bij*ϕ
     end
 
     return σ

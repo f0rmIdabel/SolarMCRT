@@ -126,6 +126,16 @@ function get_max_scatterings()
     return max_scatterings
 end
 
+function get_max_iterations()
+    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    i = findfirst("max_iterations", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    max_iterations = parse(Float64, file[i:j])
+    return max_iterations
+end
+
 function get_step()
     input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
     i = findfirst("step", input_file)[end] + 1
@@ -213,22 +223,4 @@ function get_start()
     start = [nz, nx, ny]
 
     return start
-end
-
-function get_λ_min()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
-    i = findfirst("λ_min_bf", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("[", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-
-    λ_min1 = parse(Float64, file[i:j])u"nm"
-
-    i = j + 2
-    file = file[i:end]
-    j = findfirst("]", file)[end] - 1
-
-    λ_min2 = parse(Float64, file[1:j])u"nm"
-
-    return [λ_min1, λ_min2]
 end
