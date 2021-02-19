@@ -8,14 +8,15 @@ struct Atom
     gl::Int64
     gu::Int64
     g∞::Int64
+    Z::Int64
 
+    λ::Array{Unitful.Length, 1}                    # (nλ)
     nλ_bb::Int64
     nλ_bf::Int64
 
-    ΔλD::Array{<:Unitful.Length, 3}                   # (nz, nx, ny)
-    dc::Array{Float64,3}                              # (nz, nx, ny)
-    αlc::Array{Float64,3}                             # (nz, nx, ny)
-    populations::Array{<:Unitful.Length, 4}           # (nz, nx, ny, nl)
+    doppler_width::Array{<:Unitful.Length, 3}      # (nz, nx, ny)
+    damping_constant::Array{PerArea,3}             # (nz, nx, ny)
+    populations::Array{NumberDensity, 4}           # (nz, nx, ny, nl=3)
 end
 
 struct TransitionRates
@@ -36,7 +37,7 @@ end
 """
 Collection of 2 level atoms.
 """
-function collect_atom_data(atmosphere::Atmosphere, populations)
+function collect_atom_data(atmosphere::Atmosphere)
 
     atom = h5open(get_atom_path(), "r")
     χl = read(atom, "chi_l")u"cm^-1"
@@ -53,48 +54,112 @@ function collect_atom_data(atmosphere::Atmosphere, populations)
     # Collect initial populations
     pop = h5open(get_initial_populations_path(), "r")
     initial_populations = read(pop, "initial_populations")u"m^-3"
-    close(atmos)
+    close(atom)
 
     nλ_bb, nλ_bf = get_nλ()
 
     line = AtomicLine(χu, χl, χ∞, gu, gl, f_value, atom_weight, Z)
 
     χl = line.χi
-    χu = line.χu
+    χu = line.χj
     χ∞ = line.χ∞
 
     # Make sure odd number
     nλ_bb += 1-nλ_bb%2
     nλ = 2nλ_bf + nλ_bb
 
-    # Calculate line-atmosphere quantities
+    # ==================================================================
+    # SAMPLE WAVELENGTHS
+    # ==================================================================
+    λ = sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
+
+    # Calculate atmosphere quantities for line
     unsold_const = γ_unsold_const(line)
     γ = γ_unsold.(unsold_const, atmosphere.temperature, atmosphere.hydrogen_populations[:,:,:,1]) .+ line.Aji
     ΔλD = doppler_width.(line.λ0, atom_weight, atmosphere.temperature)
-    dc = damping_const.(γ, ΔλD)
-    αlc = α_line_const(line, initial_populations[:,:,:,1], initial_populations[:,:,:,2])
+    damping_constant = damping_const.(γ, ΔλD)
 
     return line,
            χu, χl, χ∞,
            gu, gl, g∞,
-           nλ_bb, nλ_bf,
-           ΔλD, dc, αlc,
+           Z,
+           λ, nλ_bb, nλ_bf,
+           ΔλD, damping_constant,
            initial_populations
+end
+
+
+function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
+
+    atom_file = h5open(get_atom_path(), "r")
+    λ_bf_l_min = read(atom_file, "bfl_min")u"nm"
+    λ_bf_u_min = read(atom_file, "bfu_min")u"nm"
+    qwing = read(atom_file, "qwing")
+    qcore = read(atom_file, "qcore")
+    close(atom_file)
+
+    λ_bf_l_max  = transition_λ(χl, χ∞)
+    λ_bf_u_max  = transition_λ(χu, χ∞)
+    λ_bb_center = transition_λ(χl, χu)
+
+    # Make sure odd # of bb wavelengths
+    if nλ_bb > 0 && nλ_bb%2 == 0
+        nλ_bb += 1
+    end
+
+    # Initialise wavelength array
+    nλ = nλ_bf*2 + nλ_bb
+    λ = Array{Float64,1}(undef, nλ)u"nm"
+
+    # =================================================
+    # Bound-free transitions
+    # Linear spacing
+    # =================================================
+    if nλ_bf > 0
+        Δλ_bf_l = (λ_bf_l_max - λ_bf_l_min)/nλ_bf
+        Δλ_bf_u = (λ_bf_u_max - λ_bf_u_min)/nλ_bf
+
+        λ[1] = λ_bf_l_min
+        λ[nλ_bf+1] = λ_bf_u_min
+
+        for l=2:nλ_bf
+            λ[l] = λ[l-1] + Δλ_bf_l
+            λ[l+nλ_bf] = λ[l+nλ_bf - 1] + Δλ_bf_u
+        end
+    end
+
+    # =================================================
+    # Bound-bound transition
+    # Follows github.com/ITA-Solar/rh/blob/master/getlambda.c
+    # =================================================
+    if nλ_bb > 0
+        vmicro_char = 2.5u"km/s"
+
+        n = nλ_bb/2 # Questionable
+        β = qwing/(2*qcore)
+        y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
+        b = 2.0*log(y) / (n - 1)
+        a = qwing / (n - 2.0 + y*y)
+
+        center = nλ_bf*2 + (nλ_bb÷2) + 1
+        λ[center] = λ_bb_center
+        q_to_λ = λ[center] * vmicro_char / c_0
+
+        for l=1:(nλ_bb÷2)
+            Δλ = a*(l + (exp(b*l) - 1.0)) * q_to_λ
+            λ[center-l] = λ[center] - Δλ
+            λ[center+l] = λ[center] + Δλ
+        end
+    end
+
+    return λ
 end
 
 """
 Compute damping parameter constant .
 """
-function damping_const(γ::Unitful.Frequency, ΔλD::Unitful.Length)
-    (γ / (4 * π * c_0 * ΔλD)) |> u"m/m"
-end
-
-"""
-Compute line extinction given an `AtomicLine` struct, `profile` defined per wavelength,
-and upper and lower population densities `n_u` and `n_l`.
-"""
-function α_line_const(line::AtomicLine, n_u::NumberDensity, n_l::NumberDensity)
-    (h * c_0 / (4 * π * line.λ0) * (n_l * line.Bij - n_u * line.Bji)) |> u"m/m"
+function damping_constant(γ::Unitful.Frequency, ΔλD::Unitful.Length)
+    (γ / (4 * π * c_0 * ΔλD))
 end
 
 function LTE_populations(atom::Atom, atom_density::NumberDensity, temperature::Unitful.Temperature, electron_density::NumberDensity)
@@ -106,6 +171,8 @@ function LTE_populations(atom::Atom, atom_density::NumberDensity, temperature::U
     gu = atom.gu
     gl = atom.gl
     g∞ = atom.g∞
+
+    atom_density = sum(atom.populations, dims=4)[:,:,:,1]
 
     nz, nx, ny = size(temperature)
     populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
@@ -140,11 +207,7 @@ function check_population_convergence(populations::Array{<:PerLength, 4}, new_po
 end
 
 function get_revised_populations(atom::Atom,
-                                 rates::TransitionRates,
-                                 LTE_populations::Array{<:NumberDensity,4},
-                                 λ::Array{<:Untiful.Length,1},
-                                 temperature::Array{<:Unitful.Temperature,3},
-                                 electron_density::Array{<:NumberDensity,3})
+                                 rates::TransitionRates)
 
     # Transition probabilities
     P12 = rates.R12 .+ rates.C12
@@ -155,7 +218,7 @@ function get_revised_populations(atom::Atom,
     P32 = rates.R32 .+ rates.C32
 
     # Revised populations
-    atom_density = sum(LTE_populations, dims=4)[:,:,:,1]
+    atom_density = sum(atom.populations, dims=4)[:,:,:,1]
     revised_populations[:,:,:,3] = n3(atom_density, P12, P13, P21, P23, P31, P32)
     revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
@@ -163,34 +226,30 @@ function get_revised_populations(atom::Atom,
     return revised_populations
 end
 
-function calculate_transition_rates(atom, LTE_populations, temperature, electron_density)
+function calculate_transition_rates(atom::Atom,  J, temperature, electron_density)
 
-    # Read output from simulation
-    out = h5open("../out/output.h5", "r")
-    J = read(out, "J")
-    intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
-    close(out)
+    # ==================================================================
+    # LOAD λ AND LTE POPULATIONS
+    # ==================================================================
+    λ = atom.λ
+    LTE_pops = LTE_populations(atom, temperature, electron_density)
 
-    # Convert to Frequency
-    n_eff = sqrt(E∞ / (atom.χu - atom.χl))
-    ν = c_0/λ
-    nλ = length(intensity_per_packet)
-    frequency_per_packet = ...
-    for l=1:nλ
-        J[l,:,:,:] *= frequency_per_packet[l]
-    end
+    # ==================================================================
+    # CALCULATE RADIATIVE RATES (nz, nx, ny)
+    # ==================================================================
 
-    # BB
-    σ12 = σij(atom, B12, ν)
-    G12 = Gij(1, 2, ν, temperature, LTE_populations)
+    # BB PARAMETERS
+    σ12 = σij(atom, ν)
+    G12 = Gij(1, 2, ν, temperature, LTE_pops)
 
-    # BF
+    # BF PARAMETERS
+    n_eff = sqrt(E_∞ / (atom.χu - atom.χl))
+    charge = atom.Z
     σ13 = σic(1, ν, charge, n_eff)
     σ23 = σic(2, ν, charge, n_eff)
-    G13 = Gij(1, 3, ν, temperature, LTE_populations)
-    G23 = Gij(2, 3, ν, temperature, LTE_populations)
+    G13 = Gij(1, 3, ν, temperature, LTE_pops)
+    G23 = Gij(2, 3, ν, temperature, LTE_pops)
 
-    # Radiative rates
     R12 = Rij(J, σ12, ν)
     R13 = Rij(J, σ13, ν)
     R23 = Rij(J, σ23, ν)
@@ -198,13 +257,15 @@ function calculate_transition_rates(atom, LTE_populations, temperature, electron
     R31 = Rji(J, σ13, G13, ν)
     R32 = Rji(J, σ23, G23, ν)
 
-    # Collisional rates (nz, nx, ny)
-    C12 = Cij(1, 2, electron_density, temperature, LTE_populations)
-    C13 = Cij(1, 3, electron_density, temperature, LTE_populations)
-    C23 = Cij(2, 3, electron_density, temperature, LTE_populations)
-    C21 = Cij(2, 1, electron_density, temperature, LTE_populations)
-    C31 = Cij(3, 1, electron_density, temperature, LTE_populations)
-    C32 = Cij(3, 2, electron_density, temperature, LTE_populations)
+    # ==================================================================
+    # CALCULATE COLLISIONAL RATES (nz, nx, ny)
+    # ==================================================================
+    C12 = Cij(1, 2, electron_density, temperature, LTE_pops)
+    C13 = Cij(1, 3, electron_density, temperature, LTE_pops)
+    C23 = Cij(2, 3, electron_density, temperature, LTE_pops)
+    C21 = Cij(2, 1, electron_density, temperature, LTE_pops)
+    C31 = Cij(3, 1, electron_density, temperature, LTE_pops)
+    C32 = Cij(3, 2, electron_density, temperature, LTE_pops)
 
     return R12, R13, R23, R21, R31, R32,
            C12, C13, C23, C21, C31, C32
@@ -227,7 +288,7 @@ function Rji(Jν, σij, Gij, ν)
     # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
 
     # m^2 sr
-    [1 / s / m^2 / sr]
+    # [1 / s / m^2 / sr]
 
     R = zeros(Float64, nz,nx,ny)
 
@@ -238,27 +299,29 @@ function Rji(Jν, σij, Gij, ν)
 
     R *= 4π/h
 
-    reurn R
+    return R
 end
 
-function σij(atom, λ, Bij, ν)
-    # σij = h*νij/(4π)*Bij ϕνμ
-    dc = atom.dc
+function σij(atom, λ)
+    # σij = hc/(4π*λij)*Bij ϕλ
+
+    dc = atom.damping_constant
     ΔλD = atom.ΔλD
     λ0 = atom.line.λ0
     nλ_bb = atom.nλ_bb
+    Bij = atom.line.Bij
 
-    for l=1:nν_bb
-        damp = dc*λ[l]^2 |> u"m/m"
+    for l=1:nλ_bb
+        damp = damping_constant*λ[l]^2 |> u"m/m"
         v = (λ[l] - λ0) ./ ΔλD
-        ϕ = voigt_profile.(damp, ustrip(v), ΔλD)
-        σ[l,:,:,:] = h/4π * ν[l]*Bij*ϕ
+        profile = voigt_profile.(damp, ustrip(v), ΔλD)
+        σ[l,:,:,:] = h*c_0/(4π*λ0) * Bij * profile
     end
 
     return σ
 end
 
-function σic(i, ν, charge, n_eff)
+function σic(i, λ, charge, n_eff)
     # σij = σic(ν)
     c = 2.815*10e29 * charge^4/ i^5
 
@@ -270,11 +333,15 @@ function σic(i, ν, charge, n_eff)
     return
 end
 
-function Gij(i, j, ν, temperature, LTE_populations)
-    # Gij = [ni/nj]LTE exp(-hν/kT)
+function Gij(i, j, λ, temperature, LTE_populations)
+    # Gij = [ni/nj]LTE exp(-hc/λkT)
 
-    for l=1:nν
-        Gij[l,:,:,:] = LTE_populations[:,:,:,i] ./LTE_populations[:,:,:,j]  * exp.(-h*ν[l]/k/temperature)
+    nλ = length(λ)
+    n_ratio = LTE_populations[:,:,:,i] ./LTE_populations[:,:,:,j]
+    C = h*c_0/k
+
+    for l=1:nλ
+        Gij[l,:,:,:] =  n_ratio .* exp.(-C/(λ[l]*temperature))
     end
 
     return Gij
@@ -320,7 +387,7 @@ function n3(N, P12, P13, P21, P23, P31, P32)
     a = N .* P12 ./ (P21 .+ P23 .+ P12)
     b = (P32 .- P12) ./ (P21 .+ P23 .+ P12)
 
-    c = N *. (P12 .+ P13) - a .* (P21 .+ P12 .+ P13)
+    c = N .* (P12 .+ P13) .- a .* (P21 .+ P12 .+ P13)
     d = b .* (P21 .+ P12 .+ P13) .+ P31 .+ P12 .+ P13
 
     return c ./ d

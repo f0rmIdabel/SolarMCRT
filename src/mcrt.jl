@@ -6,7 +6,7 @@ Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by a maximum τ.
 """
 function mcrt(atmosphere::Atmosphere,
-              radiation::Radiation)
+              radiation::RadiationBackground)
 
     # ==================================================================
     # ATMOSPHERE DATA
@@ -262,10 +262,11 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # RADIATION DATA
     # ===================================================================
-    λ = radiation.λ
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
     ε_line = radiation.ε_line
+    α_line_constant = atom.α_line_constant
+
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = radiation.max_scatterings
@@ -273,11 +274,11 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     # ATOM DATA
     # ===================================================================
+    λ = atom.λ
     nλ_bf = atom.nλ_bf
     line = atom.line
-    dc = atom.dc
+    dc = atom.damping_constant
     ΔλD = atom.ΔλD
-    αlc = atom.αlc
     λ0 = line.λ0
 
     # ===================================================================
@@ -488,6 +489,8 @@ function mcrt(atmosphere::Atmosphere,
     end
 
     close(file)
+
+    return
 end
 
 """
@@ -496,7 +499,7 @@ ATOM MODE
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        velocity::Array{<:Unitful.velocity, 1},
+                        velocity::Array{<:Unitful.Velocity, 1},
 
                         α_continuum::Array{<:PerLength, 3},
                         boundary::Array{Int32, 2},

@@ -17,11 +17,12 @@ const E_∞ = R_∞ * c_0 * h
 
 @derived_dimension NumberDensity Unitful.𝐋^-3
 @derived_dimension PerLength Unitful.𝐋^-1
+@derived_dimension PerArea Unitful.𝐋^-2
 @derived_dimension PerTime Unitful.𝐓^-1
 @derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
 function test_mode()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("test_mode", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
@@ -31,7 +32,7 @@ function test_mode()
 end
 
 function get_nλ()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("nλ_bb", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -46,8 +47,43 @@ function get_nλ()
     return nλ_bb, nλ_bf
 end
 
+function get_Jλ()
+    out = h5open("/mn/stornext/u3/idarhan/MScProject/SolarMCRT/out/output.h5", "r")
+    J = read(out, "J")
+    intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
+    close(out)
+    nλ = length(intensity_per_packet)
+
+    for l=1:nλ
+        J[l,:,:,:] *= intensity_per_packet[l]
+    end
+
+    return J
+end
+
+
+function write_to_file(radiation::Radiation)
+    h5open("../out/output.h5", "w") do file
+        write(file, "chi", ustrip(radiation.α_continuum))
+        write(file, "epsilon", radiation.ε_continuum)
+        write(file, "packets", ustrip(radiation.packets))
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+    end
+end
+
+function write_to_file(radiation::Radiation)
+    h5open("../out/output.h5", "w") do file
+        write(file, "chi", ustrip(radiation.α_continuum))
+        write(file, "epsilon", radiation.ε_continuum)
+        write(file, "packets", ustrip(radiation.packets))
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+    end
+end
+
 function get_background_λ()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("background_wavelength", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -59,7 +95,7 @@ function get_background_λ()
 end
 
 function get_cut_off()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("cut_off", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -77,7 +113,7 @@ function get_cut_off()
 end
 
 function get_atmosphere_path()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("atmosphere_path", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
@@ -87,7 +123,7 @@ function get_atmosphere_path()
 end
 
 function get_atom_path()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("atom_path", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
@@ -97,7 +133,7 @@ function get_atom_path()
 end
 
 function get_initial_populations_path()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("initial_populations_path", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("\"", file)[end]
@@ -107,7 +143,7 @@ function get_initial_populations_path()
 end
 
 function get_target_packets()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("target_packets", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -117,7 +153,7 @@ function get_target_packets()
 end
 
 function get_max_scatterings()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("max_scatterings", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -127,7 +163,7 @@ function get_max_scatterings()
 end
 
 function get_max_iterations()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("max_iterations", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
@@ -137,7 +173,7 @@ function get_max_iterations()
 end
 
 function get_step()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("step", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("[", file)[end] + 1
@@ -163,7 +199,7 @@ function get_stop()
     nx = nothing
     ny = nothing
 
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("stop", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("[", file)[end] + 1
@@ -200,7 +236,7 @@ function get_stop()
 end
 
 function get_start()
-    input_file = open(f->read(f, String), "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/keywords.input")
+    input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("start", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("[", file)[end] + 1

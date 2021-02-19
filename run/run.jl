@@ -27,7 +27,7 @@ function run()
         # ==================================================================
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
-        radiation = Radiation(radiation_parameters...)
+        radiation = RadiationBackground(radiation_parameters...)
         write_to_file(radiation)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
@@ -46,14 +46,16 @@ function run()
         println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
 
         # =======================================================================
-        # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POPULATIONS CONVERGE
+        # CALCULATE INITIAL TRANSITION RATES
         # =======================================================================
-        atom_density = sum(atom.populations, dims=4)[:,:,:,1]
-        LTE_populations = LTE_populations(atom, atom_density, atmosphere.temperature, atmosphere.electron_density)
-        tr = calculate_transition_rates(atom, LTE_populations, atomsphere.temperature, atmosphere.electron_density)
-        rates = TransitionRates(tr...)
-        converged_populations = false
+        Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
+        rate_parameters = calculate_transition_rates(atom, Bλ, atmosphere.temperature, atmosphere.electron_density)
+        rates = TransitionRates(rate_parameters...)
 
+        # =======================================================================
+        # RUN MCRT UNTIL POPULATIONS CONVERGE
+        # =======================================================================
+        converged_populations = false
         max_iterations = get_max_iterations()
 
         for n=1:max_iterations
@@ -62,7 +64,7 @@ function run()
             # LOAD RADIATION DATA WITH CURRENT POPULATIONS
             # ==================================================================
             print("--Loading radiation data...................")
-            radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
+            radiation_parameters = collect_radiation_data(atmosphere, atom, rates)
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation)
             println(@sprintf("Radiation loaded with %.2e packets.",
@@ -73,15 +75,22 @@ function run()
             # ==================================================================
             mcrt(atmosphere, radiation)
 
+            # =======================================================================
+            # CALCULATE NEW TRANSITION RATES
+            # =======================================================================
+            Jλ = get_Jλ()
+            rate_parameters = calculate_transition_rates(atom, Jλ, atomsphere.temperature, atmosphere.electron_density)
+            rates = TransitionRates(rate_parameters...)
+
             # ==================================================================
-            # CHECK IF POPULATIONS CONVERGE
+            # CHECK IF POPULATIONS CONVERGED
             # ==================================================================
-            tr = calculate_transition_rates(atom, LTE_populations, atomsphere.temperature, atmosphere.electron_density)
-            rates = TransitionRates(tr...)
-            new_population = get_revised_populations(atom, rates, LTE_populations, atmosphere.temperature)
+            new_populations = get_revised_populations(atom, rates)
             converged = check_population_convergence(atom.populations, new_populations, error, n)
 
             if converged
+                # Update populations
+                atom.populations = copy(new_population)
                 println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
                 break
             else
