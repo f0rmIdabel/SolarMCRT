@@ -25,8 +25,8 @@ function test_mode()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("test_mode", input_file)[end] + 1
     file = input_file[i:end]
-    i = findfirst("\"", file)[end]
-    j = findfirst("\"", file[i+1:end])[end] + i
+    i = findfirst("=", file)[end]
+    j = findfirst("\n", file[i+1:end])[end] + i
     tm = parse(Bool, file[i+1:j-1])
     return tm
 end
@@ -62,25 +62,6 @@ function get_Jλ()
 end
 
 
-function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "w") do file
-        write(file, "chi", ustrip(radiation.α_continuum))
-        write(file, "epsilon", radiation.ε_continuum)
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
-    end
-end
-
-function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "w") do file
-        write(file, "chi", ustrip(radiation.α_continuum))
-        write(file, "epsilon", radiation.ε_continuum)
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
-    end
-end
 
 function get_background_λ()
     input_file = open(f->read(f, String), "../run/keywords.input")

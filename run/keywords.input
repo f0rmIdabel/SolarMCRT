@@ -9,7 +9,7 @@
 #  When the test mode is set to "true", the MC simulation is run with the background opacity at the        #
 #  given λ (nm). A convenient quick test, without going into the involved population-iteration routine.    #
 # ======================================================================================================== #
-test_mode = "true"
+test_mode = false
 background_wavelength = 500.0
 
 # ======================================================================================================== #
@@ -52,6 +52,6 @@ target_packets = 1e8
 max_scatterings = 1e8
 
 # ======================================================================================================== #
-#  Maximum number of iterations before quitting.                                                           #
+#  Maximum number of population iterations before quitting.                                                #
 # ======================================================================================================== #
 max_iterations = 10

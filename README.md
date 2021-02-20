@@ -55,9 +55,9 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-    * Wavelengths, λ [nm] (nλ)
-	* Opacity, chi [m^-1] (nλ, nz, nx, ny)
-	* Destruction probability, epsilon (nλ, nz, nx, ny)
+    * Wavelengths, wavelengths [nm] (nλ)
+	* Opacity, extinction [m^-1] (nλ, nz, nx, ny)
+	* Destruction probability, destruction (nλ, nz, nx, ny)
     * Packet distribution, packets (nλ, nz, nx, ny)
 	* Sourface boundary, boundary (nλ, nx, ny)
 	* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)

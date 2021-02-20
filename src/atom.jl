@@ -15,8 +15,8 @@ struct Atom
     nλ_bf::Int64
 
     doppler_width::Array{<:Unitful.Length, 3}      # (nz, nx, ny)
-    damping_constant::Array{PerArea,3}             # (nz, nx, ny)
-    populations::Array{NumberDensity, 4}           # (nz, nx, ny, nl=3)
+    damping_constant::Array{<:PerArea,3}             # (nz, nx, ny)
+    populations::Array{<:NumberDensity, 4}           # (nz, nx, ny, nl=3)
 end
 
 struct TransitionRates
@@ -77,14 +77,14 @@ function collect_atom_data(atmosphere::Atmosphere)
     unsold_const = γ_unsold_const(line)
     γ = γ_unsold.(unsold_const, atmosphere.temperature, atmosphere.hydrogen_populations[:,:,:,1]) .+ line.Aji
     ΔλD = doppler_width.(line.λ0, atom_weight, atmosphere.temperature)
-    damping_constant = damping_const.(γ, ΔλD)
+    damping_const = damping_constant.(γ, ΔλD)
 
     return line,
            χu, χl, χ∞,
            gu, gl, g∞,
            Z,
            λ, nλ_bb, nλ_bf,
-           ΔλD, damping_constant,
+           ΔλD, damping_const,
            initial_populations
 end
 
@@ -162,14 +162,15 @@ function damping_constant(γ::Unitful.Frequency, ΔλD::Unitful.Length)
     (γ / (4 * π * c_0 * ΔλD))
 end
 
-function LTE_populations(atom::Atom, atom_density::NumberDensity, temperature::Unitful.Temperature, electron_density::NumberDensity)
+function LTE_populations(atom::Atom,
+                         temperature::Array{<:Unitful.Temperature, 3},
+                         electron_density::Array{<:NumberDensity, 3})
 
-    χl = atom.χi
-    χu = atom.χj
+    χl = atom.χl
+    χu = atom.χu
     χ∞ = atom.χ∞
-
-    gu = atom.gu
     gl = atom.gl
+    gu = atom.gu
     g∞ = atom.g∞
 
     atom_density = sum(atom.populations, dims=4)[:,:,:,1]
@@ -226,7 +227,10 @@ function get_revised_populations(atom::Atom,
     return revised_populations
 end
 
-function calculate_transition_rates(atom::Atom,  J, temperature, electron_density)
+function calculate_transition_rates(atom::Atom,
+                                    J::Array{<:UnitsIntensity_λ, 4},
+                                    temperature::Array{<:Unitful.Temperature, 3},
+                                    electron_density::Array{<:NumberDensity, 3})
 
     # ==================================================================
     # LOAD λ AND LTE POPULATIONS
@@ -237,25 +241,20 @@ function calculate_transition_rates(atom::Atom,  J, temperature, electron_densit
     # ==================================================================
     # CALCULATE RADIATIVE RATES (nz, nx, ny)
     # ==================================================================
+    σ12 = σij(1, 2, atom)
+    σ13 = σic(1, atom)
+    σ23 = σic(2, atom)
 
-    # BB PARAMETERS
-    σ12 = σij(atom, ν)
-    G12 = Gij(1, 2, ν, temperature, LTE_pops)
+    G12 = Gij(1, 2, λ, temperature, LTE_pops)
+    G13 = Gij(1, 3, λ, temperature, LTE_pops)
+    G23 = Gij(2, 3, λ, temperature, LTE_pops)
 
-    # BF PARAMETERS
-    n_eff = sqrt(E_∞ / (atom.χu - atom.χl))
-    charge = atom.Z
-    σ13 = σic(1, ν, charge, n_eff)
-    σ23 = σic(2, ν, charge, n_eff)
-    G13 = Gij(1, 3, ν, temperature, LTE_pops)
-    G23 = Gij(2, 3, ν, temperature, LTE_pops)
-
-    R12 = Rij(J, σ12, ν)
-    R13 = Rij(J, σ13, ν)
-    R23 = Rij(J, σ23, ν)
-    R21 = Rji(J, σ12, G12, ν)
-    R31 = Rji(J, σ13, G13, ν)
-    R32 = Rji(J, σ23, G23, ν)
+    R12 = Rij(J, σ12, λ)
+    R13 = Rij(J, σ13, λ)
+    R23 = Rij(J, σ23, λ)
+    R21 = Rji(J, σ12, G12, λ)
+    R31 = Rji(J, σ13, G13, λ)
+    R32 = Rji(J, σ23, G23, λ)
 
     # ==================================================================
     # CALCULATE COLLISIONAL RATES (nz, nx, ny)
@@ -302,38 +301,47 @@ function Rji(Jν, σij, Gij, ν)
     return R
 end
 
-function σij(atom, λ)
+function σij(i::Integer, j::Integer, atom::Atom)
     # σij = hc/(4π*λij)*Bij ϕλ
 
-    dc = atom.damping_constant
+    damping_constant = atom.damping_constant
     ΔλD = atom.ΔλD
     λ0 = atom.line.λ0
     nλ_bb = atom.nλ_bb
+    nλ_bf = atom.nλ_bf
     Bij = atom.line.Bij
+    λ = atom.λ[2nλ_bf+1:end]
+
+    σ_constant = h*c_0/(4π*λ0) .* Bij
 
     for l=1:nλ_bb
-        damp = damping_constant*λ[l]^2 |> u"m/m"
+        damping = damping_constant .* λ[l]^2 |> u"m/m"
         v = (λ[l] - λ0) ./ ΔλD
-        profile = voigt_profile.(damp, ustrip(v), ΔλD)
-        σ[l,:,:,:] = h*c_0/(4π*λ0) * Bij * profile
+        profile = voigt_profile.(damping, ustrip(v), ΔλD)
+        σ[l,:,:,:] = σ_constant .* profile
     end
 
     return σ
 end
 
-function σic(i, λ, charge, n_eff)
+function σic(i::Integer, atom::Atom)
     # σij = σic(ν)
-    c = 2.815*10e29 * charge^4/ i^5
 
-    for l=1:nν_bf
+    n_eff = sqrt(E_∞ / (atom.χu - atom.χl))
+    charge = atom.Z
+    ν = c_0/atom.λ[1+(i-1)*nλ_bf:i*nλ_bf]
+    nλ_bf = atom.nλ_bf
+    sigma_constant = 2.815e29 * charge^4/ i^5
+
+    for l=1:nλ_bf
         gbf = gaunt_bf(ν[l], charge, n_eff)
-        σ[l,:,:,:] = c * gbf / ν[l]^3
+        σ[l,:,:,:] = sigma_constant * gbf / ν[l]^3
     end
 
-    return
+    return σ
 end
 
-function Gij(i, j, λ, temperature, LTE_populations)
+function Gij(i::Integer, j::Integer, λ, temperature, LTE_populations)
     # Gij = [ni/nj]LTE exp(-hc/λkT)
 
     nλ = length(λ)
@@ -399,4 +407,10 @@ end
 
 function n1(N, n3, n2)
     return N .- n3 .- n2
+end
+
+function write_to_file(λ::Array{<:Unitful.Length,1})
+    h5open("../out/output.h5", "w") do file
+        write(file, "wavelength", ustrip(λ))
+    end
 end
