@@ -43,6 +43,7 @@ function run()
         print("--Loading atom.............................")
         atom_parameters = collect_atom_data(atmosphere)
         atom = Atom(atom_parameters...)
+        write_to_file(atom.λ)
         println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
 
         # =======================================================================

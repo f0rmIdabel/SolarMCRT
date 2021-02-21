@@ -10,7 +10,7 @@ struct Atom
     g∞::Int64
     Z::Int64
 
-    λ::Array{Unitful.Length, 1}                    # (nλ)
+    λ::Array{<:Unitful.Length, 1}                    # (nλ)
     nλ_bb::Int64
     nλ_bf::Int64
 
@@ -88,7 +88,6 @@ function collect_atom_data(atmosphere::Atmosphere)
            initial_populations
 end
 
-
 function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
 
     atom_file = h5open(get_atom_path(), "r")
@@ -158,7 +157,8 @@ end
 """
 Compute damping parameter constant .
 """
-function damping_constant(γ::Unitful.Frequency, ΔλD::Unitful.Length)
+function damping_constant(γ::Unitful.Frequency,
+                          ΔλD::Unitful.Length)
     (γ / (4 * π * c_0 * ΔλD))
 end
 
@@ -189,10 +189,12 @@ function LTE_populations(atom::Atom,
     populations[:,:,:,1] = (atom_density .- populations[:,:,:,3]) ./ (1.0 .+ U2 ./ U1)
     populations[:,:,:,2] = atom_density .- populations[:,:,:,1] .- populations[:,:,:,3]
 
-    return ustrip(populations)
+    return populations
 end
 
-function check_population_convergence(populations::Array{<:PerLength, 4}, new_populations::Array{<:PerLength, 4}, criterion = 1e-3)
+function check_population_convergence(populations::Array{<:PerLength, 4},
+                                      new_populations::Array{<:PerLength, 4},
+                                      criterion::Real = 1e-3)
     N = length(populations)
     error = norm( abs.(populations .- new_population) ./populations ./N)
 
@@ -236,25 +238,34 @@ function calculate_transition_rates(atom::Atom,
     # LOAD λ AND LTE POPULATIONS
     # ==================================================================
     λ = atom.λ
+    nλ_bb = atom.nλ_bb
+    nλ_bf = atom.nλ_bf
+    λ_bf_l = λ[1:nλ_bf]
+    λ_bf_u = λ[nλ_bf+1:2nλ_bf]
+    λ_bb = λ[2nλ_bf+1:end]
+
+    J_bf_l = J[1:nλ_bf,:,:,:]
+    J_bf_u = J[nλ_bf+1:2nλ_bf,:,:,:]
+    J_bb = J[2nλ_bf+1:end,:,:,:]
     LTE_pops = LTE_populations(atom, temperature, electron_density)
 
     # ==================================================================
     # CALCULATE RADIATIVE RATES (nz, nx, ny)
     # ==================================================================
-    σ12 = σij(1, 2, atom)
-    σ13 = σic(1, atom)
-    σ23 = σic(2, atom)
+    σ12 = σij(1, 2, atom, λ_bb)
+    σ13 = σic(1, atom, λ_bf_l)
+    σ23 = σic(2, atom, λ_bf_u)
 
-    G12 = Gij(1, 2, λ, temperature, LTE_pops)
-    G13 = Gij(1, 3, λ, temperature, LTE_pops)
-    G23 = Gij(2, 3, λ, temperature, LTE_pops)
+    G12 = Gij(1, 2, λ_bb, temperature, LTE_pops)
+    G13 = Gij(1, 3, λ_bf_l, temperature, LTE_pops)
+    G23 = Gij(2, 3, λ_bf_u, temperature, LTE_pops)
 
-    R12 = Rij(J, σ12, λ)
-    R13 = Rij(J, σ13, λ)
-    R23 = Rij(J, σ23, λ)
-    R21 = Rji(J, σ12, G12, λ)
-    R31 = Rji(J, σ13, G13, λ)
-    R32 = Rji(J, σ23, G23, λ)
+    R12 = Rij(J_bb, σ12, λ_bb)
+    R13 = Rij(J_bf_l, σ13, λ_bf_l)
+    R23 = Rij(J_bf_u, σ23, λ_bf_u)
+    R21 = Rji(J_bb, σ12, G12, λ_bb)
+    R31 = Rji(J_bf_l, σ13, G13, λ_bf_l)
+    R32 = Rji(J_bf_u, σ23, G23, λ_bf_u)
 
     # ==================================================================
     # CALCULATE COLLISIONAL RATES (nz, nx, ny)
@@ -270,52 +281,102 @@ function calculate_transition_rates(atom::Atom,
            C12, C13, C23, C21, C31, C32
 end
 
-function Rij(Jν, σij, ν)
-    # Rij  = ∫4π/(hν) σij J dν
-    R = zeros(Float64, nz,nx,ny)
+function Rij(J::Array{<:UnitsIntensity_λ, 4},
+             σij::Array{<:Unitful.Area, 4},
+             λ::Array{<:Unitful.Length, 1})
+    # Rij  = ∫4πλ/(hc) σij J dλ
 
-    for i=nν
-        R +=  0.5(σij[i,:,:,:] / ν[i] .* Jν[i,:,:,:] * + σij[i+1,:,:,:] / ν[i+1] .* Jν[i+1,:,:,:]) * (ν[i+1] - ν[i])
+    nz, nx, ny = size(J)
+    nλ = size(λ)
+    R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
+
+    for l=1:(nλ-1)
+        R +=  ( λ[l]   * σij[l,:,:,:]   .* J[l,:,:,:]   .+
+                λ[l+1] * σij[l+1,:,:,:] .* J[l+1,:,:,:]  ) .* (λ[l+1] - λ[l])
     end
 
-    R *= 4π/h
+    R *= 2π/hc
 
     return R
 end
 
-function Rji(Jν, σij, Gij, ν)
+function Rji(J::Array{<:UnitsIntensity_λ, 4},
+             σij::Array{<:Unitful.Area, 4},
+             Gij::Array{Float64, 4},
+             λ::Array{<:Unitful.Length, 1})
     # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
+    # Rji = ∫4π/λ σij Gij (2c/λ^3 + Jλ^2/(hc)) dλ
 
-    # m^2 sr
-    # [1 / s / m^2 / sr]
+    nz, nx, ny = size(J)
+    R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
 
-    R = zeros(Float64, nz,nx,ny)
-
-    for i=nν
-        R +=  0.5(σij[i,:,:,:]   .* Gij[i,:,:,:]   / ν[i]   .* (2h*ν[i]^3/c_0^2   + Jν[i,:,:,:]) .+
-                  σij[i+1,:,:,:] .* Gij[i+1,:,:,:] / ν[i+1] .* (2h*ν[i+1]^3/c_0^2 + Jν[i+1,:,:,:])) * (ν[i+1] - ν[i])
+    # Trapezoid rule
+    for l=1:(nλ-1)
+        R += (σij[l,:,:,:]   .* Gij[l,:,:,:]   ./ λ[l]   .* (2c_0 ./ λ[l]^3   .+ J[l,:,:,:]   .* λ[l]^2   ./ hc ) .+
+              σij[l+1,:,:,:] .* Gij[l+1,:,:,:] ./ λ[l+1] .* (2c_0 ./ λ[l+1]^3 .+ J[l+1,:,:,:] .* λ[l+1]^2 ./ hc )  ) .* (λ[l+1] - λ[l])
     end
 
-    R *= 4π/h
+    R *= 2π
 
     return R
 end
 
-function σij(i::Integer, j::Integer, atom::Atom)
+function Rij(J::Array{<:UnitsIntensity_λ, 4},
+             σij::Array{<:Unitful.Area, 1},
+             λ::Array{<:Unitful.Length, 1})
+    # Rij  = ∫4πλ/(hc) σij J dλ
+
+    nλ, nz, nx, ny = size(J)
+    R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
+
+    for l=1:(nλ-1)
+        R +=  ( λ[l]   * σij[l]   .* J[l,:,:,:]   .+
+                λ[l+1] * σij[l+1] .* J[l+1,:,:,:]  ) .* (λ[l+1] - λ[l])
+    end
+
+    R *= 2π/hc
+
+    return R
+end
+
+function Rji(J::Array{<:UnitsIntensity_λ, 4},
+             σij::Array{<:Unitful.Area, 1},
+             Gij::Array{Float64, 4},
+             λ::Array{<:Unitful.Length, 1})
+    # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
+    # Rji = ∫4π/λ σij Gij (2c/λ^3 + Jλ^2/(hc)) dλ
+
+    nλ, nz, nx, ny = size(J)
+    R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
+
+    # Trapezoid rule
+    for l=1:(nλ-1)
+        R += (σij[l]   .* Gij[l,:,:,:]   ./ λ[l]   .* (2c_0 ./ λ[l]^3   .+ J[l,:,:,:]   .* λ[l]^2   / hc ) .+
+              σij[l+1] .* Gij[l+1,:,:,:] ./ λ[l+1] .* (2c_0 ./ λ[l+1]^3 .+ J[l+1,:,:,:] .* λ[l+1]^2 ./ hc )  ) .* (λ[l+1] - λ[l])
+    end
+
+    R *= 2π
+
+    return R
+end
+
+function σij(i::Integer,
+             j::Integer,
+             atom::Atom,
+             λ::Array{<:Unitful.Length, 1})
+
     # σij = hc/(4π*λij)*Bij ϕλ
-
     damping_constant = atom.damping_constant
-    ΔλD = atom.ΔλD
+    ΔλD = atom.doppler_width
     λ0 = atom.line.λ0
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
     Bij = atom.line.Bij
-    λ = atom.λ[2nλ_bf+1:end]
+    σ_constant = h*c_0/(4π*λ0) * Bij
+    nλ = length(λ)
+    nz, nx, ny = size(ΔλD)
+    σ = Array{Unitful.Area, 4}(undef, nλ, nz, nx, ny)
 
-    σ_constant = h*c_0/(4π*λ0) .* Bij
-
-    for l=1:nλ_bb
-        damping = damping_constant .* λ[l]^2 |> u"m/m"
+    @Threads.threads for l=1:nλ
+        damping = (λ[l]^2 * damping_constant) .|> u"m/m"
         v = (λ[l] - λ0) ./ ΔλD
         profile = voigt_profile.(damping, ustrip(v), ΔλD)
         σ[l,:,:,:] = σ_constant .* profile
@@ -324,46 +385,47 @@ function σij(i::Integer, j::Integer, atom::Atom)
     return σ
 end
 
-function σic(i::Integer, atom::Atom)
+function σic(i::Integer,
+             atom::Atom,
+             λ::Array{<:Unitful.Length, 1})
+
     # σij = σic(ν)
-
-    n_eff = sqrt(E_∞ / (atom.χu - atom.χl))
+    n_eff = sqrt(E_∞ / (atom.χl - atom.χu)) |>u"J/J" # should be χu - χl
     charge = atom.Z
-    ν = c_0/atom.λ[1+(i-1)*nλ_bf:i*nλ_bf]
-    nλ_bf = atom.nλ_bf
-    sigma_constant = 2.815e29 * charge^4/ i^5
+    sigma_constant = 2.815e29 * charge^4/ i^5 * c_0^3
+    nλ = length(λ)
+    σ = Array{Unitful.Area, 1}(undef, nλ)
 
-    for l=1:nλ_bf
-        gbf = gaunt_bf(ν[l], charge, n_eff)
-        σ[l,:,:,:] = sigma_constant * gbf / ν[l]^3
-    end
+    gbf = gaunt_bf.(λ, charge, n_eff)
+    σ = sigma_constant * gbf ./ λ.^3
 
     return σ
 end
 
-function Gij(i::Integer, j::Integer, λ, temperature, LTE_populations)
+function Gij(i::Integer,
+             j::Integer,
+             λ::Array{<:Unitful.Length, 1},
+             temperature::Array{<:Unitful.Temperature, 3},
+             LTE_populations::Array{<:NumberDensity, 4})
+
     # Gij = [ni/nj]LTE exp(-hc/λkT)
-
     nλ = length(λ)
-    n_ratio = LTE_populations[:,:,:,i] ./LTE_populations[:,:,:,j]
-    C = h*c_0/k
+    nz, nx, ny = size(temperature)
+    G = Array{Float64, 4}(undef, nλ, nz, nx, ny)
 
-    for l=1:nλ
-        Gij[l,:,:,:] =  n_ratio .* exp.(-C/(λ[l]*temperature))
+    n_ratio = LTE_populations[:,:,:,i] ./LTE_populations[:,:,:,j]
+
+    @Threads.threads for l=1:nλ
+        G[l,:,:,:] =  n_ratio .* exp.(- hc ./ (k_B*λ[l]*temperature))
     end
 
-    return Gij
+    return G
 end
 
-"""
-General for all ij
-Excitation/Ionisation
-De-excitation/Re-combination
-"""
 function Cij(n_i::Integer,
              n_j::Integer,
-             electron_density::NumberDensity,
-             temperature::Unitful.Temperature,
+             electron_density::Array{<:NumberDensity,3},
+             temperature::Array{<:Unitful.Temperature,3},
              LTE_populations::Array{<:NumberDensity,4})
 
     ionisation_level = size(LTE_populations)[end]
@@ -390,23 +452,55 @@ function Cij(n_i::Integer,
     return C
 end
 
-
-function n3(N, P12, P13, P21, P23, P31, P32)
+function n3(N::Array{<:NumberDensity,3},
+            P12::Array{<:Unitful.Frequency,3},
+            P13::Array{<:Unitful.Frequency,3},
+            P21::Array{<:Unitful.Frequency,3},
+            P23::Array{<:Unitful.Frequency,3},
+            P31::Array{<:Unitful.Frequency,3},
+            P32::Array{<:Unitful.Frequency,3})
     a = N .* P12 ./ (P21 .+ P23 .+ P12)
     b = (P32 .- P12) ./ (P21 .+ P23 .+ P12)
-
     c = N .* (P12 .+ P13) .- a .* (P21 .+ P12 .+ P13)
     d = b .* (P21 .+ P12 .+ P13) .+ P31 .+ P12 .+ P13
 
     return c ./ d
 end
 
-function n2(N, n3, P12, P21, P23, P32)
+function n2(N::Array{<:NumberDensity,3},
+            n3::Array{<:NumberDensity,3},
+            P12::Array{<:Unitful.Frequency,3},
+            P21::Array{<:Unitful.Frequency,3},
+            P23::Array{<:Unitful.Frequency,3},
+            P32::Array{<:Unitful.Frequency,3})
     return (N .* P12  + n3 .* (P32 .- P12) ) ./ (P21 .+ P23 .+ P12)
 end
 
-function n1(N, n3, n2)
+function n1(N::Array{<:NumberDensity,3},
+            n3::Array{<:NumberDensity,3},
+            n2::Array{<:NumberDensity,3})
     return N .- n3 .- n2
+end
+
+"""
+Stolen from Transparency repo
+Recipes from Seaton
+    gaunt_bf(charge::Int, n_eff::Number, λ::Unitful.Length)::Float64
+Compute bound-free Gaunt factor for a given charge, effective principal
+quantum number and wavelength λ. Taken from RH. Formula from
+[Seaton (1960), Rep. Prog. Phys. 23, 313](https://ui.adsabs.harvard.edu/abs/1960RPPh...23..313S/abstract),
+page 316.
+"""
+function gaunt_bf(λ::Unitful.Length,
+                  charge::Real,
+                  n_eff::Real)::Float64
+
+    x = ustrip(1 / (λ * R_∞ * charge^2) |> u"m/m")
+    x3 = x^(1/3)
+    nsqx = 1 / (n_eff^2 * x)
+    g_bf = 1 + 0.1728 * x3 * (1 - 2 * nsqx) - 0.0496 * x3^2 * (1 - (1 - nsqx) * 0.66666667 * nsqx)
+    @assert g_bf >= 0 "gaunt_bf negative, calculation will not be reliable"
+    return g_bf
 end
 
 function write_to_file(λ::Array{<:Unitful.Length,1})

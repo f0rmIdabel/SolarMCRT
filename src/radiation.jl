@@ -12,7 +12,7 @@ struct Radiation
     max_scatterings::Integer                             # Int64
 end
 
-struct RadiationBackground #change to only be 3D ?
+struct RadiationBackground
     λ::Array{Unitful.Length, 1}                          # (nλ)
     α_continuum::Array{PerLength, 4}                     # (nλ, nz, nx, ny)
     ε_continuum::Array{Float64,4}                        # (nλ, nz, nx, ny)
@@ -27,7 +27,8 @@ TEST MODE: BACKGROUND PROCESSES
 Collects radition data for background processes at a single wavelength
 Returns data to go into structure.
 """
-function collect_radiation_data(atmosphere::Atmosphere, λ::Unitful.Length)
+function collect_radiation_data(atmosphere::Atmosphere,
+                                λ::Unitful.Length)
     # ==================================================================
     # GET KEYWORD INPUT
     # ==================================================================
@@ -160,7 +161,6 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
     return λ, α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet, max_scatterings
 end
-
 
 function continuum_extinction_destruction(atmosphere::Atmosphere,
                                           atom::AtomicLine,
