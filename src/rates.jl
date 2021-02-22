@@ -1,6 +1,6 @@
-#include("atmosphere.jl")
+include("atmosphere.jl")
+include("atom.jl")
 #include("populations.jl")
-#include("atom.jl")
 
 struct TransitionRates
     R12::Array{<:Unitful.Frequency,3}
@@ -19,6 +19,7 @@ end
 
 function calculate_transition_rates(atom::Atom,
                                     atmosphere::Atmosphere,
+                                    populations::Array{<:NumberDensity, 4},
                                     J::Array{<:UnitsIntensity_λ, 4})
 
     # ==================================================================
@@ -26,7 +27,7 @@ function calculate_transition_rates(atom::Atom,
     # ==================================================================
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
-    LTE_pops = LTE_populations(atom, temperature, electron_density)
+    LTE_pops = LTE_populations(atom, populations, temperature, electron_density)
 
     # ==================================================================
     # LOAD WAVELENGTHS AND SEPERATE BB AND BF
@@ -256,4 +257,35 @@ function gaunt_bf(λ::Unitful.Length,
     g_bf = 1 + 0.1728 * x3 * (1 - 2 * nsqx) - 0.0496 * x3^2 * (1 - (1 - nsqx) * 0.66666667 * nsqx)
     @assert g_bf >= 0 "gaunt_bf negative, calculation will not be reliable"
     return g_bf
+end
+
+function LTE_populations(atom::Atom,
+                         populations::Array{<:NumberDensity, 4},
+                         temperature::Array{<:Unitful.Temperature, 3},
+                         electron_density::Array{<:NumberDensity, 3})
+
+    χl = atom.χl
+    χu = atom.χu
+    χ∞ = atom.χ∞
+    gl = atom.gl
+    gu = atom.gu
+    g∞ = atom.g∞
+
+    atom_density = sum(populations, dims=4)[:,:,:,1]
+
+    nz, nx, ny = size(temperature)
+    populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
+
+    C = 2π*m_e*k_B/h^2
+    U1 = gl * exp.(-χl/k_B./temperature)
+    U2 = gu * exp.(-χu/k_B./temperature)
+    U3 = g∞ * exp.(-χ∞/k_B./temperature)
+
+    K = 1 ./electron_density .* 2 .* U3 .^2 ./ (U1 .+ U2) / g∞ .* (C*temperature).^(1.5)
+
+    populations[:,:,:,3] = K .* atom_density ./ (1.0 .+ K)
+    populations[:,:,:,1] = (atom_density .- populations[:,:,:,3]) ./ (1.0 .+ U2 ./ U1)
+    populations[:,:,:,2] = atom_density .- populations[:,:,:,1] .- populations[:,:,:,3]
+
+    return populations
 end

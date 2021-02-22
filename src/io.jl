@@ -49,20 +49,41 @@ function get_nλ()
 end
 
 function get_Jλ()
-    out = h5open("/mn/stornext/u3/idarhan/MScProject/SolarMCRT/out/output.h5", "r")
+    out = h5open("../out/output.h5", "r")
     J = read(out, "J")
     intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
     close(out)
-    nλ = length(intensity_per_packet)
+
+    nλ, nz, nx, ny = size(J)
+    Jλ = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
 
     for l=1:nλ
-        J[l,:,:,:] *= intensity_per_packet[l]
+        Jλ[l,:,:,:] = intensity_per_packet[l] .* J[l,:,:,:]
     end
 
-    return J
+    return Jλ
 end
 
+function get_error(n)
+    out = h5open("../out/output.h5", "r")
+    error = read(out, "error")
+    close(out)
+    return error[n]
+end
 
+function write_error(n, error)
+
+    if n == 1
+        file = h5open("../out/output.h5", "cw")
+        write(file, "error", Array{Float64,1}(undef,get_max_iterations()))
+        file["error"][1] = error
+        close(file)
+    else
+        file = h5open("../out/output.h5", "cw")
+        file["error"][n] = error
+        close(file)
+    end
+end
 
 function get_background_λ()
     input_file = open(f->read(f, String), "../run/keywords.input")
@@ -150,7 +171,7 @@ function get_max_iterations()
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    max_iterations = parse(Float64, file[i:j])
+    max_iterations = parse(Int64, file[i:j])
     return max_iterations
 end
 

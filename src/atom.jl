@@ -94,7 +94,7 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
     # Bound-free transitions
     # Linear spacing
     # =================================================
-    if nλ_bf > 0
+    if nλ_bf > 1
         Δλ_bf_l = (λ_bf_l_max - λ_bf_l_min)/nλ_bf
         Δλ_bf_u = (λ_bf_u_max - λ_bf_u_min)/nλ_bf
 
@@ -105,16 +105,19 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
             λ[l] = λ[l-1] + Δλ_bf_l
             λ[l+nλ_bf] = λ[l+nλ_bf - 1] + Δλ_bf_u
         end
+    elseif nλ_bf == 1
+        λ[1] = λ_bf_l_max
+        λ[2] = λ_bf_u_max
     end
 
     # =================================================
     # Bound-bound transition
     # Follows github.com/ITA-Solar/rh/blob/master/getlambda.c
     # =================================================
-    if nλ_bb > 0
+    if nλ_bb > 1
         vmicro_char = 2.5u"km/s"
 
-        n = nλ_bb/2 # Questionable
+        n = nλ_bb#/2 # Questionable
         β = qwing/(2*qcore)
         y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
         b = 2.0*log(y) / (n - 1)
@@ -129,6 +132,8 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
             λ[center-l] = λ[center] - Δλ
             λ[center+l] = λ[center] + Δλ
         end
+    elseif nλ_bb == 1
+        λ[1] = λ_bb_center
     end
 
     return λ
@@ -140,7 +145,7 @@ function damping_constant(γ::Unitful.Frequency,
 end
 
 function write_to_file(λ::Array{<:Unitful.Length,1})
-    h5open("../out/output.h5", "w") do file
+    h5open("../out/output.h5", "cw") do file
         write(file, "wavelength", ustrip(λ))
     end
 end

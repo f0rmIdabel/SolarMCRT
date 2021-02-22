@@ -23,7 +23,7 @@ function mcrt(atmosphere::Atmosphere,
     ε = radiation.ε_continuum
     boundary = radiation.boundary
     packets = radiation.packets
-    max_scatterings = radiation.max_scatterings
+    max_scatterings = max_scatterings = get_max_scatterings()
 
     # ===================================================================
     # SET UP VARIABLES
@@ -68,7 +68,8 @@ function mcrt(atmosphere::Atmosphere,
         l = Threads.SpinLock()
 
         # Go through all boxes
-        et = @elapsed Threads.@threads for j=1:ny
+        #et = @elapsed Threads.@threads for j=1:ny
+        Threads.@threads for j=1:ny
 
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
@@ -243,7 +244,6 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     return box_id, r, lost
 end
 
-
 """
 ATOM MODE
 """
@@ -264,12 +264,11 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
+    α_line_constant = radiation.α_line_constant
     ε_line = radiation.ε_line
-    α_line_constant = atom.α_line_constant
-
     boundary = radiation.boundary
     packets = radiation.packets
-    max_scatterings = radiation.max_scatterings
+    max_scatterings = get_max_scatterings()
 
     # ===================================================================
     # ATOM DATA
@@ -278,13 +277,13 @@ function mcrt(atmosphere::Atmosphere,
     nλ_bf = atom.nλ_bf
     line = atom.line
     dc = atom.damping_constant
-    ΔλD = atom.ΔλD
+    ΔλD = atom.doppler_width
     λ0 = line.λ0
 
     # ===================================================================
     # SET UP VARIABLES
     # ===================================================================
-    nλ, nz, nx, ny = size(α)
+    nλ, nz, nx, ny = size(α_continuum)
 
     # Open output file and initialise variables
     file = h5open("../out/output.h5", "cw")
@@ -326,7 +325,6 @@ function mcrt(atmosphere::Atmosphere,
 
         # Go through all boxes
         et = @elapsed Threads.@threads for j=1:ny
-
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
             Threads.lock(l)
@@ -401,10 +399,9 @@ function mcrt(atmosphere::Atmosphere,
 
         # Pick out wavelength data
         packets_λ = packets[λi,:,:,:]
-        α_continuum_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
+        α_continuum_λ = α_continuum[λi,:,:,:]
         ε_continuum_λ = ε_continuum[λi,:,:,:]
-        ε_line_λ = ε_line[λi-2nλ_bf,:,:,:]
 
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
@@ -453,21 +450,22 @@ function mcrt(atmosphere::Atmosphere,
 
                             # Scatter packet once
                             box_id, r, lost, α = scatter_packet(x, y, z,
-                                                             velocity,
-                                                             α_continuum_λ,
-                                                             boundary_λ,
-                                                             box_id, r,
-                                                             J_λ,
-                                                             dc, ΔλD, αlc,
-                                                             λ0, λ[λi])
+                                                                velocity,
+                                                                α_continuum_λ,
+                                                                α_line_constant,
+                                                                boundary_λ,
+                                                                box_id, r,
+                                                                J_λ,
+                                                                dc, ΔλD,
+                                                                λ0, λ[λi])
 
                             # Check if escaped or lost in bottom
                             if lost
                                 break
                             # Check if destroyed in next particle interaction
                             α_line_λ = α -  α_continuum_λ[box_id...]
-                            ε = (ε_continuum_λ[box_id...] * α_continuum_λ[box_id...] +
-                                 ε_line_λ[box_id...] * α_line_λ) / α
+                            ε = ( ε_continuum_λ[box_id...] * α_continuum_λ[box_id...] +
+                                  ε_line[box_id...]        * α_line_λ ) / α
 
                             elseif rand() < ε
                                 Threads.atomic_add!(total_destroyed, 1)
@@ -499,18 +497,18 @@ ATOM MODE
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
                         z::Array{<:Unitful.Length, 1},
-                        velocity::Array{<:Unitful.Velocity, 1},
+                        velocity::Array{Array{<:Unitful.Velocity, 1}, 3},
 
                         α_continuum::Array{<:PerLength, 3},
+                        α_line_constant::Array{Float64, 3},
                         boundary::Array{Int32, 2},
 
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
 
-                        dc::Array{Float64, 3},
-                        ΔλD::Array{Float64, 3},
-                        αlc::Array{Float64, 3},
+                        damping_constant::Array{<:PerArea, 3},
+                        ΔλD::Array{<:Unitful.Length, 3},
 
                         λ0::Unitful.Length,
                         λ::Unitful.Length)
@@ -548,9 +546,11 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                              r, unit_vector)
 
-    velocity_los = sum(velocity[box_id...] * unit_vector)
+    velocity_los = sum(velocity[box_id...] .* unit_vector)
 
-    α = α_continuum[box_id...] + line_extinction(λ, λ0, ΔλD[box_id...], dc[box_id...], αlc[box_id...], velocity_los)
+    α = α_continuum[box_id...] +
+        line_extinction(λ, λ0, ΔλD[box_id...], damping_constant[box_id...],
+                        α_line_constant[box_id...], velocity_los)
 
     τ_cum = ds * α
     r += ds * unit_vector
@@ -597,8 +597,10 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
         face, ds = closest_edge([z[next_edge[1]], x[next_edge[2]], y[next_edge[3]]],
                                  r, unit_vector)
 
-        velocity_los = sum(velocity[box_id...] * unit_vector)
-        α = α_continuum[box_id...] + line_extinction(line, λ, line.λ0, ΔλD[box_id...], a[box_id...], velocity_los)
+        velocity_los = sum(velocity[box_id...] .* unit_vector)
+        α = α_continuum[box_id...] +
+            line_extinction(λ, λ0, ΔλD[box_id...], damping_constant[box_id...],
+                            α_line_constant[box_id...], velocity_los)
 
         τ_cum += ds * α
         r += ds * unit_vector
