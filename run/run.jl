@@ -77,7 +77,7 @@ function run()
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation) # creates new file
             write_to_file(atom.λ)
-            println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
+            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
 
             # =============================================================================
             # SIMULATION
@@ -87,7 +87,7 @@ function run()
             # =============================================================================
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
-            print("--Update transition rates..............")
+            print("\n--Update transition rates..................")
             Jλ = get_Jλ()
             rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Jλ)
             rates = TransitionRates(rate_parameters...)
@@ -96,7 +96,7 @@ function run()
             # =============================================================================
             # CALCULATE NEW POPULATIONS
             # =============================================================================
-            print("--Update populations................")
+            print("--Update populations.......................")
             new_populations = get_revised_populations(atom, rates, populations)
             write_to_file(new_populations)
             println("Populations updated.")
@@ -108,10 +108,10 @@ function run()
             populations = copy(new_populations)
 
             if converged
-                println("--Convergence at iteration n = ", n, ". Population-iteration finished.")
+                println("--Convergence at iteration n = ", n, ".\n")
                 break
             else
-                println("--No convergence. Error = ", get_error(n), ".")
+                println("--No convergence. Error = ", get_error(n), ".\n")
             end
 
             # =============================================================================

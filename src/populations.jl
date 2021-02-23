@@ -15,9 +15,9 @@ function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       n::Integer,
                                       criterion::Real = 1e-3)
     N = length(populations)
-    error = sum( abs.(populations .- new_populations) ./populations ) /N
+    error = sum( abs.(populations .- new_populations) ./populations ) #/N
     write_error(n, error)
-    
+
     converged = false
     if error < criterion
         converged = true
