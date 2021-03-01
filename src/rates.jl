@@ -1,6 +1,5 @@
 include("atmosphere.jl")
 include("atom.jl")
-#include("populations.jl")
 
 struct TransitionRates
     R12::Array{<:Unitful.Frequency,3}

@@ -108,7 +108,7 @@ function run()
             populations = copy(new_populations)
 
             if converged
-                println("--Convergence at iteration n = ", n, ".\n")
+                println("--Convergence at iteration n = ", n, ". Error = ", get_error(n),"\n")
                 break
             else
                 println("--No convergence. Error = ", get_error(n), ".\n")

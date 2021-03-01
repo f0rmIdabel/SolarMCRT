@@ -149,3 +149,25 @@ function write_to_file(λ::Array{<:Unitful.Length,1})
         write(file, "wavelength", ustrip(λ))
     end
 end
+
+function write_to_file(atom::Atom)
+    h5open("../out/output.h5", "cw") do file
+        write(file, "wavelength", ustrip(atom.λ))
+        write(file, "doppler_width", ustrip(atom.doppler_width))
+        write(file, "damping_constant", ustrip(atom.damping_constant))
+        write(file, "nlambda_bb", atom.nλ_bb)
+        write(file, "nlambda_bb", atom.nλ_bf)
+
+        χl::Unitful.Energy
+        χu::Unitful.Energy
+        χ∞::Unitful.Energy
+        gl::Int64
+        gu::Int64
+        g∞::Int64
+        Z::Int64
+
+        λ::Array{<:Unitful.Length, 1}                    # (nλ)
+        nλ_bb::Int64
+        nλ_bf::Int64
+    end
+end

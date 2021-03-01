@@ -68,8 +68,7 @@ function mcrt(atmosphere::Atmosphere,
         l = Threads.SpinLock()
 
         # Go through all boxes
-        #et = @elapsed Threads.@threads for j=1:ny
-        Threads.@threads for j=1:ny
+        et = @elapsed Threads.@threads for j=1:ny
 
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
@@ -251,7 +250,7 @@ function mcrt(atmosphere::Atmosphere,
               radiation::Radiation,
               atom::Atom)
 
-    # ==================================================================
+    # ================================PARAMETERS==================================
     # ATMOSPHERE DATA
     # ==================================================================
     x = atmosphere.x
