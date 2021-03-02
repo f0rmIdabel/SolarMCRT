@@ -76,7 +76,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
-                                                                   temperature, α[1,:,:,:], boundary[1,:,:])
+                                                                   temperature, α_abs[1,:,:,:], boundary[1,:,:])
 
     return λ, α, ε, boundary, packets, intensity_per_packet
 end
@@ -143,7 +143,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
     for l=1:2nλ_bf
         boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                      temperature, α_continuum[l,:,:,:], boundary[l,:,:])
+                                                                      temperature, α_continuum[l,:,:,:], boundary[l,:,:]) #FIX α
     end
 
     # BB wavelengths
@@ -153,7 +153,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
         α = α_continuum[l,:,:,:] .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_zero)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                       temperature, α, boundary[l,:,:])
+                                                                       temperature, α, boundary[l,:,:]) #FIX α
     end
 
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet
