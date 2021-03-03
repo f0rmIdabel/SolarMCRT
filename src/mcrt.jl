@@ -153,7 +153,27 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # Keep track of status
     lost = false
 
-    # Useful quantities
+    # Useful quanti    proton_density = hydrogen_populations[:,:,:,end]
+    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+
+    for l=1:2nλ_bf
+        α_continuum_abs[l,:,:,:] =  α_cont_abs.(λ[l], temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+        α_continuum_scat[l,:,:,:] = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_popuplation)
+    end
+
+    α_continuum_abs_line = α_cont_abs.(λ0, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_cont_scatt_line = α_cont_scatt.(λ0, electron_density, hydrogen_ground_popuplation)
+
+    for l=2nλ_bf+1:nλ
+        α_continuum_abs[l,:,:,:] = α_continuum_abs_line
+        α_continuum_scat[l,:,:,:] = α_cont_scatt_line
+    end
+
+    #......
+
+
+
+ties
     side_dim = SVector(size(boundary))
     side_edge = SA[x[1] x[end]
                    y[1] y[end]]

@@ -3,134 +3,65 @@ import Plots
 import Statistics
 using Test
 
-function test()
-    println("\n", "="^91, "\n", " "^34,
-            "SOLAR ATMOSPHERE MCRT",
-            "\n", "="^91, "\n")
+function full_check()
 
     # =============================================================================
-    # LOAD ATMOSPHERE DATA
+    # ATMOSPHERE
     # =============================================================================
-    print("--Loading atmosphere data..................")
     atmosphere_parameters = collect_atmosphere_data()
     atmosphere = Atmosphere(atmosphere_parameters...)
-    println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
 
-    if test_mode()
-        # =============================================================================
-        # LOAD WAVELENGTH
-        # =============================================================================
-        print("--Loading wavelength.......................")
-        λ = get_background_λ()
-        println("Wavelength λ = ", λ, " loaded.")
+    check_atmosphere(atmosphere)
+    plot_atmosphere(atmosphere)
 
-        # =============================================================================
-        # LOAD RADIATION DATA
-        # =============================================================================
-        print("--Loading radiation data...................")
-        radiation_parameters = collect_radiation_data(atmosphere, λ)
-        radiation = RadiationBackground(radiation_parameters...)
-        write_to_file(radiation) # creates new file
-        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
+    # =============================================================================
+    # BACKGROUND RADIATION
+    # =============================================================================
+    λ = get_background_λ()
+    radiation_parameters = collect_radiation_data(atmosphere, λ)
+    radiationBackground = RadiationBackground(radiation_parameters...)
 
-        # =============================================================================
-        # SIMULATION
-        # =============================================================================
-        mcrt(atmosphere, radiation)
+    check_radiationBackground(radiationBackground)
+    plot_radiationBackground(radiationBackground, atmosphere.z)
 
-    else
-        # =============================================================================
-        # LOAD ATOM
-        # =============================================================================
-        print("--Loading atom.............................")
-        atom_parameters = collect_atom_data(atmosphere)
-        atom = Atom(atom_parameters...)
-        println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
+    # =============================================================================
+    # ATOM
+    # =============================================================================
+    atom_parameters = collect_atom_data(atmosphere)
+    atom = Atom(atom_parameters...)
 
-        # =============================================================================
-        # LOAD INITIAL POPULATIONS
-        # =============================================================================
-        print("--Loading initial populations..............")
-        populations = collect_initial_populations()
-        println("Initial populations loaded.")
+    check_atom(atom)
 
-        # =============================================================================
-        # CALCULATE INITIAL TRANSITION RATES
-        # =============================================================================
-        print("--Loading initial transition rates.........")
-        Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
-        rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Bλ)
-        rates = TransitionRates(rate_parameters...)
-        println("Initial transition rates loaded.")
+    # =============================================================================
+    # INITIAL POPULATIONS
+    # =============================================================================
+    populations = collect_initial_populations()
 
-        # =============================================================================
-        # RUN MCRT UNTIL POPULATIONS CONVERGE
-        # =============================================================================
-        converged_populations = false
-        max_iterations = get_max_iterations()
+    check_populations(populations)
+    plot_populations(populations, atmosphere.z)
 
-        for n=1:max_iterations
-            println("\n  ITERATION ", n, "\n", "="^91)
-            # =============================================================================
-            # LOAD RADIATION DATA WITH CURRENT POPULATIONS
-            # =============================================================================
-            print("--Loading radiation data...................")
-            radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
-            radiation = Radiation(radiation_parameters...)
-            write_to_file(radiation) # creates new file
-            write_to_file(atom.λ)
-            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
+    # =============================================================================
+    # INITIAL TRANSITION RATES
+    # =============================================================================
+    Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
+    rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Bλ)
+    rates = TransitionRates(rate_parameters...)
 
-            # =============================================================================
-            # SIMULATION
-            # =============================================================================
-            mcrt(atmosphere, radiation, atom)
+    check_rates(rates)
+    plot_rates(rates, atmosphere.z)
 
-            # =============================================================================
-            # CALCULATE NEW TRANSITION RATES
-            # =============================================================================
-            print("\n--Update transition rates..................")
-            Jλ = get_Jλ()
-            rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Jλ)
-            rates = TransitionRates(rate_parameters...)
-            println("Transition rates updated.")
+    # =============================================================================
+    # RADIATION
+    # =============================================================================
+    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
+    radiation = Radiation(radiation_parameters...)
 
-            # =============================================================================
-            # CALCULATE NEW POPULATIONS
-            # =============================================================================
-            print("--Update populations.......................")
-            new_populations = get_revised_populations(atom, rates, populations)
-            write_to_file(new_populations)
-            println("Populations updated.")
-
-            # =============================================================================
-            # CHECK POPULATION CONVERGENCE
-            # =============================================================================
-            converged = check_population_convergence(populations, new_populations, n)
-            populations = copy(new_populations)
-
-            if converged
-                println("--Convergence at iteration n = ", n, ".\n")
-                break
-            else
-                println("--No convergence. Error = ", get_error(n), ".\n")
-            end
-
-            # =============================================================================
-            # END OF ITERATION
-            # =============================================================================
-        end
-
-        # =============================================================================
-        # END OF ATOM MODE
-        # =============================================================================
-    end
-
+    check_radiation(radiation)
+    plot_radiation(radiation, atmosphere.z, atom.λ)
 end
 
-run()
 
-function test_atmosphere(atmosphere::Atmosphere)
+function check_atmosphere(atmosphere::Atmosphere)
 
     z = atmosphere.z
     x = atmosphere.x
@@ -156,21 +87,21 @@ function test_atmosphere(atmosphere::Atmosphere)
     # ===========================================================
     # CHECK UNITS
     # ===========================================================
-    @test all(unit.(z) .== unit(1u"m"))
-    @test all(unit.(x) .== unit(1u"m"))
-    @test all(unit.(y) .== unit(1u"m"))
-    @test all(unit.(T) .== unit(1u"K"))
-    @test all(unit.(v) .== unit(1u"m/s"))
-    @test all(unit.(vz) .== unit(1u"m/s"))
-    @test all(unit.(electron_density) .== unit(1u"m^-3"))
-    @test all(unit.(hydrogen_populations) .== unit(1u"m^-3"))
+    @test all( dimension.(z) .== Unitful.𝐋 )
+    @test all( dimension.(x) .== Unitful.𝐋 )
+    @test all( dimension.(y) .== Unitful.𝐋 )
+    @test all( dimension.(T) .== Unitful.𝚯 )
+    @test all( dimension.(v) .== Unitful.𝐋 * Untitful.𝐓^-1 )
+    @test all( dimension.(vz) .== Unitful.𝐋 * Untitful.𝐓^-1 )
+    @test all( dimension.(electron_density) .== Unitful.𝐋^-3 )
+    @test all( dimension.(hydrogen_populations) .== Unitful.𝐋^-3 )
 
     # ===========================================================
     # NO NEGAITVE VALUES
     # ===========================================================
-    @test all(T .>= 0u"K")
-    @test all(electron_density .>= 0u"m^-3")
-    @test all(hydrogen_populations .>= 0u"m^-3")
+    @test all( ustrip.(T) .>= 0.0 )
+    @test all( ustrip.(electron_density) .>= 0.0 )
+    @test all( ustrip.(hydrogen_populations) .>= 0.0 )
 
     # ===========================================================
     # DECREASING Z, INCREASING X AND Y
@@ -179,11 +110,77 @@ function test_atmosphere(atmosphere::Atmosphere)
     dx = x[2:end] .- x[1:end-1]
     dy = y[2:end] .- y[1:end-1]
 
-    @test all(dz .<= 0u"m")
-    @test all(dx .>= 0u"m")
-    @test all(dy .>= 0u"m")
+    @test all( ustrip.(dz) .<= 0.0 )
+    @test all( ustrip.(dx) .<= 0.0 )
+    @test all( ustrip.(dy) .<= 0.0 )
 end
 
+function plot_atmosphere(atmosphere::Atmosphere)
+end
+
+function check_radiationBackground(radiationBackground)
+    λ = radiationBackground.λ
+    α_continuum = radiationBackground.α_continuum
+    ε_continuum = radiationBackground.ε_continuum
+    boundary = radiationBackground.boundary
+    packets = radiationBackground.packets
+    intensity_per_packet = radiationBackground.intensity_per_packet
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
+    size(α_continuum) = nλ, nz, nx, ny
+
+    @assert size(α_continuum) == size(α_continuum) == size(packets)
+    @assert size(boundary) == (nλ, nx, ny)
+    @assert length(λ) == length(intensity_per_packet) == nλ
+
+    # ===========================================================
+    # CHECK UNITS
+    # ===========================================================
+    @test all( dimension.(λ) .==  Unitful.𝐋 )
+    @test all( dimension.(α_continuum) .== Unitful.𝐋^-1 )
+    @test all( dimension.(ε_continuum) .== NoDims
+    @test all( dimension.(boundary) .== NoDims
+    @test all( dimension.(packets) .== NoDims
+    @test all( dimension.(intensity_per_packet) .== Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3 )
+
+    # ===========================================================
+    # NO NEGAITVE VALUES
+    # ===========================================================
+    @test all( ustrip.(λ) .>= 0.0 )
+    @test all( ustrip.(α_continuum) .>= 0.0 )
+    @test all( ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all( ε_continuum .>= 0.0 )
+    @test all( boundary .>= 0 )
+    @test all( packets .>= 0 )
+end
+
+function plot_radiationBackground(radiationBackground, atmosphere.z, λ)
+end
+
+function check_atom(atom)
+end
+
+function check_populations(populations)
+end
+
+function plot_populations(populations, atmosphere.z)
+end
+
+function check_rates(rates)
+end
+
+function plot_rates(rates, atmosphere.z)
+end
+
+function check_radiation(radiation)
+end
+
+function plot_radiation(radiation, atmosphere.z, atom.λ)
+end
+
+#### USEFUL JUNK
 
 function test_radiation(atom::Atom)
 
@@ -230,9 +227,6 @@ function check_parameters(atmosphere::Atmosphere, radiation::Radiation)
 
       nλ, nz, nx, ny = size(χ)
 
-
-
-
       # ==================================================================
       # AVG PARAMETERS
       # ==================================================================
@@ -268,84 +262,6 @@ function check_parameters(atmosphere::Atmosphere, radiation::Radiation)
       Plots.png("parameters")"""
 end
 
-
-function run()
-    println("\n", "="^91, "\n", " "^34,
-            "SOLAR ATMOSPHERE MCRT",
-            "\n", "="^91, "\n")
-
-    # ==================================================================
-    # LOAD ATMOSPHERE DATA
-    # ==================================================================
-    print("--Loading atmosphere data..................")
-    atmosphere_parameters = collect_atmosphere_data()
-    atmosphere = Atmosphere(atmosphere_parameters...)
-    println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
-
-    mode = get_mode()
-
-    if mode == "test"
-
-        # ==================================================================
-        # LOAD WAVELENGTH
-        # ==================================================================
-        print("--Loading wavelength.......................")
-        λ = get_test_λ()
-        println("Wavelength λ = ", λ, " loaded.")
-
-        # ==================================================================
-        # LOAD RADIATION DATA
-        # ==================================================================
-        print("--Loading radiation data...................")
-        radiation_parameters = collect_radiation_data(atmosphere, λ)
-        radiation = Radiation(radiation_parameters...)
-        #write_to_file(radiation)
-        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
-
-    elseif mode == "atom"
-
-        # ==================================================================
-        # LOAD ATOM
-        # ==================================================================
-        print("--Loading atom.............................")
-        atom_parameters = collect_atom_data()
-        atom = AtomicLine(collect_atom_data()...)
-        nλ_bb, nλ_bf = get_nλ()
-        nλ = nλ_bf*2 + nλ_bb
-        nλ += 1-nλ%2
-        println("Atom loaded with ", nλ, " wavelengths.")
-
-        # ==================================================================
-        # LOAD INITIAL ATOM POPULATIONS
-        # ==================================================================
-
-        max_iterations = 10
-
-        new_populations =  collect_initial_populations(atmosphere.hydrogen_populations)
-        converged_populations = false
-        error = Array{Float64,2}(undef, max_iterations, nλ)
-
-        # ==================================================================
-        # CALCULATE RADIATION PROPERTIES AND RUN MCRT UNTIL POP CONVERGE
-        # ==================================================================
-
-        for n=1:1#max_iterations
-            println("\n  ITERATION ", n)
-            println("="^91)
-            populations = new_populations
-            # ==================================================================
-            # LOAD RADIATION DATA WITH CURRENT POPULATIONS
-            # ==================================================================
-            print("--Loading radiation data...................")
-            radiation_parameters = collect_radiation_data(atmosphere, atom, populations)
-            radiation = Radiation(radiation_parameters...)
-            #write_to_file(radiation)
-            println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets[1,:,:,:])))
-        end
-    end
-
-    check_parameters(atmosphere, radiation)
-end
 
 function average_column(array)
       Statistics.mean(array, dims=[2,3])[:,1,1]
