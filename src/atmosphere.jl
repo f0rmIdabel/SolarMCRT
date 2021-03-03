@@ -20,27 +20,74 @@ function collect_atmosphere_data()
     # ===========================================================
     # READ ATMOSPHERE FILE
     # ===========================================================
-    atmos = h5open(get_atmosphere_path(), "r")
-    x = read(atmos, "x")u"m"
-    y = read(atmos, "y")u"m"
-    z = read(atmos, "z")u"m"
+    h5open(get_atmosphere_path(), "r") do atmos
+        x = read(atmos, "x")u"m"
+        y = read(atmos, "y")u"m"
+        z = read(atmos, "z")u"m"
 
-    # Change to single variable
-    velocity_x = read(atmos, "velocity_x")u"m/s"
-    velocity_y = read(atmos, "velocity_y")u"m/s"
-    velocity_z = read(atmos, "velocity_z")u"m/s"
+        velocity_x = read(atmos, "velocity_x")u"m/s"
+        velocity_y = read(atmos, "velocity_y")u"m/s"
+        velocity_z = read(atmos, "velocity_z")u"m/s"
 
-    temperature = read(atmos, "temperature")u"K"
-    electron_density = read(atmos, "electron_density")u"m^-3"
-    hydrogen_populations = read(atmos, "hydrogen_populations")u"m^-3"
-    close(atmos)
+        temperature = read(atmos, "temperature")u"K"
+        electron_density = read(atmos, "electron_density")u"m^-3"
+        hydrogen_populations = read(atmos, "hydrogen_populations")u"m^-3"
+    end
 
-    # original dimensions of data
-    nz, nx, ny = size(temperature)
+    # ===========================================================
+    # GET SNAPSHOT (remove)
+    # ===========================================================
+
+    if length(size(z)) == 2
+        z = z[:,1]
+        velocity_x = velocity_x[:,:,:,1]
+        velocity_y = velocity_y[:,:,:,1]
+        velocity_z = velocity_z[:,:,:,1]
+        temperature = temperature[:,:,:,1]
+        electron_density = electron_density[:,:,:,1]
+        hydrogen_populations = hydrogen_populations[:,:,:,:,1]
+    end
+
+    # ===========================================================
+    # MAKE SURE Δx, Δy > 0 and Δz < 0 (remove)
+    # ===========================================================
+    if z[1] < z[end]
+        z = reverse(z)
+        velocity_z = velocity_z[end:-1:1,:,:]
+        velocity_x = velocity_x[end:-1:1,:,:]
+        velocity_y = velocity_y[end:-1:1,:,:]
+        temperature = temperature[end:-1:1,:,:]
+        electron_density = electron_density[end:-1:1,:,:]
+        hydrogen_populations = hydrogen_populations[end:-1:1,:,:,:]
+    end
+
+    if x[1] > x[end]
+        x = reverse(x)
+        velocity_z = velocity_z[:,end:-1:1,:]
+        velocity_x = velocity_x[:,end:-1:1,:]
+        velocity_y = velocity_y[:,end:-1:1,:]
+        temperature = temperature[:,end:-1:1,:]
+        electron_density = electron_density[:,end:-1:1,:]
+        hydrogen_populations = hydrogen_populations[:,end:-1:1,:,:]
+    end
+
+
+    if y[1] > y[end]
+        y = reverse(y)
+        velocity_z = velocity_z[:,:,end:-1:1]
+        velocity_x = velocity_x[:,:,end:-1:1]
+        velocity_y = velocity_y[:,:,end:-1:1]
+        temperature = temperature[:,:,end:-1:1]
+        electron_density = electron_density[:,:,end:-1:1]
+        hydrogen_populations = hydrogen_populations[:,:,end:-1:1,:]
+    end
 
     # ===========================================================
     # CUT AND SLICE ATMOSPHERE BY INDEX
     # ===========================================================
+
+    # original dimensions of data
+    nz, nx, ny = size(temperature)
 
     ze, xe, ye = get_stop()
     zs, xs, ys = get_start()

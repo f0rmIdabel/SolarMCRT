@@ -61,11 +61,11 @@ function collect_radiation_data(atmosphere::Atmosphere,
     proton_density = hydrogen_populations[:,:,:,end]
     hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
 
-    α_abs = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_scat = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
+    α_continuum_abs = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
+    α_continuum_scat = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
 
-    α[1,:,:,:] = α_abs .+ α_scat
-    ε[1,:,:,:] = α_abs ./ α[1,:,:,:]
+    α[1,:,:,:] = α_continuum_abs .+ α_continuum_scat
+    ε[1,:,:,:] = α_continuum_abs ./ α[1,:,:,:]
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY
@@ -76,7 +76,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
-                                                                   temperature, α_abs[1,:,:,:], boundary[1,:,:])
+                                                                   temperature, α_continuum_abs, boundary[1,:,:])
 
     return λ, α, ε, boundary, packets, intensity_per_packet
 end
@@ -141,9 +141,10 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
     # BF wavelengths
     for l=1:2nλ_bf
+        α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
         boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                      temperature, α_continuum[l,:,:,:], boundary[l,:,:]) #FIX α
+                                                                      temperature, α_continuum_abs, boundary[l,:,:]) #FIX α
     end
 
     # BB wavelengths
@@ -151,9 +152,11 @@ function collect_radiation_data(atmosphere::Atmosphere,
         α = α_continuum[l,:,:,:] .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
         boundary[l,:,:] = optical_depth_boundary(α, z, τ_max)
 
-        α = α_continuum[l,:,:,:] .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_zero)
+        α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_zero)
+        α_abs =  α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:] .+ α_line .* ε_line
+
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                       temperature, α, boundary[l,:,:]) #FIX α
+                                                                       temperature, α_abs, boundary[l,:,:]) #FIX α
     end
 
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet

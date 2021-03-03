@@ -91,7 +91,6 @@ function mcrt(atmosphere::Atmosphere,
                     box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
 
                     for pct=1:pcts
-
                         # Initial box
                         box_id = [k,i,j]
 
