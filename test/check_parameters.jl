@@ -62,7 +62,9 @@ end
 
 
 function check_atmosphere(atmosphere::Atmosphere)
-
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
     z = atmosphere.z
     x = atmosphere.x
     y = atmosphere.y
@@ -119,6 +121,9 @@ function plot_atmosphere(atmosphere::Atmosphere)
 end
 
 function check_radiationBackground(radiationBackground)
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
     λ = radiationBackground.λ
     α_continuum = radiationBackground.α_continuum
     ε_continuum = radiationBackground.ε_continuum
@@ -159,16 +164,117 @@ end
 function plot_radiationBackground(radiationBackground, atmosphere.z, λ)
 end
 
-function check_atom(atom)
+function check_atom(atom, atmosphere_size)
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
+    line = atom.line
+    Aul = line.Aul
+    Bul = line.Bul
+    Blu = line.Bli
+    λ0 = line.λ0
+    doppler_width = atom.doppler_width
+    damping_constant = atom.damping_constant
+    λ = atom.λ
+    nλ_bb = atom.nλ_bb
+    nλ_bf = atom.nλ_bf
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
+    @assert size(doppler_width) == size(damping_constant) == size(Bul)
+                                == size(Blu) == size(Aul) == atmosphere_size
+    @assert length(nλ) == 2nλ_bf + nλ_bb
+
+    # ===========================================================
+    # CHECK UNITS
+    # ===========================================================
+    @test all( dimension.(Aul) .==  Unitful.𝐓^-1 )
+    @test all( dimension.(Bul) .==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋)
+    @test all( dimension.(Blu) .==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋)
+    @test all( dimension.(λ)   .==  Unitful.𝐋)
+    @test all( dimension.(damping_constant)  .==  Unitful.𝐋^-2)
+    @test all( dimension.(doppler_width)  .==  Unitful.𝐋)
+    @test dimension(λ0)  ==  Unitful.𝐋
+
+    # ===========================================================
+    # NO NEGAITVE VALUES
+    # ===========================================================
+    @test all( ustrip.(Aul) .>= 0.0 )
+    @test all( ustrip.(Bul) .>= 0.0 )
+    @test all( ustrip.(Blu) .>= 0.0 )
+    @test all( ustrip.(damping_constant) .>= 0.0 )
+    @test all( ustrip.(doppler_width) .>= 0.0 )
+    @test all( ustrip.(λ) .>= 0.0 )
+    @test ustrip.(λ0) .>= 0.0
+    @test nλ_bb >= 0
+    @test nλ_bf >= 0
 end
 
-function check_populations(populations)
+function check_populations(populations, atmosphere_size)
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
+    @assert size(populations) == atmosphere_size
+
+    # ===========================================================
+    # CHECK UNITS
+    # ===========================================================
+    @test all( dimension.(populations) .==  Unitful.𝐋^-3)
+
+    # ===========================================================
+    # NO NEGAITVE VALUES
+    # ===========================================================
+    @test all( ustrip.(populations) .>= 0.0 )
 end
 
 function plot_populations(populations, atmosphere.z)
 end
 
-function check_rates(rates)
+function check_rates(rates, atmosphere_size)
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
+    R12 = rates.R12
+    R13 = rates.R13
+    R23 = rates.R23
+    R21 = rates.R21
+    R31 = rates.R31
+    R32 = rates.R32
+    C12 = rates.C12
+    C13 = rates.C13
+    C23 = rates.C23
+    C21 = rates.C21
+    C31 = rates.C31
+    C32 = rates.C32
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
+    @assert size(R12) == atmosphere_size
+    @assert size(R13) == atmosphere_size
+    @assert size(R23) == atmosphere_size
+    @assert size(R21) == atmosphere_size
+    @assert size(R31) == atmosphere_size
+    @assert size(R32) == atmosphere_size
+    @assert size(C12) == atmosphere_size
+    @assert size(C13) == atmosphere_size
+    @assert size(C23) == atmosphere_size
+    @assert size(C21) == atmosphere_size
+    @assert size(C31) == atmosphere_size
+    @assert size(C32) == atmosphere_size
+
+    # ===========================================================
+    # CHECK UNITS
+    # ===========================================================
+    @test all( dimension.(R12) .==  Unitful.𝐓^-1)
+
+    # ===========================================================
+    # NO NEGAITVE VALUES
+    # ===========================================================
+    @test all( ustrip.(populations) .>= 0.0 )
+
 end
 
 function plot_rates(rates, atmosphere.z)
