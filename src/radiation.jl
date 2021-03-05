@@ -107,7 +107,6 @@ function collect_radiation_data(atmosphere::Atmosphere,
     hydrogen_populations = atmosphere.hydrogen_populations
     nz, nx, ny = size(temperature)
     velocity_z = atmosphere.velocity_z
-    velocity_zero = zeros(nz,nx,ny)u"m/s"
 
     # ==================================================================
     # GET ATOM DATA
@@ -144,7 +143,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
         α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
         boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                      temperature, α_continuum_abs, boundary[l,:,:]) #FIX α
+                                                                      temperature, α_continuum_abs, boundary[l,:,:])
     end
 
     # BB wavelengths
@@ -152,11 +151,11 @@ function collect_radiation_data(atmosphere::Atmosphere,
         α = α_continuum[l,:,:,:] .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
         boundary[l,:,:] = optical_depth_boundary(α, z, τ_max)
 
-        α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_zero)
+        α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
         α_abs =  α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:] .+ α_line .* ε_line
 
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                       temperature, α_abs, boundary[l,:,:]) #FIX α
+                                                                       temperature, α_abs, boundary[l,:,:])
     end
 
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet
@@ -256,7 +255,7 @@ function line_extinction(λ::Unitful.Length,
                          ΔλD::Unitful.Length,
                          damping_constant::PerArea,
                          α_line_constant::Float64,
-                         v_los::Unitful.Velocity)
+                         v_los::Unitful.Velocity=0u"m/s")
 
     damping = damping_constant*λ^2 |> u"m/m"
     v = (λ - λ0 .+ λ0 .* v_los ./ c_0) ./ ΔλD

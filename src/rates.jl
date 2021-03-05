@@ -181,8 +181,7 @@ function σic(i::Integer,
     charge = atom.Z
     σ_constant = (4 * e^2 / (3 * π * sqrt(3) * ε_0 * m_e * c_0^2 * R_∞)) |> u"m^2"
 
-    #stimulated_emission = exp(-h_k * ν / temperature)
-    σ = (σ_constant * charge^4 * n_eff * λ3_ratio .* gaunt_bf.(λ, charge, n_eff)) #(1 - stimulated_emission)
+    σ = (σ_constant * charge^4 * n_eff * λ3_ratio .* gaunt_bf.(λ, charge, n_eff))
 
     return σ
 end
@@ -234,7 +233,7 @@ function Cij(n_i::Integer,
         C = C .* ( LTE_populations[:,:,:,n_i] ./ LTE_populations[:,:,:,n_j] )
     end
 
-    return C
+    return C#(1 - stimulated_emission)#(1 - stimulated_emission)
 end
 
 """
@@ -275,16 +274,23 @@ function LTE_populations(atom::Atom,
     nz, nx, ny = size(temperature)
     populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
 
-    C = 2π*m_e*k_B/h^2
-    U1 = gl * exp.(-χl/k_B./temperature)
-    U2 = gu * exp.(-χu/k_B./temperature)
-    U3 = g∞ * exp.(-χ∞/k_B./temperature)
+    # Partition functions
+    U0 = gl * exp.(-χl/k_B./temperature) .+ gu * exp.(-χu/k_B./temperature)
+    U1 = g∞ * exp.(-χ∞/k_B./temperature)
 
-    K = 1 ./electron_density .* 2 .* U3 .^2 ./ (U1 .+ U2) / g∞ .* (C*temperature).^(1.5)
+    K = 2*U1 ./ (U0 .* electron_density) .* ( π*m_e*k_B/h^2 .* temperature ).^(1.5) .* exp.(-χ∞/k_B./temperature)
 
-    populations[:,:,:,3] = K .* atom_density ./ (1.0 .+ K)
-    populations[:,:,:,1] = (atom_density .- populations[:,:,:,3]) ./ (1.0 .+ U2 ./ U1)
-    populations[:,:,:,2] = atom_density .- populations[:,:,:,1] .- populations[:,:,:,3]
+    # Ionised
+    N1 = K .* atom_density ./ (1.0 .+ K)
+
+    # Neutral
+    N0 = atom_density .- N1
+    n1 = gl./U0 .* N0 .* exp.(-χl/k_B./temperature) # ground level
+    n2 = N0 .- n1                                   # excited level
+
+    populations[:,:,:,1] = n1
+    populations[:,:,:,2] = n2
+    populations[:,:,:,3] = N1
 
     return populations
 end
