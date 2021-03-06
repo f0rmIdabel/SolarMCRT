@@ -1,7 +1,5 @@
 include("../src/mcrt.jl")
 include("../src/populations.jl")
-import Plots
-import Statistics
 using Test
 
 function check_atmosphere(atmosphere::Atmosphere)
@@ -42,11 +40,11 @@ function check_atmosphere(atmosphere::Atmosphere)
     @test dimension(hydrogen_populations[1]) == Unitful.𝐋^-3
 
     # ===========================================================
-    # NO NEGAITVE VALUES
+    # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all( ustrip.(T) .>= 0.0 )
-    @test all( ustrip.(electron_density) .>= 0.0 )
-    @test all( ustrip.(hydrogen_populations) .>= 0.0 )
+    @test all( Inf .> ustrip.(T) .>= 0.0 )
+    @test all( Inf .> ustrip.(electron_density) .>= 0.0 )
+    @test all( Inf .> ustrip.(hydrogen_populations) .>= 0.0 )
 
     # ===========================================================
     # DECREASING Z, INCREASING X AND Y
@@ -60,10 +58,7 @@ function check_atmosphere(atmosphere::Atmosphere)
     @test all( ustrip.(dy) .>= 0.0 )
 end
 
-function plot_atmosphere(atmosphere::Atmosphere)
-end
-
-function check_radiationBackground(radiationBackground)
+function check_radiationBackground(radiationBackground, atmosphere_size)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -77,7 +72,8 @@ function check_radiationBackground(radiationBackground)
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    nλ, nz, nx, ny = size(α_continuum)
+    nλ = length(λ)
+    nz, nx, ny = atmosphere_size
 
     @assert size(α_continuum) == size(α_continuum) == size(packets)
     @assert size(boundary) == (nλ, nx, ny)
@@ -94,17 +90,14 @@ function check_radiationBackground(radiationBackground)
     @test dimension(intensity_per_packet[1]) == Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
     # ===========================================================
-    # NO NEGAITVE VALUES
+    # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all( ustrip.(λ) .>= 0.0 )
-    @test all( ustrip.(α_continuum) .>= 0.0 )
-    @test all( ustrip.(intensity_per_packet) .>= 0.0 )
-    @test all( ε_continuum .>= 0.0 )
-    @test all( boundary .>= 0 )
-    @test all( packets .>= 0 )
-end
-
-function plot_radiationBackground(radiationBackground,z, λ)
+    @test all(  Inf .> ustrip.(λ) .>= 0.0 )
+    @test all(  Inf .> ustrip.(α_continuum) .>= 0.0 )
+    @test all(  Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all(  Inf .> ε_continuum .>= 0.0 )
+    @test all(  Inf .> boundary .>= 0 )
+    @test all(  Inf .> packets .>= 0 )
 end
 
 function check_atom(atom, atmosphere_size)
@@ -112,10 +105,13 @@ function check_atom(atom, atmosphere_size)
     # LOAD DATA
     # ===========================================================
     line = atom.line
-    Aul = line.Aul
-    Bul = line.Bul
-    Blu = line.Bli
+    Aul = line.Aji
+    Bul = line.Bji
+    Blu = line.Bij
     λ0 = line.λ0
+    χl = atom.χl
+    χu = atom.χu
+    χ∞ = atom.χ∞
     doppler_width = atom.doppler_width
     damping_constant = atom.damping_constant
     λ = atom.λ
@@ -125,32 +121,40 @@ function check_atom(atom, atmosphere_size)
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    @assert size(doppler_width) == size(damping_constant) == size(Bul) == size(Blu) == size(Aul) == atmosphere_size
-    @assert length(nλ) == 2nλ_bf + nλ_bb
+    @assert size(doppler_width) == atmosphere_size
+    @assert size(damping_constant) == atmosphere_size
+    @assert length(λ) == 2nλ_bf + nλ_bb
 
     # ===========================================================
     # CHECK UNITS
     # ===========================================================
-    @test dimension(Aul[1]) ==  Unitful.𝐓^-1
-    @test dimension(Bul[1]) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
-    @test dimension(Blu[1]) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
+    @test dimension(Aul) ==  Unitful.𝐓^-1
+    @test dimension(Bul) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
+    @test dimension(Blu) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
     @test dimension(λ[1])   ==  Unitful.𝐋
     @test dimension(damping_constant[1])  ==  Unitful.𝐋^-2
     @test dimension(doppler_width[1])  ==  Unitful.𝐋
     @test dimension(λ0)  ==  Unitful.𝐋
+    @test dimension(χl) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
+    @test dimension(χu) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
+    @test dimension(χ∞) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
 
     # ===========================================================
-    # NO NEGAITVE VALUES
+    # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all( ustrip.(Aul) .>= 0.0 )
-    @test all( ustrip.(Bul) .>= 0.0 )
-    @test all( ustrip.(Blu) .>= 0.0 )
-    @test all( ustrip.(damping_constant) .>= 0.0 )
-    @test all( ustrip.(doppler_width) .>= 0.0 )
-    @test all( ustrip.(λ) .>= 0.0 )
-    @test ustrip.(λ0) .>= 0.0
-    @test nλ_bb >= 0
-    @test nλ_bf >= 0
+    @test all( Inf > ustrip(Aul) >= 0.0 )
+    @test all( Inf > ustrip(Bul) >= 0.0 )
+    @test all( Inf > ustrip(Blu) >= 0.0 )
+    @test all( Inf .> ustrip.(damping_constant) .>= 0.0 )
+    @test all( Inf .> ustrip.(doppler_width) .>= 0.0 )
+    @test all( Inf .> ustrip.(λ) .>= 0.0 )
+    @test Inf > ustrip(λ0) >= 0.0
+    @test Inf > nλ_bb >= 0
+    @test Inf > nλ_bf >= 0
+
+    @test ustrip(χl) == 0.0
+    @test ustrip(χu) > 0.0
+    @test χ∞ > χu
 end
 
 function check_populations(populations, atmosphere_size)
@@ -158,20 +162,19 @@ function check_populations(populations, atmosphere_size)
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    @assert size(populations) == atmosphere_size
+    nz, nx, ny = atmosphere_size
+    @assert size(populations) == (nz, nx, ny, 3)
 
     # ===========================================================
     # CHECK UNITS
     # ===========================================================
-    @test all( dimension.(populations) .==  Unitful.𝐋^-3)
+    @test dimension(populations[1]) ==  Unitful.𝐋^-3
 
     # ===========================================================
     # NO NEGAITVE VALUES
     # ===========================================================
-    @test all( ustrip.(populations) .>= 0.0 )
-end
-
-function plot_populations(populations,z)
+    println(minimum(populations))
+    @test all( Inf .> ustrip.(populations) .> 0.0 ) # divide by zero problem
 end
 
 function check_rates(rates, atmosphere_size)
@@ -224,26 +227,23 @@ function check_rates(rates, atmosphere_size)
     @test dimension(C32[1]) ==  Unitful.𝐓^-1
 
     # ===========================================================
-    # NO NEGAITVE VALUES
+    # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all( ustrip.(R12) .>= 0.0 )
-    @test all( ustrip.(R13) .>= 0.0 )
-    @test all( ustrip.(R23) .>= 0.0 )
-    @test all( ustrip.(R21) .>= 0.0 )
-    @test all( ustrip.(R31) .>= 0.0 )
-    @test all( ustrip.(R32) .>= 0.0 )
-    @test all( ustrip.(C12) .>= 0.0 )
-    @test all( ustrip.(C13) .>= 0.0 )
-    @test all( ustrip.(C23) .>= 0.0 )
-    @test all( ustrip.(C21) .>= 0.0 )
-    @test all( ustrip.(C31) .>= 0.0 )
-    @test all( ustrip.(C32) .>= 0.0 )
+    @test all( Inf .> ustrip.(R12) .>= 0.0 )
+    @test all( Inf .> ustrip.(R13) .>= 0.0 )
+    @test all( Inf .> ustrip.(R23) .>= 0.0 )
+    @test all( Inf .> ustrip.(R21) .>= 0.0 ) #Fail
+    @test all( Inf .> ustrip.(R31) .>= 0.0 )
+    @test all( Inf .> ustrip.(R32) .>= 0.0 )
+    @test all( Inf .> ustrip.(C12) .>= 0.0 )
+    @test all( Inf .> ustrip.(C13) .>= 0.0 )
+    @test all( Inf .> ustrip.(C23) .>= 0.0 )
+    @test all( Inf .> ustrip.(C21) .>= 0.0 ) #
+    @test all( Inf .> ustrip.(C31) .>= 0.0 ) #
+    @test all( Inf .> ustrip.(C32) .>= 0.0 )
 end
 
-function plot_rates(rates, z)
-end
-
-function check_radiation(radiation, atom)
+function check_radiation(radiation, atom, atmosphere_size)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -256,14 +256,12 @@ function check_radiation(radiation, atom)
     packets = radiation.packets
     intensity_per_packet = radiation.intensity_per_packet
 
-
     # ===========================================================
     # LOAD DATA
     # ===========================================================
     λ = atom.λ
     nλ_bf = atom.nλ_bf
     nλ = length(λ)
-    nz,nx,ny = size(α_line_constant)
     α_line = Array{Unitful.PerLength, 4}(undef,nλ,nz,nx,ny)
 
     for l=2nλ_bf+1:nλ
@@ -273,6 +271,7 @@ function check_radiation(radiation, atom)
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
+    nz, nx, ny = atmosphere_size
     @assert size(α_continuum) = (nλ, nz, nx, ny)
     @assert size(α_continuum) == size(ε_continuum) == size(packets)
     @assert size(α_line_constant) = (nz, nx, ny)
@@ -285,7 +284,7 @@ function check_radiation(radiation, atom)
     # ===========================================================
     @test dimension(α_continuum[1]) == Unitful.𝐋^-1
     @test dimension(ε_continuum[1]) == NoDims
-    @test dimension(α_line_constant[1]) == NoDims
+    @test dimension(α_line[1]) == Unitful.𝐋^-1
     @test dimension(ε_line[1]) == NoDims
     @test dimension(boundary[1]) == NoDims
     @test dimension(packets[1]) == NoDims
@@ -295,136 +294,10 @@ function check_radiation(radiation, atom)
     # NO NEGAITVE VALUES
     # ===========================================================
     @test all( ustrip.(α_continuum) .>= 0.0 )
-    @test all( ustrip.(α_line_constant) .>= 0.0 )
-    @test all( ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all( ustrip.(α_line) .>= 0.0 )
     @test all( ε_continuum .>= 0.0 )
     @test all( ε_line .>= 0.0 )
     @test all( boundary .>= 0 )
     @test all( packets .>= 0 )
+    @test all( ustrip.(intensity_per_packet) .>= 0.0 )
 end
-
-function plot_radiation(radiation, z, λ)
-end
-
-#### USEFUL JUNK
-
-
-function check_parameters(atmosphere::Atmosphere, radiation::Radiation)
-
-      # ==================================================================
-      # LOAD ATMOSPHERE PARAMETERS
-      # ==================================================================
-      z = atmosphere.z
-      x = atmosphere.x
-      y = atmosphere.y
-      T = atmosphere.temperature
-
-      λ = radiation.λ
-      χ = radiation.χ
-      ε = radiation.ε
-      boundary = radiation.boundary
-      packets = radiation.packets
-      intensity_per_packet = radiation.intensity_per_packet
-
-      nλ, nz, nx, ny = size(χ)
-
-      # ==================================================================
-      # AVG PARAMETERS
-      # ==================================================================
-      print("--Calculate averages.......................")
-
-      mean_χ = Array{Float64, 2}(undef, nλ, nz)
-      mean_ε = Array{Float64, 2}(undef, nλ, nz)
-      mean_packets = Array{Float64, 2}(undef, nλ, nz)
-      mean_boundary = Array{Float64, 1}(undef, nλ)
-      mean_T = average_column(T)
-
-      for l=1:nλ
-          mean_χ[l,:] = average_column(χ[l,:,:,:])
-          mean_ε[l,:] = average_column(ε[l,:,:,:])
-          mean_packets[l,:] = average_column(packets[l,:,:,:])
-          mean_boundary[l] = Statistics.mean(boundary)
-      end
-
-      println(" Averages calculated")
-
-      # ==================================================================
-      # PLOT PARAMETERS
-      # ==================================================================
-      plot(mean_χ[1,:], z[1:end-1], xlabel = "̄χ", ylabel = "z", xscale=:log10)
-
-      """ENV["GKSwstype"]="nul"
-
-      p1 = Plots.plot(mean_χ, z, xlabel = "̄χ", ylabel = "z", xscale=:log10)
-      p2 = Plots.plot(mean_ε, z, xlabel = "̄ε", ylabel = "z")
-      p3 = Plots.plot(mean_T, z, xlabel = "temperature", ylabel = "z" )
-      p4 = Plots.plot(mean_packets, z, xlabel = "packets", ylabel = "z")
-      Plots.plot(p1, p2, p3, p4, layout = (2, 2), legend = false)
-      Plots.png("parameters")"""
-end
-
-
-function average_column(array)
-      Statistics.mean(array, dims=[2,3])[:,1,1]
-end
-
-
-function full_check()
-
-    # =============================================================================
-    # ATMOSPHERE
-    # =============================================================================
-    atmosphere_parameters = collect_atmosphere_data()
-    atmosphere = Atmosphere(atmosphere_parameters...)
-
-    check_atmosphere(atmosphere)
-    plot_atmosphere(atmosphere)
-
-    # =============================================================================
-    # BACKGROUND RADIATION
-    # =============================================================================
-    λ = get_background_λ()
-    radiation_parameters = collect_radiation_data(atmosphere, λ)
-    radiationBackground = RadiationBackground(radiation_parameters...)
-
-    check_radiationBackground(radiationBackground)
-    plot_radiationBackground(radiationBackground, atmosphere.z)
-
-    # =============================================================================
-    # ATOM
-    # =============================================================================
-    atom_parameters = collect_atom_data(atmosphere)
-    atom = Atom(atom_parameters...)
-
-    check_atom(atom)
-
-    # =============================================================================
-    # INITIAL POPULATIONS
-    # =============================================================================
-    populations = collect_initial_populations()
-
-    check_populations(populations)
-    plot_populations(populations, atmosphere.z)
-
-    # =============================================================================
-    # INITIAL TRANSITION RATES
-    # =============================================================================
-    Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
-    rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Bλ)
-    rates = TransitionRates(rate_parameters...)
-
-    check_rates(rates)
-    plot_rates(rates, atmosphere.z)
-
-    # =============================================================================
-    # RADIATION
-    # =============================================================================
-    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
-    radiation = Radiation(radiation_parameters...)
-
-    check_radiation(radiation)
-    plot_radiation(radiation, atmosphere.z, atom.λ)
-end
-
-
-full_check()

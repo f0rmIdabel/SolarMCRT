@@ -177,7 +177,7 @@ function σic(i::Integer,
 
     λ_edge = λ[end]
     λ3_ratio = (λ ./ λ_edge).^3
-    n_eff = sqrt(E_∞ / (atom.χl - atom.χu)) |>u"J/J" # should be χu - χl
+    n_eff = sqrt(E_∞ / (atom.χu - atom.χl)) |>u"J/J" # should be χu - χl
     charge = atom.Z
     σ_constant = (4 * e^2 / (3 * π * sqrt(3) * ε_0 * m_e * c_0^2 * R_∞)) |> u"m^2"
 
@@ -233,7 +233,7 @@ function Cij(n_i::Integer,
         C = C .* ( LTE_populations[:,:,:,n_i] ./ LTE_populations[:,:,:,n_j] )
     end
 
-    return C#(1 - stimulated_emission)#(1 - stimulated_emission)
+    return C
 end
 
 """
@@ -257,6 +257,7 @@ function gaunt_bf(λ::Unitful.Length,
     return g_bf
 end
 
+
 function LTE_populations(atom::Atom,
                          populations::Array{<:NumberDensity, 4},
                          temperature::Array{<:Unitful.Temperature, 3},
@@ -268,29 +269,35 @@ function LTE_populations(atom::Atom,
     gl = atom.gl
     gu = atom.gu
     g∞ = atom.g∞
+    U0 = 2.0 #U0 = atom.U0
+    U1 = 1.0 #U1 = atom.U1
 
     atom_density = sum(populations, dims=4)[:,:,:,1]
-
     nz, nx, ny = size(temperature)
     populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
 
+    z1 = gl * exp.(-(χ∞ - χl)/k_B./temperature)
+    z2 = gu * exp.(-(χ∞ - χu)/k_B./temperature)
+
     # Partition functions
-    U0 = gl * exp.(-χl/k_B./temperature) .+ gu * exp.(-χu/k_B./temperature)
-    U1 = g∞ * exp.(-χ∞/k_B./temperature)
+    U0 = z1 .+ z2
 
-    K = 2*U1 ./ (U0 .* electron_density) .* ( π*m_e*k_B/h^2 .* temperature ).^(1.5) .* exp.(-χ∞/k_B./temperature)
+    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U1 ./ U0 .* exp.(-(χ∞ - χl)/k_B./temperature)
 
-    # Ionised
-    N1 = K .* atom_density ./ (1.0 .+ K)
-
-    # Neutral
-    N0 = atom_density .- N1
-    n1 = gl./U0 .* N0 .* exp.(-χl/k_B./temperature) # ground level
-    n2 = N0 .- n1                                   # excited level
+    n3  = (c .* atom_density ./ (1.0 .+ c)) .|> u"m^-3"
+    n2 = ((atom_density .- n3) ./ (z1 ./ z2 .+ 1.0) ) .|> u"m^-3"
+    n1 = (atom_density .- n2 .- n3) .|> u"m^-3"
 
     populations[:,:,:,1] = n1
     populations[:,:,:,2] = n2
-    populations[:,:,:,3] = N1
+    populations[:,:,:,3] = n3
+
+    println(minimum(n1))
+    println(minimum(n2))
+    println(minimum(n3))
+    println(maximum(n1))
+    println(maximum(n2))
+    println(maximum(n3))
 
     return populations
 end

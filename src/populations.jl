@@ -4,7 +4,7 @@ include("rates.jl")
 function collect_initial_populations()
 
     pop = h5open(get_initial_populations_path(), "r")
-    initial_populations = read(pop, "initial_populations")u"m^-3"
+    initial_populations = read(pop, "populations")u"m^-3"
     close(pop)
 
     return initial_populations

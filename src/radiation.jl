@@ -140,8 +140,9 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
     # BF wavelengths
     for l=1:2nλ_bf
-        α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
         boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
+
+        α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                       temperature, α_continuum_abs, boundary[l,:,:])
     end
@@ -153,7 +154,6 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
         α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
         α_abs =  α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:] .+ α_line .* ε_line
-
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α_abs, boundary[l,:,:])
     end
@@ -221,15 +221,15 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     # EXTINCTION AND DESTRUCTION FROM ATOM BOUND-FREE
     # ==================================================================
     ν = c_0 ./ λ
-    n_eff = sqrt(E_∞ / (atom.χl - atom.χu)) |> u"J/J"
+    n_eff = sqrt(E_∞ / (atom.χu - atom.χl)) |> u"J/J"
 
     C31 = rates.C31
     R31 = rates.R31
-    C32 = rates.C32
+    C32 = rates.C32  #NAN
     R32 = rates.R32
 
     ε_bf_l = C31 ./ (R31 .+ C31)
-    ε_bf_u = C32 ./ (R32 .+ C32)
+    ε_bf_u = C32 ./ (R32 .+ C32) 
 
     @Threads.threads for l=1:nλ_bf
         α_bf_l = hydrogenic_bf.(ν[l], ν[nλ_bf],
@@ -246,6 +246,8 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
         α_continuum[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] .+ α_bf_u
         ε_continuum[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ (α_background[l+nλ_bf,:,:,:] .+ α_bf_u)
     end
+
+
 
     return α_continuum, ε_continuum
 end

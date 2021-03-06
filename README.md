@@ -1,10 +1,8 @@
 # SolarMCRT
 
-**This is not up to date.**
+**This README is not up to date because I am an indecisive idiot.**
 
 Simple Monte Carlo radiative transfer code to be used on solar atmosphere models.
-
-
 
 
 ## Input
@@ -67,3 +65,7 @@ The code outputs
     * Total scatterings, total_scatterings (nλ)
 
 To get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around 2 GBs of data.
+
+## Potential problems
+
+	* population ratio diverge

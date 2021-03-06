@@ -36,6 +36,9 @@ function run()
         # =============================================================================
         mcrt(atmosphere, radiation)
 
+        # =============================================================================
+        # END OF TEST MODE
+        # =============================================================================
     else
         # =============================================================================
         # LOAD ATOM
@@ -126,48 +129,4 @@ function run()
 
 end
 
-#run()
-
-
-function fix()
-    println("\n", "="^91, "\n", " "^34,
-            "SOLAR ATMOSPHERE MCRT",
-            "\n", "="^91, "\n")
-
-    # =============================================================================
-    # LOAD ATMOSPHERE DATA
-    # =============================================================================
-    print("--Loading atmosphere data..................")
-    atmosphere_parameters = collect_atmosphere_data()
-    atmosphere = Atmosphere(atmosphere_parameters...)
-    println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
-
-    # =============================================================================
-    # LOAD ATOM
-    # =============================================================================
-    print("--Loading atom.............................")
-    atom_parameters = collect_atom_data(atmosphere)
-    atom = Atom(atom_parameters...)
-    println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
-
-    # =============================================================================
-    # LOAD INITIAL POPULATIONS
-    # =============================================================================
-    print("--Loading initial populations..............")
-    populations = collect_initial_populations()
-    println("Initial populations loaded.")
-
-    original = 1
-    h5open("../../../basement/MScProject/Atmospheres/raw/bifrost_qs006023_s525_quarter.hdf5", "r") do file
-        original = read(file, "hydrogen_populations")[:,:,:,:,1]u"m^-3"
-    end
-
-    pop = LTE_populations(atom, original, atmosphere.temperature, atmosphere.electron_density)
-
-    h5open("../../../basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5", "r+") do file
-        write(file, "hydrogen_populations", ustrip.(pop))
-    end
-
-end
-
-fix()
+run()

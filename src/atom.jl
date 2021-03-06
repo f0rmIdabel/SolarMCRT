@@ -61,7 +61,7 @@ function collect_atom_data(atmosphere::Atmosphere)
     damping_const = damping_constant.(γ, ΔλD)
 
     return line,
-           χu, χl, χ∞,
+           χl, χu, χ∞,
            gu, gl, g∞,
            Z,
            λ, nλ_bb, nλ_bf,
