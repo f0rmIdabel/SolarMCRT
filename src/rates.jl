@@ -26,7 +26,7 @@ function calculate_transition_rates(atom::Atom,
     # ==================================================================
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
-    LTE_pops = LTE_populations(atom, populations, temperature, electron_density)
+    LTE_pops = collect_initial_populations()# LTE_populations(atom, populations, temperature, electron_density)
 
     # ==================================================================
     # LOAD WAVELENGTHS AND SEPERATE BB AND BF
@@ -280,7 +280,7 @@ function LTE_populations(atom::Atom,
     z2 = gu * exp.(-(χ∞ - χu)/k_B./temperature)
 
     # Partition functions
-    U0 = z1 .+ z2
+    U0 = 2.0 #z1 .+ z2
 
     c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U1 ./ U0 .* exp.(-(χ∞ - χl)/k_B./temperature)
 
@@ -292,12 +292,12 @@ function LTE_populations(atom::Atom,
     populations[:,:,:,2] = n2
     populations[:,:,:,3] = n3
 
-    println(minimum(n1))
+    """println(minimum(n1))
     println(minimum(n2))
     println(minimum(n3))
     println(maximum(n1))
     println(maximum(n2))
-    println(maximum(n3))
+    println(maximum(n3))"""
 
     return populations
 end

@@ -3,8 +3,8 @@ include("plot_parameters.jl")
 
 function run_tests()
 
-    populations = collect_initial_populations()
-    I_changed_the_LTE_calculation(populations)
+    #populations = collect_initial_populations()
+    #I_changed_the_LTE_calculation(populations)
 
     # =============================================================================
     # ATMOSPHERE
@@ -12,19 +12,18 @@ function run_tests()
     atmosphere_parameters = collect_atmosphere_data()
     atmosphere = Atmosphere(atmosphere_parameters...)
 
-    #check_atmosphere(atmosphere)
-    #plot_atmosphere(atmosphere)
+    check_atmosphere(atmosphere)
+    plot_atmosphere(atmosphere)
 
     atmosphere_size = size(atmosphere.temperature)
-
     # =============================================================================
     # BACKGROUND RADIATION
     # =============================================================================
-    #λ = get_background_λ()
-    #radiation_parameters = collect_radiation_data(atmosphere, λ)
-    #radiationBackground = RadiationBackground(radiation_parameters...)
+    λ = get_background_λ()
+    radiation_parameters = collect_radiation_data(atmosphere, λ)
+    radiationBackground = RadiationBackground(radiation_parameters...)
 
-    #check_radiationBackground(radiationBackground, atmosphere_size)
+    check_radiationBackground(radiationBackground, atmosphere_size)
     #plot_radiationBackground(radiationBackground, atmosphere.z)
 
     # =============================================================================
@@ -33,7 +32,7 @@ function run_tests()
     atom_parameters = collect_atom_data(atmosphere)
     atom = Atom(atom_parameters...)
 
-    #check_atom(atom, atmosphere_size)
+    check_atom(atom, atmosphere_size)
 
     # =============================================================================
     # INITIAL POPULATIONS
@@ -56,10 +55,9 @@ function run_tests()
     # =============================================================================
     # RADIATION
     # =============================================================================
-    #radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
-    #radiation = Radiation(radiation_parameters...)
-
-    #check_radiation(radiation, atom, atmosphere_size)
+    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
+    radiation = Radiation(radiation_parameters...)
+    check_radiation(radiation, atom, atmosphere_size)
     #plot_radiation(radiation, atmosphere.z, atom.λ)
 end
 
@@ -71,12 +69,12 @@ atmosphere file and the initial populations file.
 function I_changed_the_LTE_calculation(populations)
 
 
-    h5open("../run/atoms/H_2lvl_LTE_populations.h5", "r+") do file
+    h5open(get_initial_populations_path(), "r+") do file
            delete_object(file, "populations")
            write(file, "populations", ustrip.(populations))
     end
 
-    h5open("../../../basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5", "r+") do file
+    h5open(get_atmosphere_path(), "r+") do file
         delete_object(file, "hydrogen_populations")
         write(file, "hydrogen_populations", ustrip.(populations))
     end

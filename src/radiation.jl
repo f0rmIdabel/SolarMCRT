@@ -111,7 +111,6 @@ function collect_radiation_data(atmosphere::Atmosphere,
     # ==================================================================
     # GET ATOM DATA
     # ==================================================================
-    populations = populations
     line = atom.line
     λ0 = line.λ0
     ΔλD = atom.doppler_width
@@ -229,7 +228,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     R32 = rates.R32
 
     ε_bf_l = C31 ./ (R31 .+ C31)
-    ε_bf_u = C32 ./ (R32 .+ C32) 
+    ε_bf_u = C32 ./ (R32 .+ C32)
 
     @Threads.threads for l=1:nλ_bf
         α_bf_l = hydrogenic_bf.(ν[l], ν[nλ_bf],
@@ -277,7 +276,7 @@ end
 Compute line extinction given an `AtomicLine` struct, `profile` defined per wavelength,
 and upper and lower population densities `n_u` and `n_l`.
 """
-function line_extinction_constant(line::AtomicLine, n_u::NumberDensity, n_l::NumberDensity)
+function line_extinction_constant(line::AtomicLine, n_l::NumberDensity, n_u::NumberDensity)
     (h * c_0 / (4 * π * line.λ0) * (n_l * line.Bij - n_u * line.Bji)) |> u"m/m"
 end
 

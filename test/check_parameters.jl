@@ -158,7 +158,6 @@ function check_atom(atom, atmosphere_size)
 end
 
 function check_populations(populations, atmosphere_size)
-
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
@@ -173,7 +172,6 @@ function check_populations(populations, atmosphere_size)
     # ===========================================================
     # NO NEGAITVE VALUES
     # ===========================================================
-    println(minimum(populations))
     @test all( Inf .> ustrip.(populations) .> 0.0 ) # divide by zero problem
 end
 
@@ -232,14 +230,14 @@ function check_rates(rates, atmosphere_size)
     @test all( Inf .> ustrip.(R12) .>= 0.0 )
     @test all( Inf .> ustrip.(R13) .>= 0.0 )
     @test all( Inf .> ustrip.(R23) .>= 0.0 )
-    @test all( Inf .> ustrip.(R21) .>= 0.0 ) #Fail
+    @test all( Inf .> ustrip.(R21) .>= 0.0 )
     @test all( Inf .> ustrip.(R31) .>= 0.0 )
     @test all( Inf .> ustrip.(R32) .>= 0.0 )
     @test all( Inf .> ustrip.(C12) .>= 0.0 )
     @test all( Inf .> ustrip.(C13) .>= 0.0 )
     @test all( Inf .> ustrip.(C23) .>= 0.0 )
-    @test all( Inf .> ustrip.(C21) .>= 0.0 ) #
-    @test all( Inf .> ustrip.(C31) .>= 0.0 ) #
+    @test all( Inf .> ustrip.(C21) .>= 0.0 )
+    @test all( Inf .> ustrip.(C31) .>= 0.0 )
     @test all( Inf .> ustrip.(C32) .>= 0.0 )
 end
 
@@ -256,25 +254,29 @@ function check_radiation(radiation, atom, atmosphere_size)
     packets = radiation.packets
     intensity_per_packet = radiation.intensity_per_packet
 
+    nz, nx, ny = atmosphere_size
     # ===========================================================
     # LOAD DATA
     # ===========================================================
     λ = atom.λ
-    nλ_bf = atom.nλ_bf
     nλ = length(λ)
-    α_line = Array{Unitful.PerLength, 4}(undef,nλ,nz,nx,ny)
 
-    for l=2nλ_bf+1:nλ
-        α_line[l,:,:,:] = line_extinction.(λ[l], atom.λ0, atom.doppler_width, atom.damping_constant, α_line_constant)
+    nλ_bb = atom.nλ_bb
+    nλ_bf = atom.nλ_bf
+    α_line = Array{PerLength, 4}(undef,nλ_bb,nz,nx,ny)
+
+    for l=1:nλ_bb
+        α_line[l,:,:,:] = line_extinction.(λ[2nλ_bf + l], atom.line.λ0, atom.doppler_width, atom.damping_constant, α_line_constant)
     end
 
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    nz, nx, ny = atmosphere_size
-    @assert size(α_continuum) = (nλ, nz, nx, ny)
-    @assert size(α_continuum) == size(ε_continuum) == size(packets)
-    @assert size(α_line_constant) = (nz, nx, ny)
+    @assert size(α_continuum) == (nλ, nz, nx, ny)
+    @assert size(α_continuum) ==  (nλ, nz, nx, ny)
+    @assert size(ε_continuum) == (nλ, nz, nx, ny)
+    @assert size(packets) == (nλ, nz, nx, ny)
+    @assert size(α_line_constant) == (nz, nx, ny)
     @assert size(ε_line) == (nz, nx, ny)
     @assert size(boundary) == (nλ, nx, ny)
     @assert length(intensity_per_packet) == nλ
@@ -285,6 +287,7 @@ function check_radiation(radiation, atom, atmosphere_size)
     @test dimension(α_continuum[1]) == Unitful.𝐋^-1
     @test dimension(ε_continuum[1]) == NoDims
     @test dimension(α_line[1]) == Unitful.𝐋^-1
+    @test dimension(α_line_constant[1]) == NoDims
     @test dimension(ε_line[1]) == NoDims
     @test dimension(boundary[1]) == NoDims
     @test dimension(packets[1]) == NoDims
@@ -293,11 +296,12 @@ function check_radiation(radiation, atom, atmosphere_size)
     # ===========================================================
     # NO NEGAITVE VALUES
     # ===========================================================
-    @test all( ustrip.(α_continuum) .>= 0.0 )
-    @test all( ustrip.(α_line) .>= 0.0 )
-    @test all( ε_continuum .>= 0.0 )
-    @test all( ε_line .>= 0.0 )
-    @test all( boundary .>= 0 )
-    @test all( packets .>= 0 )
-    @test all( ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all( Inf .> ustrip.(α_continuum) .>= 0.0 )
+    @test all( Inf .> ε_continuum .>= 0.0 )
+    @test all( Inf .> ε_line .>= 0.0 )
+    @test all( Inf .> boundary .>= 0 )
+    @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
+    @test all( Inf .> ustrip.(α_line) .>= 0.0 )
+    @test all( Inf .> packets .>= 0 )
+    @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
 end

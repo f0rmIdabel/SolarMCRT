@@ -31,13 +31,14 @@ function plot_atmosphere(atmosphere::Atmosphere)
                     xscale=:log10, legend = false)
     p4 = Plots.plot([mean_h1./total, mean_h2./total, mean_h3./total], ustrip.(z),
                      xlabel = "population density [m^-3]", ylabel = "z [m]",
-                     xscale=:log10, label=permutedims(["ground","excited","ionised"]))
+                     xscale=:log10, label=permutedims(["ground","excited","ionised"]),
+                     legendfontsize=5)
     Plots.plot(p1, p2, p3, p4, layout = (2, 2))
     Plots.png("plots/atmosphere")
 end
 
-function plot_radiationBackground(radiationBackground, z, λ)
-    λ = radiationBackground.λ
+function plot_radiationBackground(radiationBackground, z)
+    #λ = radiationBackground.λ
     z = z[1:end-1]
     α_continuum = radiationBackground.α_continuum[1,:,:,:]
     ε_continuum = radiationBackground.ε_continuum[1,:,:,:]
@@ -45,9 +46,9 @@ function plot_radiationBackground(radiationBackground, z, λ)
     packets = radiationBackground.packets[1,:,:,:]
     #intensity_per_packet = radiationBackground.intensity_per_packet
 
-    mean_α = average_column(α_continuum)
+    mean_α = average_column(ustrip.(α_continuum))u"m^-1"
     mean_ε = average_column(ε_continuum)
-    mean_packets = average_column(packets) #.* intensity_per_packet
+    mean_packets = average_column(packets)
 
     nx, ny = size(boundary)
     x = 1:nx
@@ -55,12 +56,18 @@ function plot_radiationBackground(radiationBackground, z, λ)
     f(x,y) = ustrip(z[boundary[x,y]])
 
     ENV["GKSwstype"]="nul"
-    p1 = Plots.plot(ustrip.(mean_α), z, xlabel = "α [m^-1]", ylabel = "z [m]" )
-    p2 = Plots.plot(mean_ε, z, xlabel = "ε", ylabel = "z [m]" )
-    p3 = Plots.plot(mean_packets, z, xlabel = "Thermal emission [m^-3]", ylabel = "z [m]" )
-    p4 = Plots.surface(x, y, f, zlim = [ustrip(z[end]), ustrip(z[1])], camera=(-45,camera_tilt))
+    p1 = Plots.plot(ustrip.(mean_α), ustrip.(z),
+                    xlabel = "α [m^-1]", ylabel = "z [m]",
+                    xscale=:log10, legend = false)
+    p2 = Plots.plot(mean_ε, ustrip.(z), xlabel = "ε", ylabel = "z [m]",
+                    xscale=:log10, legend = false)
+    p3 = Plots.plot(mean_packets, ustrip.(z), xlabel = "Packets", ylabel = "z [m]",
+                    xscale=:log10, legend = false)
+    p4 = Plots.surface(x, y, f,
+                      zlim = [ustrip(z[end]), ustrip(z[1])],
+                      camera=(-45,camera_tilt), legend=false)
 
-    Plots.plot(p1, p2, p3, p4, legend = false)
+    Plots.plot(p1, p2, p3, p4)
     Plots.png("plots/radiationBackground")
 end
 
