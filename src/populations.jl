@@ -12,10 +12,11 @@ end
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
                                       n::Integer,
+                                      output_path::String,
                                       criterion::Real = 1e-3)
     N = length(populations)
     error = sum( abs.(populations .- new_populations) ./populations ) ./N
-    write_error(n, error)
+    write_error(error, n, output_path)
 
     converged = false
     if error < criterion
@@ -80,22 +81,24 @@ function n1(N::Array{<:NumberDensity,3},
     return N .- n3 .- n2
 end
 
-function write_to_file(populations::Array{<:NumberDensity,4})
-    h5open("../out/output.h5", "r+") do file
-        write(file, "populations", ustrip(populations))
+function write_to_file(populations::Array{<:NumberDensity,4}, output_path::String)
+    h5open(output_path, "r+") do file
+        write(file, "iterations/populations", ustrip(populations))
     end
 end
 
-function write_error(n, error)
+function write_error(error, n, output_path)
 
     if n == 1
-        file = h5open("../out/output_error.h5", "w")
-        write(file, "error", Array{Float64,1}(undef,get_max_iterations()))
-        file["error"][1] = error
-        close(file)
+        h5open(output_path, "r+") do file
+            group = file["iterations"]
+            write(group, "error", Array{Float64,1}(undef,get_max_iterations()))
+            group["error"][1] = error
+        end
     else
-        file = h5open("../out/output_error.h5", "r+")
-        file["error"][n] = error
-        close(file)
+        h5open(output_path, "r+") do file
+            group = file["iterations"]
+            group["error"][n] = error
+        end
     end
 end

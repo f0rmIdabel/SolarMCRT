@@ -24,8 +24,8 @@ initial_populations_path  = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/at
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 50
-nλ_bf = 30
+nλ_bb = 1
+nλ_bf = 1
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -44,7 +44,7 @@ step = [1, 1, 1]
 #  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.                    #
 # ======================================================================================================== #
-target_packets = 1e7
+target_packets = 1e5
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #

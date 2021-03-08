@@ -18,7 +18,11 @@ function run()
         # =============================================================================
         # INITIALISE OUTPUT FILE
         # =============================================================================
-
+        output_path = get_output_path()
+        h5open(output_path, "w") do file
+           create_group(file, "radiation")
+           create_group(file, "MC")
+       end
 
         # =============================================================================
         # LOAD WAVELENGTH
@@ -33,13 +37,13 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = RadiationBackground(radiation_parameters...)
-        write_to_file(radiation, output_path) # creates new file
+        write_to_file(radiation, output_path)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # =============================================================================
         # SIMULATION
         # =============================================================================
-        mcrt(atmosphere, radiation)
+        mcrt(atmosphere, radiation, output_path)
 
         # =============================================================================
         # END OF TEST MODE
@@ -48,7 +52,12 @@ function run()
         # =============================================================================
         # INITIALISE OUTPUT FILE
         # =============================================================================
-
+        output_path = get_output_path()
+        h5open(output_path, "w") do file
+           create_group(file, "radiation")
+           create_group(file, "MC")
+           create_group(file, "iterations")
+       end
 
         # =============================================================================
         # LOAD ATOM
@@ -88,19 +97,19 @@ function run()
             print("--Loading radiation data...................")
             radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
             radiation = Radiation(radiation_parameters...)
-            write_to_file(radiation) # creates new file
+            write_to_file(radiation, output_path)
             println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
 
             # =============================================================================
             # SIMULATION
             # =============================================================================
-            mcrt(atmosphere, radiation, atom)
+            mcrt(atmosphere, radiation, atom, output_path)
 
             # =============================================================================
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
             print("\n--Update transition rates..................")
-            Jλ = get_Jλ()
+            Jλ = get_Jλ(output_path)
             rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Jλ)
             rates = TransitionRates(rate_parameters...)
             println("Transition rates updated.")
@@ -110,20 +119,20 @@ function run()
             # =============================================================================
             print("--Update populations.......................")
             new_populations = get_revised_populations(atom, rates, populations)
-            write_to_file(new_populations)
+            write_to_file(new_populations, output_path)
             println("Populations updated.")
 
             # =============================================================================
             # CHECK POPULATION CONVERGENCE
             # =============================================================================
-            converged = check_population_convergence(populations, new_populations, n)
+            converged = check_population_convergence(populations, new_populations, n, output_path)
             populations = copy(new_populations)
 
             if converged
-                println("--Convergence at iteration n = ", n, ". Error = ", get_error(n),"\n")
+                println("--Convergence at iteration n = ", n, ". Error = ", get_error(output_path,n),"\n")
                 break
             else
-                println("--No convergence. Error = ", get_error(n), ".\n")
+                println("--No convergence. Error = ", get_error(output_path,n), ".\n")
             end
 
             # =============================================================================

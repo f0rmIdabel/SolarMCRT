@@ -49,11 +49,13 @@ function get_nλ()
     return nλ_bb, nλ_bf
 end
 
-function get_Jλ()
-    out = h5open("../out/output.h5", "r")
-    J = read(out, "J")
-    intensity_per_packet = read(out, "intensity_per_packet")u"kW / m^2 / sr / nm"
-    close(out)
+function get_Jλ(output_path)
+    J = nothing
+    intensity_per_packet = nothing
+    h5open(output_path, "r") do file
+        J = read(file, "MC/J")
+        intensity_per_packet = read(file, "radiation/intensity_per_packet")u"kW / m^2 / sr / nm"
+    end
 
     nλ, nz, nx, ny = size(J)
     Jλ = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
@@ -65,10 +67,10 @@ function get_Jλ()
     return Jλ
 end
 
-function get_error(n)
-    out = h5open("../out/output_error.h5", "r")
-    error = read(out, "error")
-    close(out)
+function get_error(output_path, n)
+    h5open(output_path, "r") do file
+        error = read(file, "iterations/error")
+    end
     return error[n]
 end
 
@@ -100,6 +102,20 @@ function get_cut_off()
     end
 
     return cut_off
+end
+
+function get_output_path()
+
+    if test_mode()
+        path = "../out/output_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
+    else
+        nλ_bb, nλ_bf = get_nλ()
+        nλ_bb += 1-nλ_bb%2
+        nλ = 2nλ_bf + nλ_bb
+        path = "../out/output_nw" * string(nλ) * "_" * string(get_target_packets()) * "pcs.h5"
+    end
+
+    return path
 end
 
 function get_atmosphere_path()

@@ -453,23 +453,23 @@ function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
     ((h * c_0) / (χ2-χ1)) |> u"nm"
 end
 
-function write_to_file(radiation::RadiationBackground)
-    h5open("../out/output.h5", "w") do file
-        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "destruction_continuum", radiation.ε_continuum)
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+function write_to_file(radiation::RadiationBackground, output_path)
+    h5open(output_path, "r+") do file
+        write(file, "radiation/extinction_continuum", ustrip(radiation.α_continuum))
+        write(file, "radiation/destruction_continuum", radiation.ε_continuum)
+        write(file, "radiation/packets", ustrip(radiation.packets))
+        write(file, "radiation/boundary", radiation.boundary)
+        write(file, "radiation/intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end
 end
 
-function write_to_file(radiation::Radiation)
-    h5open("../out/output.h5", "w") do file
-        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "destruction_continuum", radiation.ε_continuum)
-        write(file, "destruction_line", radiation.ε_line)
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+function write_to_file(radiation::Radiation, output_path)
+    h5open(output_path, "r+") do file
+        write(file, "radiation/extinction_continuum", ustrip(radiation.α_continuum))
+        write(file, "radiation/destruction_continuum", radiation.ε_continuum)
+        write(file, "radiation/destruction_line", radiation.ε_line)
+        write(file, "radiation/packets", ustrip(radiation.packets))
+        write(file, "radiation/boundary", radiation.boundary)
+        write(file, "radiation/intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end
 end

@@ -6,7 +6,8 @@ ATOM MODE
 """
 function mcrt(atmosphere::Atmosphere,
               radiation::Radiation,
-              atom::Atom)
+              atom::Atom,
+              output_path::String)
 
     # ================================PARAMETERS==================================
     # ATMOSPHERE DATA
@@ -26,6 +27,7 @@ function mcrt(atmosphere::Atmosphere,
     boundary = radiation.boundary
     packets = radiation.packets
     max_scatterings = get_max_scatterings()
+    max_iterations = get_max_iterations()
 
     # ===================================================================
     # ATOM DATA
@@ -42,12 +44,13 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     nλ, nz, nx, ny = size(α_continuum)
 
-    # Open output file and initialise variables
-    file = h5open("../out/output.h5", "r+")
-    J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
-    write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
-    write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
-    write(file, "time", Array{Float64,1}(undef,nλ))
+    h5open(output_path, "r+") do file
+        group = file["MC"]
+        J = create_dataset(group, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(group, "total_destroyed", Array{Int64,1}(undef,nλ))
+        write(group, "total_scatterings", Array{Int64,1}(undef,nλ))
+        write(group, "time", Array{Float64,1}(undef,nλ))
+    end
 
     # Initialise placeholder variable
     J_λ = zeros(Int32, nz, nx, ny)
@@ -140,10 +143,15 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        J[λi,:,:,:] = J_λ
-        file["total_destroyed"][λi] = total_destroyed.value
-        file["total_scatterings"][λi] = total_scatterings.value
-        file["time"][λi] = et
+        h5open(output_path, "r+") do file
+            group = file["MC"]
+            J = group["J"]
+            J[λi,:,:,:] = J_λ
+            group["total_destroyed"][λi] = total_destroyed.value
+            group["total_scatterings"][λi] = total_scatterings.value
+            group["total_destroyed"][λi] = total_scatterings.value
+            group["time"][λi] = et
+        end
     end
 
     # Line wavelengths
@@ -239,15 +247,17 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        J[λi,:,:,:] = J_λ
-        file["total_destroyed"][λi] = total_destroyed.value
-        file["total_scatterings"][λi] = total_scatterings.value
-        file["time"][λi] = et
+        h5open(output_path, "r+") do file
+            group = file["MC"]
+            J = group["J"]
+            J[λi,:,:,:] = J_λ
+            group["total_destroyed"][λi] = total_destroyed.value
+            group["total_scatterings"][λi] = total_scatterings.value
+            group["total_destroyed"][λi] = total_scatterings.value
+            group["time"][λi] = et
+        end
     end
 
-    close(file)
-
-    return
 end
 
 """
@@ -394,15 +404,14 @@ function closest_edge(next_edges::Array{<:Unitful.Length, 1},
 end
 
 
-
-
 """
 TEST MODE
 Simulates the radiation field in a given atmosphere with
 a lower optical depth boundary given by a maximum τ.
 """
 function mcrt(atmosphere::Atmosphere,
-              radiation::RadiationBackground)
+              radiation::RadiationBackground,
+              output_path::String)
 
     # ==================================================================
     # ATMOSPHERE DATA
@@ -427,11 +436,13 @@ function mcrt(atmosphere::Atmosphere,
     nλ, nz, nx, ny = size(α)
 
     # Open output file and initialise variables
-    file = h5open("../out/output.h5", "r+")
-    J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
-    write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
-    write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
-    write(file, "time", Array{Float64,1}(undef,nλ))
+    h5open(output_path, "r+") do file
+        group = file["MC"]
+        J = create_dataset(group, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(group, "total_destroyed", Array{Int64,1}(undef,nλ))
+        write(group, "total_scatterings", Array{Int64,1}(undef,nλ))
+        write(group, "time", Array{Float64,1}(undef,nλ))
+    end
 
     # Initialise placeholder variable
     J_λ = zeros(Int32, nz, nx, ny)
@@ -523,13 +534,16 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        J[λi,:,:,:] = J_λ
-        file["total_destroyed"][λi] = total_destroyed.value
-        file["total_scatterings"][λi] = total_scatterings.value
-        file["time"][λi] = et
+        h5open(output_path, "r+") do file
+            group = file["MC"]
+            J = group["J"]
+            J[λi,:,:,:] = J_λ
+            group["total_destroyed"][λi] = total_destroyed.value
+            group["total_scatterings"][λi] = total_scatterings.value
+            group["total_destroyed"][λi] = total_scatterings.value
+            group["time"][λi] = et
+        end
     end
-
-    close(file)
 end
 
 """
