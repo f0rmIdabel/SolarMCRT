@@ -25,8 +25,8 @@ initial_populations_path  = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/at
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 20
-nλ_bf = 30
+nλ_bb = 15
+nλ_bf = 10
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
