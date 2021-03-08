@@ -71,6 +71,22 @@ function calculate_transition_rates(atom::Atom,
     C31 = Cij(3, 1, electron_density, temperature, LTE_pops)
     C32 = Cij(3, 2, electron_density, temperature, LTE_pops)
 
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # ==================================================================
+    @test all( Inf .> ustrip.(R12) .>= 0.0 )
+    @test all( Inf .> ustrip.(R13) .>= 0.0 )
+    @test all( Inf .> ustrip.(R23) .>= 0.0 )
+    @test all( Inf .> ustrip.(R21) .>= 0.0 )
+    @test all( Inf .> ustrip.(R31) .>= 0.0 )
+    @test all( Inf .> ustrip.(R32) .>= 0.0 )
+    @test all( Inf .> ustrip.(C12) .>= 0.0 )
+    @test all( Inf .> ustrip.(C13) .>= 0.0 )
+    @test all( Inf .> ustrip.(C23) .>= 0.0 )
+    @test all( Inf .> ustrip.(C21) .>= 0.0 )
+    @test all( Inf .> ustrip.(C31) .>= 0.0 )
+    @test all( Inf .> ustrip.(C32) .>= 0.0 )
+
     return R12, R13, R23, R21, R31, R32,
            C12, C13, C23, C21, C31, C32
 end

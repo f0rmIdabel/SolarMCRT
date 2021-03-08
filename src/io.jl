@@ -10,6 +10,7 @@ using StaticArrays
 using Unitful
 using Random
 using Printf
+using Test
 using HDF5
 
 import PhysicalConstants.CODATA2018: c_0, h, k_B, m_u, m_e, R_∞, ε_0, e
@@ -65,24 +66,10 @@ function get_Jλ()
 end
 
 function get_error(n)
-    out = h5open("../out/output.h5", "r")
+    out = h5open("../out/output_error.h5", "r")
     error = read(out, "error")
     close(out)
     return error[n]
-end
-
-function write_error(n, error)
-
-    if n == 1
-        file = h5open("../out/output.h5", "cw")
-        write(file, "error", Array{Float64,1}(undef,get_max_iterations()))
-        file["error"][1] = error
-        close(file)
-    else
-        file = h5open("../out/output.h5", "cw")
-        file["error"][n] = error
-        close(file)
-    end
 end
 
 function get_background_λ()

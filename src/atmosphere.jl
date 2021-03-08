@@ -229,5 +229,18 @@ function collect_atmosphere_data()
         end
     end
 
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # =================================================================
+    dz = z[2:end] .- z[1:end-1]
+    dx = x[2:end] .- x[1:end-1]
+    dy = y[2:end] .- y[1:end-1]
+    @test all( ustrip.(dz) .<= 0.0 )
+    @test all( ustrip.(dx) .>= 0.0 )
+    @test all( ustrip.(dy) .>= 0.0 )
+    @test all( Inf .> ustrip.(temperature) .>= 0.0 )
+    @test all( Inf .> ustrip.(electron_density) .>= 0.0 )
+    @test all( Inf .> ustrip.(hydrogen_populations) .>= 0.0 )
+
     return z, x, y, velocity, velocity_z, temperature, electron_density, hydrogen_populations
 end

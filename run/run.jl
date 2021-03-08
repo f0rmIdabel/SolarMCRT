@@ -16,6 +16,11 @@ function run()
 
     if test_mode()
         # =============================================================================
+        # INITIALISE OUTPUT FILE
+        # =============================================================================
+
+
+        # =============================================================================
         # LOAD WAVELENGTH
         # =============================================================================
         print("--Loading wavelength.......................")
@@ -28,7 +33,7 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = RadiationBackground(radiation_parameters...)
-        write_to_file(radiation) # creates new file
+        write_to_file(radiation, output_path) # creates new file
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # =============================================================================
@@ -40,6 +45,11 @@ function run()
         # END OF TEST MODE
         # =============================================================================
     else
+        # =============================================================================
+        # INITIALISE OUTPUT FILE
+        # =============================================================================
+
+
         # =============================================================================
         # LOAD ATOM
         # =============================================================================
@@ -79,7 +89,6 @@ function run()
             radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation) # creates new file
-            write_to_file(atom.λ)
             println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
 
             # =============================================================================

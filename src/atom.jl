@@ -60,6 +60,22 @@ function collect_atom_data(atmosphere::Atmosphere)
     ΔλD = doppler_width.(line.λ0, atom_weight, atmosphere.temperature)
     damping_const = damping_constant.(γ, ΔλD)
 
+    # ===========================================================
+    # NO NEGAITVE OR INFINITE VALUES
+    # ===========================================================
+    @test all( Inf > ustrip(line.Aji) >= 0.0 )
+    @test all( Inf > ustrip(line.Bji) >= 0.0 )
+    @test all( Inf > ustrip(line.Bij) >= 0.0 )
+    @test all( Inf .> ustrip.(damping_const) .>= 0.0 )
+    @test all( Inf .> ustrip.(ΔλD) .>= 0.0 )
+    @test all( Inf .> ustrip.(λ) .>= 0.0 )
+    @test Inf > ustrip(line.λ0) >= 0.0
+    @test Inf > nλ_bb >= 0
+    @test Inf > nλ_bf >= 0
+    @test ustrip(χl) == 0.0
+    @test ustrip(χu) > 0.0
+    @test χ∞ > χu
+
     return line,
            χl, χu, χ∞,
            gu, gl, g∞,
@@ -133,7 +149,7 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
             λ[center+l] = λ[center] + Δλ
         end
     elseif nλ_bb == 1
-        λ[1] = λ_bb_center
+        λ[2nλ_bf + 1] = λ_bb_center
     end
 
     return λ
@@ -145,18 +161,18 @@ function damping_constant(γ::Unitful.Frequency,
 end
 
 function write_to_file(λ::Array{<:Unitful.Length,1})
-    h5open("../out/output.h5", "cw") do file
+    h5open("../out/output.h5", "r+") do file
         write(file, "wavelength", ustrip(λ))
     end
 end
 
 function write_to_file(atom::Atom)
-    h5open("../out/output.h5", "cw") do file
+    h5open("../out/output.h5", "r+") do file
         write(file, "wavelength", ustrip(atom.λ))
         write(file, "doppler_width", ustrip(atom.doppler_width))
         write(file, "damping_constant", ustrip(atom.damping_constant))
         write(file, "nlambda_bb", atom.nλ_bb)
-        write(file, "nlambda_bb", atom.nλ_bf)
+        write(file, "nlambda_bf", atom.nλ_bf)
 
         χl::Unitful.Energy
         χu::Unitful.Energy

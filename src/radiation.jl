@@ -78,6 +78,16 @@ function collect_radiation_data(atmosphere::Atmosphere,
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
                                                                    temperature, α_continuum_abs, boundary[1,:,:])
 
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # ==================================================================
+    @test all(  Inf .> ustrip.(λ) .>= 0.0 )
+    @test all(  Inf .> ustrip.(α) .>= 0.0 )
+    @test all(  Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all(  Inf .> ε .>= 0.0 )
+    @test all(  Inf .> boundary .>= 0 )
+    @test all(  Inf .> packets .>= 0 )
+
     return λ, α, ε, boundary, packets, intensity_per_packet
 end
 
@@ -156,6 +166,18 @@ function collect_radiation_data(atmosphere::Atmosphere,
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α_abs, boundary[l,:,:])
     end
+
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # ==================================================================
+    @test all( Inf .> ustrip.(α_continuum) .>= 0.0 )
+    @test all( Inf .> ε_continuum .>= 0.0 )
+    @test all( Inf .> ε_line .>= 0.0 )
+    @test all( Inf .> boundary .>= 0 )
+    @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
+    #@test all( Inf .> ustrip.(α_line) .>= 0.0 )
+    @test all( Inf .> packets .>= 0 )
+    @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
 
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet
 end
