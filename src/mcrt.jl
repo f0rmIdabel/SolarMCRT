@@ -44,12 +44,11 @@ function mcrt(atmosphere::Atmosphere,
     # ===================================================================
     nλ, nz, nx, ny = size(α_continuum)
 
-    h5open(output_path, "r+") do file
-        group = file["MC"]
-        J = create_dataset(group, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
-        write(group, "total_destroyed", Array{Int64,1}(undef,nλ))
-        write(group, "total_scatterings", Array{Int64,1}(undef,nλ))
-        write(group, "time", Array{Float64,1}(undef,nλ))
+    h5open(output_path, "w") do file
+        J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
+        write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
+        write(file, "time", Array{Float64,1}(undef,nλ))
     end
 
     # Initialise placeholder variable
@@ -144,13 +143,11 @@ function mcrt(atmosphere::Atmosphere,
         # WRITE TO FILE
         # ===================================================================
         h5open(output_path, "r+") do file
-            group = file["MC"]
-            J = group["J"]
-            J[λi,:,:,:] = J_λ
-            group["total_destroyed"][λi] = total_destroyed.value
-            group["total_scatterings"][λi] = total_scatterings.value
-            group["total_destroyed"][λi] = total_scatterings.value
-            group["time"][λi] = et
+            file["J"][λi,:,:,:] = J_λ
+            file["total_destroyed"][λi] = total_destroyed.value
+            file["total_scatterings"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_scatterings.value
+            file["time"][λi] = et
         end
     end
 
@@ -248,13 +245,11 @@ function mcrt(atmosphere::Atmosphere,
         # WRITE TO FILE
         # ===================================================================
         h5open(output_path, "r+") do file
-            group = file["MC"]
-            J = group["J"]
-            J[λi,:,:,:] = J_λ
-            group["total_destroyed"][λi] = total_destroyed.value
-            group["total_scatterings"][λi] = total_scatterings.value
-            group["total_destroyed"][λi] = total_scatterings.value
-            group["time"][λi] = et
+            file["J"][λi,:,:,:] = J_λ
+            file["total_destroyed"][λi] = total_destroyed.value
+            file["total_scatterings"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_scatterings.value
+            file["time"][λi] = et
         end
     end
 
@@ -436,12 +431,11 @@ function mcrt(atmosphere::Atmosphere,
     nλ, nz, nx, ny = size(α)
 
     # Open output file and initialise variables
-    h5open(output_path, "r+") do file
-        group = file["MC"]
-        J = create_dataset(group, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
-        write(group, "total_destroyed", Array{Int64,1}(undef,nλ))
-        write(group, "total_scatterings", Array{Int64,1}(undef,nλ))
-        write(group, "time", Array{Float64,1}(undef,nλ))
+    h5open(output_path, "w") do file
+        J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(file, "total_destroyed", Array{Int64,1}(undef,nλ))
+        write(file, "total_scatterings", Array{Int64,1}(undef,nλ))
+        write(file, "time", Array{Float64,1}(undef,nλ))
     end
 
     # Initialise placeholder variable
@@ -534,14 +528,12 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        h5open(output_path, "r+") do file
-            group = file["MC"]
-            J = group["J"]
-            J[λi,:,:,:] = J_λ
-            group["total_destroyed"][λi] = total_destroyed.value
-            group["total_scatterings"][λi] = total_scatterings.value
-            group["total_destroyed"][λi] = total_scatterings.value
-            group["time"][λi] = et
+        h5open(output_path, "w") do file
+            file["J"][λi,:,:,:] = J_λ
+            file["total_destroyed"][λi] = total_destroyed.value
+            file["total_scatterings"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_scatterings.value
+            file["time"][λi] = et
         end
     end
 end

@@ -13,19 +13,26 @@ test_mode = false
 background_wavelength = 500.0
 
 # ======================================================================================================== #
-#  Paths to atmosphere and atom data, as well as the initial atom populations.                             #
-#  bifrost_cb24bih_s385_fullv.ncdf                                                                         #
+#  Path to atmosphere data (bifrost_cb24bih_s385_fullv.ncdf )                                              #
 # ======================================================================================================== #
-atmosphere_path           = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
-atom_path                 = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl.h5"
-initial_populations_path  = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl_LTE_populations.h5"
+atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
+
+# ======================================================================================================== #
+#  Path to atom data.                                                                                      #
+# ======================================================================================================== #
+atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl.h5"
+
+# ======================================================================================================== #
+#  Initial population distribution. Choose between "LTE" and "zero_radiation".                             #
+# ======================================================================================================== #
+population_distribution = "LTE"
 
 # ======================================================================================================== #
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 1
-nλ_bf = 1
+nλ_bb = 1 
+nλ_bf = 3
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #

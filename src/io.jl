@@ -33,6 +33,16 @@ function test_mode()
     return tm
 end
 
+function get_population_distribution()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("population_distribution", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    distribution = string(file[i+1:j-1])
+    return distribution
+end
+
 function get_nλ()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("nλ_bb", input_file)[end] + 1
@@ -49,12 +59,10 @@ function get_nλ()
     return nλ_bb, nλ_bf
 end
 
-function get_Jλ(output_path)
+function get_Jλ(output_path, intensity_per_packet)
     J = nothing
-    intensity_per_packet = nothing
     h5open(output_path, "r") do file
-        J = read(file, "MC/J")
-        intensity_per_packet = read(file, "radiation/intensity_per_packet")u"kW / m^2 / sr / nm"
+        J = read(file, "J")
     end
 
     nλ, nz, nx, ny = size(J)
@@ -68,8 +76,9 @@ function get_Jλ(output_path)
 end
 
 function get_error(output_path, n)
+    error = nothing
     h5open(output_path, "r") do file
-        error = read(file, "iterations/error")
+        error = read(file, "error")
     end
     return error[n]
 end

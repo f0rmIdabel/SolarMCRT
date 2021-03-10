@@ -25,13 +25,15 @@ function run_tests(check=true, plot=false)
     # =============================================================================
     # INITIAL POPULATIONS
     # =============================================================================
-    populations = collect_initial_populations()
+    populations = collect_initial_populations(atom, atmosphere.temperature,
+                                                    atmosphere.electron_density)
 
     # =============================================================================
     # INITIAL TRANSITION RATES
     # =============================================================================
     Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
-    rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Bλ)
+    rate_parameters = calculate_transition_rates(atom, atmosphere.temperature,
+                                                       atmosphere.electron_density, Bλ)
     rates = TransitionRates(rate_parameters...)
 
     # =============================================================================
@@ -92,7 +94,7 @@ function update_population_input()
     old_populations = collect_initial_populations()
     populations = LTE_populations(atom, old_populations, atmosphere.temperature, atmosphere.electron_density)
 
-    """h5open(get_initial_populations_path(), "r+") do file
+    h5open(get_initial_populations_path(), "r+") do file
         delete_object(file, "populations")
         write(file, "populations", ustrip.(populations))
     end
@@ -100,8 +102,8 @@ function update_population_input()
     h5open(get_atmosphere_path(), "r+") do file
         delete_object(file, "hydrogen_populations")
         write(file, "hydrogen_populations", ustrip.(populations))
-    end"""
-
-    println(minimum(old_populations))
-    println(minimum(populations))
+    end
 end
+
+
+#update_population_input()

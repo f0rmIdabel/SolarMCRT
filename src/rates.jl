@@ -17,16 +17,14 @@ struct TransitionRates
 end
 
 function calculate_transition_rates(atom::Atom,
-                                    atmosphere::Atmosphere,
-                                    populations::Array{<:NumberDensity, 4},
+                                    temperature::Array{<:Unitful.Temperature, 3},
+                                    electron_density::Array{<:NumberDensity,3},
                                     J::Array{<:UnitsIntensity_λ, 4})
 
     # ==================================================================
     # LOAD ATMOSPHERE PARAMETERS
     # ==================================================================
-    temperature = atmosphere.temperature
-    electron_density = atmosphere.electron_density
-    LTE_pops = collect_initial_populations()# LTE_populations(atom, populations, temperature, electron_density)
+    LTE_pops = LTE_populations(atom, temperature, electron_density)
 
     # ==================================================================
     # LOAD WAVELENGTHS AND SEPERATE BB AND BF
@@ -222,8 +220,8 @@ function Gij(i::Integer,
     return G
 end
 
-function Cij(n_i::Integer,
-             n_j::Integer,
+function Cij(i::Integer,
+             j::Integer,
              electron_density::Array{<:NumberDensity,3},
              temperature::Array{<:Unitful.Temperature,3},
              LTE_populations::Array{<:NumberDensity,4})
@@ -231,22 +229,21 @@ function Cij(n_i::Integer,
     ionisation_level = size(LTE_populations)[end]
 
     # If UP
-    if n_i < n_j
-        if n_j < ionisation_level
-            C = coll_exc_hydrogen_johnson.(n_i, n_j, electron_density, temperature)
-        elseif n_j == ionisation_level
-            C = coll_ion_hydrogen_johnson.(n_i, electron_density, temperature)
+    if i < j
+        if j < ionisation_level
+            C = coll_exc_hydrogen_johnson.(i, j, electron_density, temperature)
+        elseif j == ionisation_level
+            C = coll_ion_hydrogen_johnson.(i, electron_density, temperature)
         end
 
     # If DOWN
-    elseif n_i > n_j
-        if n_i < ionisation_level
-            C = coll_exc_hydrogen_johnson.(n_j, n_i, electron_density, temperature)
-        elseif n_i == ionisation_level
-            C = coll_ion_hydrogen_johnson.(n_j, electron_density, temperature)
+    elseif i > j
+        if i < ionisation_level
+            C = coll_exc_hydrogen_johnson.(j, i, electron_density, temperature)
+        elseif i == ionisation_level
+            C = coll_ion_hydrogen_johnson.(j, electron_density, temperature)
         end
-
-        C = C .* ( LTE_populations[:,:,:,n_i] ./ LTE_populations[:,:,:,n_j] )
+        C = C .* ( LTE_populations[:,:,:,i] ./ LTE_populations[:,:,:,j] )
     end
 
     return C
@@ -275,7 +272,6 @@ end
 
 
 function LTE_populations(atom::Atom,
-                         populations::Array{<:NumberDensity, 4},
                          temperature::Array{<:Unitful.Temperature, 3},
                          electron_density::Array{<:NumberDensity, 3})
 
@@ -285,20 +281,17 @@ function LTE_populations(atom::Atom,
     gl = atom.gl
     gu = atom.gu
     g∞ = atom.g∞
-    U0 = 2.0 #U0 = atom.U0
-    U1 = 1.0 #U1 = atom.U1
+    U0 = atom.U0
+    U1 = atom.U1
 
-    atom_density = sum(populations, dims=4)[:,:,:,1]
+    atom_density = atom.density
     nz, nx, ny = size(temperature)
     populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
 
-    z1 = gl * exp.(-(χ∞ - χl)/k_B./temperature)
-    z2 = gu * exp.(-(χ∞ - χu)/k_B./temperature)
+    z1 = gl * exp.( -χl/k_B./temperature)
+    z2 = gu * exp.(- χu/k_B./temperature)
 
-    # Partition functions
-    U0 = 2.0 #z1 .+ z2
-
-    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U1 ./ U0 .* exp.(-(χ∞ - χl)/k_B./temperature)
+    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U1 ./ U0 .* exp.(-χ∞/k_B./temperature)
 
     n3  = (c .* atom_density ./ (1.0 .+ c)) .|> u"m^-3"
     n2 = ((atom_density .- n3) ./ (z1 ./ z2 .+ 1.0) ) .|> u"m^-3"
@@ -308,12 +301,6 @@ function LTE_populations(atom::Atom,
     populations[:,:,:,2] = n2
     populations[:,:,:,3] = n3
 
-    """println(minimum(n1))
-    println(minimum(n2))
-    println(minimum(n3))
-    println(maximum(n1))
-    println(maximum(n2))
-    println(maximum(n3))"""
 
     return populations
 end

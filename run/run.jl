@@ -19,10 +19,6 @@ function run()
         # INITIALISE OUTPUT FILE
         # =============================================================================
         output_path = get_output_path()
-        h5open(output_path, "w") do file
-           create_group(file, "radiation")
-           create_group(file, "MC")
-       end
 
         # =============================================================================
         # LOAD WAVELENGTH
@@ -53,11 +49,6 @@ function run()
         # INITIALISE OUTPUT FILE
         # =============================================================================
         output_path = get_output_path()
-        h5open(output_path, "w") do file
-           create_group(file, "radiation")
-           create_group(file, "MC")
-           create_group(file, "iterations")
-       end
 
         # =============================================================================
         # LOAD ATOM
@@ -71,7 +62,8 @@ function run()
         # LOAD INITIAL POPULATIONS
         # =============================================================================
         print("--Loading initial populations..............")
-        populations = collect_initial_populations()
+        populations = collect_initial_populations(atom, atmosphere.temperature,
+                                                        atmosphere.electron_density)
         println("Initial populations loaded.")
 
         # =============================================================================
@@ -79,7 +71,8 @@ function run()
         # =============================================================================
         print("--Loading initial transition rates.........")
         Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
-        rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Bλ)
+        rate_parameters = calculate_transition_rates(atom, atmosphere.temperature,
+                                                           atmosphere.electron_density, Bλ)
         rates = TransitionRates(rate_parameters...)
         println("Initial transition rates loaded.")
 
@@ -97,7 +90,6 @@ function run()
             print("--Loading radiation data...................")
             radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
             radiation = Radiation(radiation_parameters...)
-            write_to_file(radiation, output_path)
             println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
 
             # =============================================================================
@@ -109,8 +101,9 @@ function run()
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
             print("\n--Update transition rates..................")
-            Jλ = get_Jλ(output_path)
-            rate_parameters = calculate_transition_rates(atom, atmosphere, populations, Jλ)
+            Jλ = get_Jλ(output_path, radiation.intensity_per_packet)
+            rate_parameters = calculate_transition_rates(atom, atmosphere.temperature,
+                                                               atmosphere.electron_density, Jλ)
             rates = TransitionRates(rate_parameters...)
             println("Transition rates updated.")
 
@@ -118,21 +111,23 @@ function run()
             # CALCULATE NEW POPULATIONS
             # =============================================================================
             print("--Update populations.......................")
-            new_populations = get_revised_populations(atom, rates, populations)
-            write_to_file(new_populations, output_path)
+            new_populations = get_revised_populations(rates, atom.density)
             println("Populations updated.")
 
             # =============================================================================
             # CHECK POPULATION CONVERGENCE
             # =============================================================================
-            converged = check_population_convergence(populations, new_populations, n, output_path)
+            converged, error = check_population_convergence(populations, new_populations, output_path)
             populations = copy(new_populations)
 
             if converged
-                println("--Convergence at iteration n = ", n, ". Error = ", get_error(output_path,n),"\n")
+                println(@sprintf("--Convergence at iteration n = %d. Error = %.1e.\n", n, error))
+                write_to_file(atom, output_path)
+                write_to_file(radiation, output_path)
+                write_to_file(new_populations, output_path)
                 break
             else
-                println("--No convergence. Error = ", get_error(output_path,n), ".\n")
+                println(@sprintf("\n--No convergence. Error = %.1e.\n", error))
             end
 
             # =============================================================================
@@ -144,7 +139,6 @@ function run()
         # END OF ATOM MODE
         # =============================================================================
     end
-
 end
 
 run()

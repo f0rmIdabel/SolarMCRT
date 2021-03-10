@@ -1,34 +1,53 @@
 include("rates.jl")
 
-function collect_initial_populations()
+function collect_initial_populations(atom::Atom,
+                                     temperature::Array{<:Unitful.Temperature, 3},
+                                     electron_density::Array{<:NumberDensity,3})
 
-    pop = h5open(get_initial_populations_path(), "r")
-    initial_populations = read(pop, "populations")u"m^-3"
-    close(pop)
+    density = atom.density
+    population_mode = get_population_distribution()
+
+    if population_mode == "LTE"
+        initial_populations = LTE_populations(atom, temperature, electron_density)
+    elseif population_mode == "zero_radiation"
+        initial_populations = zero_radiation_populations(atom, temperature, electron_density)
+    end
 
     return initial_populations
 end
 
+
+function zero_radiation_populations(atom::Atom,
+                                    temperature::Array{<:Unitful.Temperature, 3},
+                                    electron_density::Array{<:NumberDensity,3})
+    nλ = length(atom.λ)
+    nz,nx,ny = size(temperature)
+
+    J0 = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
+    rates0 = TransitionRates(calculate_transition_rates(atom, temperature, electron_density, J0)...)
+    populations = get_revised_populations(rates0, atom.density)
+    return populations
+end
+
+
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
-                                      new_populations::Array{<:NumberDensity, 4},
-                                      n::Integer,
+                                      new_populations::Array{<:NumberDensity, 4}
                                       output_path::String,
                                       criterion::Real = 1e-3)
     N = length(populations)
     error = sum( abs.(populations .- new_populations) ./populations ) ./N
-    write_error(error, n, output_path)
 
     converged = false
     if error < criterion
         converged = true
     end
 
-    return converged
+    return converged, error
 end
 
-function get_revised_populations(atom::Atom,
-                                 rates::TransitionRates,
-                                 populations::Array{<:NumberDensity, 4})
+
+function get_revised_populations(rates::TransitionRates,
+                                 atom_density::Array{<:NumberDensity, 3})
 
     # Transition probabilities
     P12 = rates.R12 .+ rates.C12
@@ -38,18 +57,19 @@ function get_revised_populations(atom::Atom,
     P31 = rates.R31 .+ rates.C31
     P32 = rates.R32 .+ rates.C32
 
-    nz, nx, ny, nl = size(populations)
-    revised_populations = Array{Float64, 4}(undef, nz, nx, ny, nl)u"m^-3"
+    nz, nx, ny = size(P12)
+    revised_populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
 
-    atom_density = sum(populations, dims=4)[:,:,:,1]
     revised_populations[:,:,:,3] = n3(atom_density, P12, P13, P21, P23, P31, P32)
     revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
 
     @test all( Inf .> ustrip.(revised_populations) .> 0.0 )
+    @test all( sum(revised_populations, dims=4)[:,:,:,1] .≈ atom_density )
 
     return revised_populations
 end
+
 
 function n3(N::Array{<:NumberDensity,3},
             P12::Array{<:Unitful.Frequency,3},
@@ -81,24 +101,25 @@ function n1(N::Array{<:NumberDensity,3},
     return N .- n3 .- n2
 end
 
-function write_to_file(populations::Array{<:NumberDensity,4}, output_path::String)
+function write_to_file(populations::Array{<:NumberDensity,4},
+                       output_path::String)
     h5open(output_path, "r+") do file
         write(file, "iterations/populations", ustrip(populations))
     end
 end
 
-function write_error(error, n, output_path)
+function write_error(error::Float64,
+                     n::Int64,
+                     output_path::String)
 
     if n == 1
         h5open(output_path, "r+") do file
-            group = file["iterations"]
-            write(group, "error", Array{Float64,1}(undef,get_max_iterations()))
-            group["error"][1] = error
+            write(file, "error", Array{Float64,1}(undef, get_max_iterations()))
+            file["error"][1] = error
         end
     else
         h5open(output_path, "r+") do file
-            group = file["iterations"]
-            group["error"][n] = error
+            file["error"][n] = error
         end
     end
 end

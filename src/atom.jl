@@ -8,6 +8,8 @@ struct Atom
     gl::Int64
     gu::Int64
     g∞::Int64
+    U0::Float64
+    U1::Float64
     Z::Int64
 
     λ::Array{<:Unitful.Length, 1}                    # (nλ)
@@ -16,6 +18,7 @@ struct Atom
 
     doppler_width::Array{<:Unitful.Length, 3}      # (nz, nx, ny)
     damping_constant::Array{<:PerArea,3}             # (nz, nx, ny)
+    density::Array{<:NumberDensity}
 end
 
 """
@@ -37,6 +40,9 @@ function collect_atom_data(atmosphere::Atmosphere)
     f_value = read(atom, "f_value")
     atom_weight = read(atom, "atom_weight")u"kg"
     Z = read(atom, "Z")
+    U0 = read(atom, "U_neutral")
+    U1 = read(atom, "U_ionised")
+    density = read(atom, "density")u"m^-3"
     close(atom)
 
     line = AtomicLine(χu, χl, χ∞, gu, gl, f_value, atom_weight, Z)
@@ -53,11 +59,22 @@ function collect_atom_data(atmosphere::Atmosphere)
     λ = sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
 
     # ==================================================================
-    # CALCULATE LINE-ATMOSPHERE QUANTITIES
+    # CALCULATE DAMPING AND DOPPLER WIDTH
     # ==================================================================
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    neutral_hydrogen_density = atmosphere.hydrogen_populations[:,:,:,1] .+
+                               atmosphere.hydrogen_populations[:,:,:,2]
+
     unsold_const = γ_unsold_const(line)
-    γ = γ_unsold.(unsold_const, atmosphere.temperature, atmosphere.hydrogen_populations[:,:,:,1]) .+ line.Aji
-    ΔλD = doppler_width.(line.λ0, atom_weight, atmosphere.temperature)
+    #quad_stark_const = const_quadratic_stark(line)
+
+    γ = γ_unsold.(unsold_const, temperature, neutral_hydrogen_density)
+    γ .+= line.Aji
+    #γ .+= γ_linear_stark.(electron_density, 3, 2)
+    #γ .+= γ_quadratic_stark.(electron_density, temperature, quad_stark_const)
+
+    ΔλD = doppler_width.(line.λ0, atom_weight, temperature)
     damping_const = damping_constant.(γ, ΔλD)
 
     # ===========================================================
@@ -79,9 +96,10 @@ function collect_atom_data(atmosphere::Atmosphere)
     return line,
            χl, χu, χ∞,
            gu, gl, g∞,
-           Z,
+           U0, U1, Z,
            λ, nλ_bb, nλ_bf,
-           ΔλD, damping_const
+           ΔλD, damping_const,
+           density
 end
 
 function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
@@ -166,24 +184,10 @@ function write_to_file(λ::Array{<:Unitful.Length,1})
     end
 end
 
-function write_to_file(atom::Atom)
-    h5open("../out/output.h5", "r+") do file
+function write_to_file(atom::Atom, output_path::String)
+    h5open(output_path, "r+") do file
         write(file, "wavelength", ustrip(atom.λ))
-        write(file, "doppler_width", ustrip(atom.doppler_width))
-        write(file, "damping_constant", ustrip(atom.damping_constant))
         write(file, "nlambda_bb", atom.nλ_bb)
         write(file, "nlambda_bf", atom.nλ_bf)
-
-        χl::Unitful.Energy
-        χu::Unitful.Energy
-        χ∞::Unitful.Energy
-        gl::Int64
-        gu::Int64
-        g∞::Int64
-        Z::Int64
-
-        λ::Array{<:Unitful.Length, 1}                    # (nλ)
-        nλ_bb::Int64
-        nλ_bf::Int64
     end
 end

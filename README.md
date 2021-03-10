@@ -1,6 +1,6 @@
 # SolarMCRT
 
-**This README is not up to date because I am an indecisive idiot.**
+**This README is not up to date :)**
 
 Simple Monte Carlo radiative transfer code to be used on solar atmosphere models.
 

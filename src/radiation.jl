@@ -212,12 +212,13 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     ε_continuum = Array{Float64,4}(undef, nλ, nz, nx, ny)
 
     proton_density = hydrogen_populations[:,:,:,end]
-    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+    hydrogen_ground_density = hydrogen_populations[:,:,:,1]
+    hydrogen_neutral_density = hydrogen_populations[:,:,:,1] .+ hydrogen_populations[:,:,:,2]
 
     # Background at bound-free wavelengths
     @Threads.threads for l=1:2*nλ_bf
-        α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-        α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_popuplation)
+        α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_neutral_density, proton_density)
+        α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
 
         α_background[l,:,:,:] = α_scatt .+ α_abs
         ε_background[l,:,:,:] = α_abs ./ α_background[l,:,:,:]
@@ -228,8 +229,8 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     # ==================================================================
 
     # Assume constant background over line profile wavelengths
-    α_abs = α_cont_abs.(λ0, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_scatt =  α_cont_scatt.(λ0, electron_density, hydrogen_ground_popuplation)
+    α_abs = α_cont_abs.(λ0, temperature, electron_density, hydrogen_neutral_density, proton_density)
+    α_scatt =  α_cont_scatt.(λ0, electron_density, hydrogen_ground_density)
     α_background_line = α_abs .+ α_scatt
     ε_background_line = α_abs ./ α_background_line
 
@@ -246,7 +247,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
 
     C31 = rates.C31
     R31 = rates.R31
-    C32 = rates.C32  #NAN
+    C32 = rates.C32
     R32 = rates.R32
 
     ε_bf_l = C31 ./ (R31 .+ C31)
@@ -267,8 +268,6 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
         α_continuum[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] .+ α_bf_u
         ε_continuum[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ (α_background[l+nλ_bf,:,:,:] .+ α_bf_u)
     end
-
-
 
     return α_continuum, ε_continuum
 end
@@ -310,14 +309,14 @@ Credit: Tiago
 function α_cont_abs(λ::Unitful.Length,
                     temperature::Unitful.Temperature,
                     electron_density::NumberDensity,
-                    h_ground_density::NumberDensity,
+                    h_neutral_density::NumberDensity,
                     proton_density::NumberDensity)
 
-    α = Transparency.hminus_ff_stilley(λ, temperature, h_ground_density, electron_density)
-    α += Transparency.hminus_bf_geltman(λ, temperature, h_ground_density, electron_density)
+    α = Transparency.hminus_ff_stilley(λ, temperature, h_neutral_density, electron_density)
+    α += Transparency.hminus_bf_geltman(λ, temperature, h_neutral_density, electron_density)
     α += hydrogenic_ff(c_0 / λ, temperature, electron_density, proton_density, 1)
-    α += h2plus_ff(λ, temperature, h_ground_density, proton_density)
-    α += h2plus_bf(λ, temperature, h_ground_density, proton_density)
+    α += h2plus_ff(λ, temperature, h_neutral_density, proton_density)
+    α += h2plus_bf(λ, temperature, h_neutral_density, proton_density)
     return α
 end
 
@@ -455,21 +454,21 @@ end
 
 function write_to_file(radiation::RadiationBackground, output_path)
     h5open(output_path, "r+") do file
-        write(file, "radiation/extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "radiation/destruction_continuum", radiation.ε_continuum)
-        write(file, "radiation/packets", ustrip(radiation.packets))
-        write(file, "radiation/boundary", radiation.boundary)
-        write(file, "radiation/intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
+        write(file, "destruction_continuum", radiation.ε_continuum)
+        write(file, "packets", ustrip(radiation.packets))
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end
 end
 
 function write_to_file(radiation::Radiation, output_path)
     h5open(output_path, "r+") do file
-        write(file, "radiation/extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "radiation/destruction_continuum", radiation.ε_continuum)
-        write(file, "radiation/destruction_line", radiation.ε_line)
-        write(file, "radiation/packets", ustrip(radiation.packets))
-        write(file, "radiation/boundary", radiation.boundary)
-        write(file, "radiation/intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
+        write(file, "destruction_continuum", radiation.ε_continuum)
+        write(file, "destruction_line", radiation.ε_line)
+        write(file, "packets", ustrip(radiation.packets))
+        write(file, "boundary", radiation.boundary)
+        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
     end
 end
