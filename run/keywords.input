@@ -15,12 +15,12 @@ background_wavelength = 500.0
 # ======================================================================================================== #
 #  Path to atmosphere data (bifrost_cb24bih_s385_fullv.ncdf )                                              #
 # ======================================================================================================== #
-atmosphere_path = "/mn/stornext/u3/idarhan/basement/MScProject/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
+atmosphere_path = "/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
 
 # ======================================================================================================== #
 #  Path to atom data.                                                                                      #
 # ======================================================================================================== #
-atom_path = "/mn/stornext/u3/idarhan/MScProject/SolarMCRT/run/atoms/H_2lvl.h5"
+atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_2lvl.h5"
 
 # ======================================================================================================== #
 #  Initial population distribution. Choose between "LTE" and "zero_radiation".                             #
@@ -31,8 +31,14 @@ population_distribution = "LTE"
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 1 
-nλ_bf = 3
+nλ_bb = 5
+nλ_bf = 5
+
+# ======================================================================================================== #
+#  The intended number of packets to be created for each wavelength.                                       #
+#  Deviates from the actual number, as packets are not perfectly divided between boxes.                    #
+# ======================================================================================================== #
+target_packets = 1e5
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -46,12 +52,6 @@ cut_off = 20.0
 start = [1, 1, 1]
 stop = [end, end, end]
 step = [1, 1, 1]
-
-# ======================================================================================================== #
-#  The intended number of packets to be created for each wavelength.                                       #
-#  Deviates from the actual number, as packets are not perfectly divided between boxes.                    #
-# ======================================================================================================== #
-target_packets = 1e5
 
 # ======================================================================================================== #
 #  Maximum number of scatterings before quitting.                                                          #

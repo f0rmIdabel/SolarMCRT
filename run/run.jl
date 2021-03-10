@@ -33,13 +33,13 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ)
         radiation = RadiationBackground(radiation_parameters...)
-        write_to_file(radiation, output_path)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # =============================================================================
         # SIMULATION
         # =============================================================================
         mcrt(atmosphere, radiation, output_path)
+        write_to_file(radiation, output_path)
 
         # =============================================================================
         # END OF TEST MODE

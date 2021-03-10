@@ -528,7 +528,7 @@ function mcrt(atmosphere::Atmosphere,
         # ===================================================================
         # WRITE TO FILE
         # ===================================================================
-        h5open(output_path, "w") do file
+        h5open(output_path, "r+") do file
             file["J"][λi,:,:,:] = J_λ
             file["total_destroyed"][λi] = total_destroyed.value
             file["total_scatterings"][λi] = total_scatterings.value

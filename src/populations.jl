@@ -31,7 +31,7 @@ end
 
 
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
-                                      new_populations::Array{<:NumberDensity, 4}
+                                      new_populations::Array{<:NumberDensity, 4},
                                       output_path::String,
                                       criterion::Real = 1e-3)
     N = length(populations)

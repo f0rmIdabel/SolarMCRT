@@ -66,13 +66,14 @@ function collect_atom_data(atmosphere::Atmosphere)
     neutral_hydrogen_density = atmosphere.hydrogen_populations[:,:,:,1] .+
                                atmosphere.hydrogen_populations[:,:,:,2]
 
-    unsold_const = γ_unsold_const(line)
-    #quad_stark_const = const_quadratic_stark(line)
+    #unsold_const = γ_unsold_const(line)
+    unsold_const = const_unsold(line)
+    quad_stark_const = const_quadratic_stark(line)
 
     γ = γ_unsold.(unsold_const, temperature, neutral_hydrogen_density)
     γ .+= line.Aji
-    #γ .+= γ_linear_stark.(electron_density, 3, 2)
-    #γ .+= γ_quadratic_stark.(electron_density, temperature, quad_stark_const)
+    γ .+= γ_linear_stark.(electron_density, 3, 2)
+    γ .+= γ_quadratic_stark.(electron_density, temperature, stark_constant=quad_stark_const)
 
     ΔλD = doppler_width.(line.λ0, atom_weight, temperature)
     damping_const = damping_constant.(γ, ΔλD)
