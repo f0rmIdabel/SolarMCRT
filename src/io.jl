@@ -33,30 +33,96 @@ function test_mode()
     return tm
 end
 
-function get_population_distribution()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("population_distribution", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("\"", file)[end]
-    j = findfirst("\"", file[i+1:end])[end] + i
-    distribution = string(file[i+1:j-1])
-    return distribution
+function get_output_path()
+
+    if test_mode()
+        path = "../out/output_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
+    else
+        nλ_bb, nλ_bf = get_nλ()
+        nλ_bb += 1-nλ_bb%2
+        nλ = 2nλ_bf + nλ_bb
+        pop_distrib = get_population_distribution()
+        if pop_distrib == "LTE"
+            d = "_LTE"
+        elseif pop_distrib == "zero_radiation"
+            d = "_ZR"
+        end
+        path = "../out/output_nw" * string(nλ) * "_" * string(get_target_packets()) * "pcs" * d * ".h5"
+    end
+
+    return path
 end
 
-function get_nλ()
+function get_max_iterations()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("nλ_bb", input_file)[end] + 1
+    i = findfirst("max_iterations", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    nλ_bb = parse(Int64, file[i:j])
+    max_iterations = parse(Int64, file[i:j])
+    return max_iterations
+end
 
-    i = findfirst("nλ_bf", input_file)[end] + 1
+function get_error(output_path, n)
+    error = nothing
+    h5open(output_path, "r") do file
+        error = read(file, "error")
+    end
+    return error[n] # DELETE
+end
+
+# =============================================================================
+# RADIATION
+# =============================================================================
+
+function get_target_packets()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("target_packets", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    nλ_bf = parse(Int64, file[i:j])
-    return nλ_bb, nλ_bf
+    target_packets = parse(Float64, file[i:j])
+    return target_packets # move
+end
+
+function get_max_scatterings()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("max_scatterings", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    max_scatterings = parse(Float64, file[i:j])
+    return max_scatterings # move
+end
+
+function get_cut_off()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("cut_off", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+
+    cut_off = nothing
+
+    try
+        cut_off = parse(Float64, file[i:j])
+    catch
+        cut_off = parse(Bool, file[i:j])
+    end
+
+    return cut_off # move
+end
+
+function get_background_λ()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("background_wavelength", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+
+    λ = parse(Float64, file[i:j])u"nm"
+
+    return λ
 end
 
 function get_Jλ(output_path, intensity_per_packet)
@@ -75,67 +141,25 @@ function get_Jλ(output_path, intensity_per_packet)
     return Jλ
 end
 
-function get_error(output_path, n)
-    error = nothing
-    h5open(output_path, "r") do file
-        error = read(file, "error")
-    end
-    return error[n]
-end
-
-function get_background_λ()
+function get_nλ()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("background_wavelength", input_file)[end] + 1
+    i = findfirst("nλ_bb", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
+    nλ_bb = parse(Int64, file[i:j])
 
-    λ = parse(Float64, file[i:j])u"nm"
-
-    return λ
-end
-
-function get_cut_off()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("cut_off", input_file)[end] + 1
+    i = findfirst("nλ_bf", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-
-    cut_off = nothing
-
-    try
-        cut_off = parse(Float64, file[i:j])
-    catch
-        cut_off = parse(Bool, file[i:j])
-    end
-
-    return cut_off
+    nλ_bf = parse(Int64, file[i:j])
+    return nλ_bb, nλ_bf
 end
 
-function get_output_path()
-
-    if test_mode()
-        path = "../out/output_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
-    else
-        nλ_bb, nλ_bf = get_nλ()
-        nλ_bb += 1-nλ_bb%2
-        nλ = 2nλ_bf + nλ_bb
-        path = "../out/output_nw" * string(nλ) * "_" * string(get_target_packets()) * "pcs.h5"
-    end
-
-    return path
-end
-
-function get_atmosphere_path()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("atmosphere_path", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("\"", file)[end]
-    j = findfirst("\"", file[i+1:end])[end] + i
-    atmosphere_path = string(file[i+1:j-1])
-    return atmosphere_path
-end
+# =============================================================================
+# ATOM
+# =============================================================================
 
 function get_atom_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
@@ -147,6 +171,16 @@ function get_atom_path()
     return atmosphere_path
 end
 
+function get_population_distribution()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("population_distribution", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    distribution = string(file[i+1:j-1])
+    return distribution
+end
+
 function get_initial_populations_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("initial_populations_path", input_file)[end] + 1
@@ -154,37 +188,21 @@ function get_initial_populations_path()
     i = findfirst("\"", file)[end]
     j = findfirst("\"", file[i+1:end])[end] + i
     initial_populations_path = string(file[i+1:j-1])
-    return initial_populations_path
+    return initial_populations_path  # DELETE
 end
 
-function get_target_packets()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("target_packets", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-    target_packets = parse(Float64, file[i:j])
-    return target_packets
-end
+# =============================================================================
+# ATMOSPHERE
+# =============================================================================
 
-function get_max_scatterings()
+function get_atmosphere_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("max_scatterings", input_file)[end] + 1
+    i = findfirst("atmosphere_path", input_file)[end] + 1
     file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-    max_scatterings = parse(Float64, file[i:j])
-    return max_scatterings
-end
-
-function get_max_iterations()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("max_iterations", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-    max_iterations = parse(Int64, file[i:j])
-    return max_iterations
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    atmosphere_path = string(file[i+1:j-1])
+    return atmosphere_path
 end
 
 function get_step()

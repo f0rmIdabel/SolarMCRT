@@ -151,7 +151,7 @@ function plot_radiation(radiation, atom, z)
     # ===========================================================
     # LOAD RADIATION DATA
     # ===========================================================
-    α_continuum = ustrip.(radiation.α_continuum)
+    α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
     α_line_constant = radiation.α_line_constant
     ε_line = radiation.ε_line
@@ -170,11 +170,13 @@ function plot_radiation(radiation, atom, z)
     ε_total = copy(ε_continuum)
 
     for l=1:nλ_bb
-        α_line = ustrip.(line_extinction.(λ[2nλ_bf + l], atom.line.λ0, atom.doppler_width, atom.damping_constant, α_line_constant))
+        α_line = line_extinction.(λ[2nλ_bf + l], atom.line.λ0, atom.doppler_width, atom.damping_constant, α_line_constant)
 
         α_total[(2nλ_bf + l),:,:,:] += α_line
         ε_total[(2nλ_bf + l),:,:,:] = (ε_continuum[(2nλ_bf + l),:,:,:].*α_continuum[(2nλ_bf + l),:,:,:]  .+  ε_line.*α_line) ./ α_total[(2nλ_bf + l),:,:,:]
     end
+
+    α_total = ustrip.(α_total)
 
     mean_packets_bf_l = zeros(nz)
     mean_packets_bf_u = zeros(nz)
@@ -215,7 +217,11 @@ function plot_radiation(radiation, atom, z)
     end
 
     λ = ustrip.(λ)
-    #box = [70,]
+
+    c = 2nλ_bf + nλ_bb ÷ 2 + 1
+    mean_α_bb = average_column(α_total[c,:,:,:])
+    mean_α_bf_l = average_column(α_total[nλ_bf,:,:,:])
+    mean_α_bf_u = average_column(α_total[2nλ_bf,:,:,:])
 
     ENV["GKSwstype"]="nul"
     p1 = Plots.plot([mean_α_bb, mean_α_bf_l, mean_α_bf_u ], ustrip.(z),

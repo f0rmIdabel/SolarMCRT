@@ -152,7 +152,7 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
     if nλ_bb > 1
         vmicro_char = 2.5u"km/s"
 
-        n = nλ_bb#/2 # Questionable
+        n = nλ_bb/2 # Questionable
         β = qwing/(2*qcore)
         y = β + sqrt(β*β + (β - 1.0)*n + 2.0 - 3.0*β)
         b = 2.0*log(y) / (n - 1)

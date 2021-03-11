@@ -7,6 +7,7 @@ ATOM MODE
 function mcrt(atmosphere::Atmosphere,
               radiation::Radiation,
               atom::Atom,
+              max_scatterings::Real,
               output_path::String)
 
     # ================================PARAMETERS==================================
@@ -26,8 +27,6 @@ function mcrt(atmosphere::Atmosphere,
     ε_line = radiation.ε_line
     boundary = radiation.boundary
     packets = radiation.packets
-    max_scatterings = get_max_scatterings()
-    max_iterations = get_max_iterations()
 
     # ===================================================================
     # ATOM DATA
@@ -146,7 +145,7 @@ function mcrt(atmosphere::Atmosphere,
             file["J"][λi,:,:,:] = J_λ
             file["total_destroyed"][λi] = total_destroyed.value
             file["total_scatterings"][λi] = total_scatterings.value
-            file["total_destroyed"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_destroyed.value
             file["time"][λi] = et
         end
     end
@@ -248,11 +247,10 @@ function mcrt(atmosphere::Atmosphere,
             file["J"][λi,:,:,:] = J_λ
             file["total_destroyed"][λi] = total_destroyed.value
             file["total_scatterings"][λi] = total_scatterings.value
-            file["total_destroyed"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_destroyed.value
             file["time"][λi] = et
         end
     end
-
 end
 
 """
@@ -406,6 +404,7 @@ a lower optical depth boundary given by a maximum τ.
 """
 function mcrt(atmosphere::Atmosphere,
               radiation::RadiationBackground,
+              max_scatterings::Real,
               output_path::String)
 
     # ==================================================================
@@ -423,7 +422,6 @@ function mcrt(atmosphere::Atmosphere,
     ε = radiation.ε_continuum
     boundary = radiation.boundary
     packets = radiation.packets
-    max_scatterings = max_scatterings = get_max_scatterings()
 
     # ===================================================================
     # SET UP VARIABLES
@@ -532,7 +530,7 @@ function mcrt(atmosphere::Atmosphere,
             file["J"][λi,:,:,:] = J_λ
             file["total_destroyed"][λi] = total_destroyed.value
             file["total_scatterings"][λi] = total_scatterings.value
-            file["total_destroyed"][λi] = total_scatterings.value
+            file["total_destroyed"][λi] = total_destroyed.value
             file["time"][λi] = et
         end
     end

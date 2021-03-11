@@ -27,12 +27,9 @@ Collects radition data for background processes at a single wavelength
 Returns data to go into structure.
 """
 function collect_radiation_data(atmosphere::Atmosphere,
-                                λ::Unitful.Length)
-    # ==================================================================
-    # GET KEYWORD INPUT
-    # ==================================================================
-    target_packets = get_target_packets()
-    τ_max = get_cut_off()
+                                λ::Unitful.Length,
+                                τ_max::Float64,
+                                target_packets::Float64)
 
     # ==================================================================
     # GET ATMOSPHERE DATA AND WAVELENGTH
@@ -99,12 +96,9 @@ Returns data to go into structure.
 function collect_radiation_data(atmosphere::Atmosphere,
                                 atom::Atom,
                                 rates::TransitionRates,
-                                populations::Array{<:NumberDensity,4})
-   # ==================================================================
-   # GET KEYWORD INPUT
-   # ==================================================================
-    target_packets = get_target_packets()
-    τ_max = get_cut_off()
+                                populations::Array{<:NumberDensity,4},
+                                τ_max::Float64,
+                                target_packets::Float64)
 
     # ==================================================================
     # GET ATMOSPHERE DATA
@@ -175,7 +169,6 @@ function collect_radiation_data(atmosphere::Atmosphere,
     @test all( Inf .> ε_line .>= 0.0 )
     @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
-    #@test all( Inf .> ustrip.(α_line) .>= 0.0 )
     @test all( Inf .> packets .>= 0 )
     @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
 
@@ -464,11 +457,11 @@ end
 
 function write_to_file(radiation::Radiation, output_path)
     h5open(output_path, "r+") do file
-        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "destruction_continuum", radiation.ε_continuum)
-        write(file, "destruction_line", radiation.ε_line)
         write(file, "packets", ustrip(radiation.packets))
         write(file, "boundary", radiation.boundary)
         write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        #write(file, "extinction_continuum", ustrip(radiation.α_continuum))
+        #write(file, "destruction_continuum", radiation.ε_continuum)
+        #write(file, "destruction_line", radiation.ε_line)
     end
 end

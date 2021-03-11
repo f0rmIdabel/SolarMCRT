@@ -3,6 +3,9 @@ include("plot_parameters.jl")
 
 function run_tests(check=true, plot=false)
 
+    target_packets = get_target_packets()
+    cut_off = get_cut_off()
+
     # =============================================================================
     # ATMOSPHERE
     # =============================================================================
@@ -13,7 +16,7 @@ function run_tests(check=true, plot=false)
     # BACKGROUND RADIATION
     # =============================================================================
     λ = get_background_λ()
-    radiation_parameters = collect_radiation_data(atmosphere, λ)
+    radiation_parameters = collect_radiation_data(atmosphere, λ, cut_off, target_packets)
     radiationBackground = RadiationBackground(radiation_parameters...)
 
     # =============================================================================
@@ -39,7 +42,7 @@ function run_tests(check=true, plot=false)
     # =============================================================================
     # RADIATION
     # =============================================================================
-    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations)
+    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations, cut_off, target_packets)
     radiation = Radiation(radiation_parameters...)
 
     if check == true
@@ -66,7 +69,7 @@ function run_tests(check=true, plot=false)
     end
 end
 
-run_tests(true, true)
+run_tests(false, true)
 
 
 """
