@@ -22,7 +22,7 @@ The code requires an atmosphere file containing
         * temperature [K] (nz, nx, ny)
     * Densities
         * electron_density [m^-3] (nz, nx, ny)
-        * hydrogen_populations [m^-3] (nz, nx, ny, levels>=3)
+        * hydrogen_populations [m^-3] (nz, nx, ny, levels=3)
 
 When ran in full *atom mode*,  the program needs a two-level atom file containing
 
@@ -35,7 +35,7 @@ When ran in full *atom mode*,  the program needs a two-level atom file containin
 		* Ground level statistical weight, gl
 		* Second level statistical weight, gu
 		* Ionised level statistical weight, ginf
-        * Partition function neutral atom, U0
+		* Partition function neutral atom, U0
 		* Partition function ionised atom, U1
 		* Oscillator strength, f_value
 		* Atom density, density
@@ -53,19 +53,20 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-    * Wavelengths, wavelengths [nm] (nλ)
-	* Opacity, extinction [m^-1] (nλ, nz, nx, ny)
-	* Destruction probability, destruction (nλ, nz, nx, ny)
-    * Packet distribution, packets (nλ, nz, nx, ny)
-	* Sourface boundary, boundary (nλ, nx, ny)
-	* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)
+	* Radiation data
+    	* Wavelengths, wavelengths [nm] (nλ)
+		* Sourface boundary, boundary (nλ, nx, ny)
+    	* Packet distribution, packets (nλ, nz, nx, ny)
+		* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)
+	* Simulation result from every iteration
+    	* Mean radiation field, J (ni, nλ, nz, nx, ny)
+    	* Total destroyed packets, total_destroyed (ni, nλ)
+    	* Total scatterings, total_scatterings (ni, nλ)
+		* Atom populations, populations (ni, nz, nx, ny, nl)
+		* Time, time (ni, nλ)
 
-    * Mean radiation field, J (nλ, nz, nx, ny)
-    * Total destroyed packets, total_destroyed (nλ)
-    * Total scatterings, total_scatterings (nλ)
-
-To get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around 2 GBs of data.
+To get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around X GBs of data.
 
 ## Potential problems
 
-	* population ratio diverge
+	* ...

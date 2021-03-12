@@ -2,6 +2,11 @@ include("../src/mcrt.jl")
 include("../src/populations.jl")
 using Test
 
+"""
+    check_atmosphere(atmosphere::Atmosphere)
+
+Check that atmosphere data has valid units, dimensions and values.
+"""
 function check_atmosphere(atmosphere::Atmosphere)
     # ===========================================================
     # LOAD DATA
@@ -58,7 +63,14 @@ function check_atmosphere(atmosphere::Atmosphere)
     @test all( ustrip.(dy) .>= 0.0 )
 end
 
-function check_radiationBackground(radiationBackground, atmosphere_size)
+"""
+    check_radiationBackground(radiationBackground::RadiationBackground,
+                              atmosphere_size::Tuple)
+
+Check that background radiation data has valid units, dimensions and values.
+"""
+function check_radiationBackground(radiationBackground::RadiationBackground,
+                                   atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -100,7 +112,14 @@ function check_radiationBackground(radiationBackground, atmosphere_size)
     @test all(  Inf .> packets .>= 0 )
 end
 
-function check_atom(atom, atmosphere_size)
+"""
+    check_atom(atom::Atom,
+               atmosphere_size::Tuple)
+
+Check that atom data has valid units, dimensions and values.
+"""
+function check_atom(atom::Atom,
+                    atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -157,7 +176,14 @@ function check_atom(atom, atmosphere_size)
     @test χ∞ > χu
 end
 
-function check_populations(populations, atmosphere_size)
+"""
+    check_populations(populations::Array{<:NumberDensity,4},
+                      atmosphere_size::Tuple)
+
+Check that populations have valid units, dimensions and values.
+"""
+function check_populations(populations::Array{<:NumberDensity,4},
+                           atmosphere_size::Tuple)
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
@@ -172,10 +198,17 @@ function check_populations(populations, atmosphere_size)
     # ===========================================================
     # NO NEGAITVE VALUES
     # ===========================================================
-    @test all( Inf .> ustrip.(populations) .> 0.0 ) # divide by zero problem
+    @test all( Inf .> ustrip.(populations) .> 0.0 )
 end
 
-function check_rates(rates, atmosphere_size)
+"""
+    check_rates(rates::TransitionRates,
+                atmosphere_size::Tuple)
+
+Check that transition rates have valid units, dimensions and values.
+"""
+function check_rates(rates::TransitionRates,
+                     atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -241,7 +274,16 @@ function check_rates(rates, atmosphere_size)
     @test all( Inf .> ustrip.(C32) .>= 0.0 )
 end
 
-function check_radiation(radiation, atom, atmosphere_size)
+"""
+check_radiation(radiation::Radiation,
+                atom::Atom,
+                atmosphere_size::Tuple)
+
+Check that radiation data has valid units, dimensions and values.
+"""
+function check_radiation(radiation::Radiation,
+                         atom::Atom,
+                         atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
     # ===========================================================

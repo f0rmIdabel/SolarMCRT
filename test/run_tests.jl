@@ -69,44 +69,4 @@ function run_tests(check=true, plot=false)
     end
 end
 
-run_tests(false, true)
-
-
-"""
-I am not yet sure if my LTE population function works,
-so whenever I change it, I need to update the
-atmosphere file and the initial populations file.
-"""
-function update_population_input()
-
-    # =============================================================================
-    # ATMOSPHERE
-    # =============================================================================
-    atmosphere_parameters = collect_atmosphere_data()
-    atmosphere = Atmosphere(atmosphere_parameters...)
-
-    # =============================================================================
-    # ATOM
-    # =============================================================================
-    atom_parameters = collect_atom_data(atmosphere)
-    atom = Atom(atom_parameters...)
-
-    # =============================================================================
-    # INITIAL POPULATIONS
-    # =============================================================================
-    old_populations = collect_initial_populations()
-    populations = LTE_populations(atom, old_populations, atmosphere.temperature, atmosphere.electron_density)
-
-    h5open(get_initial_populations_path(), "r+") do file
-        delete_object(file, "populations")
-        write(file, "populations", ustrip.(populations))
-    end
-
-    h5open(get_atmosphere_path(), "r+") do file
-        delete_object(file, "hydrogen_populations")
-        write(file, "hydrogen_populations", ustrip.(populations))
-    end
-end
-
-
-#update_population_input()
+run_tests(true, true)
