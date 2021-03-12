@@ -460,8 +460,5 @@ function write_to_file(radiation::Radiation, output_path)
         write(file, "packets", ustrip(radiation.packets))
         write(file, "boundary", radiation.boundary)
         write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
-        #write(file, "extinction_continuum", ustrip(radiation.α_continuum))
-        #write(file, "destruction_continuum", radiation.ε_continuum)
-        #write(file, "destruction_line", radiation.ε_line)
     end
 end

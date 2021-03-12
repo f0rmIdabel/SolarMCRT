@@ -12,11 +12,12 @@ function run()
     print("--Loading atmosphere data..................")
     atmosphere_parameters = collect_atmosphere_data()
     atmosphere = Atmosphere(atmosphere_parameters...)
-    println("Atmosphere loaded with dimensions ", size(atmosphere.temperature), ".")
+    atmosphere_size = size(atmosphere.temperature)
+    println("Atmosphere loaded with dimensions ", atmosphere_size, ".")
 
     if test_mode()
         # =============================================================================
-        # INITIALISE OUTPUT FILE
+        # READ CONFIG FILE
         # =============================================================================
         output_path = get_output_path()
         max_scatterings = get_max_scatterings()
@@ -42,29 +43,29 @@ function run()
         # SIMULATION
         # =============================================================================
         mcrt(atmosphere, radiation, max_scatterings, output_path)
-        write_to_file(radiation, output_path)
 
         # =============================================================================
         # END OF TEST MODE
         # =============================================================================
     else
         # =============================================================================
-        # INITIALISE OUTPUT FILE
+        # READ CONFIG FILE
         # =============================================================================
         output_path = get_output_path()
         max_iterations = get_max_iterations()
         max_scatterings = get_max_scatterings()
         target_packets = get_target_packets()
         cut_off = get_cut_off()
-
         population_distribution = get_population_distribution()
+
         # =============================================================================
         # LOAD ATOM
         # =============================================================================
         print("--Loading atom.............................")
         atom_parameters = collect_atom_data(atmosphere)
         atom = Atom(atom_parameters...)
-        println("Atom loaded with ", atom.nλ_bb + 2*atom.nλ_bf, " wavelengths.")
+        nλ = atom.nλ_bb + 2*atom.nλ_bf
+        println("Atom loaded with ", nλ , " wavelengths.")
 
         # =============================================================================
         # LOAD INITIAL POPULATIONS
@@ -85,6 +86,15 @@ function run()
         println("Initial transition rates loaded.")
 
         # =============================================================================
+        # CREATE OUTPUT FILE
+        # =============================================================================
+        print("--Initialise output file...................")
+        create_output_file(output_path, max_iterations, nλ, atmosphere_size)
+        write_to_file(atom, output_path)
+        write_to_file(populations, 0, output_path)
+        println(@sprintf("%.1f GBs of data initialised.", how_much_data(max_iterations, nλ, atmosphere_size)))
+
+        # =============================================================================
         # RUN MCRT UNTIL POPULATIONS CONVERGE
         # =============================================================================
         converged_populations = false
@@ -102,13 +112,13 @@ function run()
             # =============================================================================
             # SIMULATION
             # =============================================================================
-            mcrt(atmosphere, radiation, atom, max_scatterings, output_path)
+            mcrt(atmosphere, radiation, atom, max_scatterings, n, output_path)
 
             # =============================================================================
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
             print("\n--Update transition rates..................")
-            Jλ = get_Jλ(output_path, radiation.intensity_per_packet)
+            Jλ = get_Jλ(output_path, n, radiation.intensity_per_packet)
             rate_parameters = calculate_transition_rates(atom, atmosphere.temperature,
                                                                atmosphere.electron_density, Jλ)
             rates = TransitionRates(rate_parameters...)
@@ -118,18 +128,17 @@ function run()
             # CALCULATE NEW POPULATIONS
             # =============================================================================
             print("--Update populations.......................")
-            new_populations = get_revised_populations(rates, atom.density)
+            new_populations = get_revised_populations(rates, atom.density, n, output_path)
             println("Populations updated.")
 
             # =============================================================================
             # CHECK POPULATION CONVERGENCE
             # =============================================================================
-            converged, error = check_population_convergence(populations, new_populations, output_path)
+            converged, error = check_population_convergence(populations, new_populations)
             populations = copy(new_populations)
 
             if converged
                 println(@sprintf("--Convergence at iteration n = %d. Error = %.1e.\n", n, error))
-                write_to_file(new_populations, output_path)
                 break
             else
                 println(@sprintf("\n--No convergence. Error = %.1e.\n", error))
@@ -140,9 +149,6 @@ function run()
             # =============================================================================
         end
 
-        write_to_file(atom, output_path)
-        write_to_file(radiation, output_path)
-
         # =============================================================================
         # END OF ATOM MODE
         # =============================================================================
@@ -150,7 +156,3 @@ function run()
 end
 
 run()
-
-function how_much_data()
-
-end

@@ -125,10 +125,10 @@ function get_background_λ()
     return λ
 end
 
-function get_Jλ(output_path, intensity_per_packet)
+function get_Jλ(output_path, iteration, intensity_per_packet)
     J = nothing
     h5open(output_path, "r") do file
-        J = read(file, "J")
+        J = read(file, "J")[iteration,:,:,:,:]
     end
 
     nλ, nz, nx, ny = size(J)
@@ -292,4 +292,85 @@ function get_start()
     start = [nz, nx, ny]
 
     return start
+end
+
+# =============================================================================
+# OUTPUT FILE
+# =============================================================================
+
+function create_output_file(output_path, max_iterations, nλ, atmosphere_size)
+
+    nz, nx, ny = atmosphere_size
+
+    h5open(output_path, "w") do file
+        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(file, "J", Array{Int32,5}(undef, max_iterations, nλ, nz, nx,ny))
+        write(file, "total_destroyed", Array{Int32,2}(undef, max_iterations, nλ))
+        write(file, "total_scatterings", Array{Int32,2}(undef,max_iterations, nλ))
+        write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
+
+        write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
+        write(file, "boundary", Array{Int32,4}(undef,max_iterations, nλ, nx, ny))
+        write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
+
+        write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
+        write(file, "error", Array{Float64,1}(undef, max_iterations))
+    end
+end
+
+
+function create_output_file(output_path, nλ, atmosphere_size)
+
+    nz, nx, ny = atmosphere_size
+
+    h5open(output_path, "w") do file
+        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        write(file, "J", Array{Int32,5}(undef, nλ, nz, nx,ny))
+        write(file, "total_destroyed", Array{Int32,2}(undef, nλ))
+        write(file, "total_scatterings", Array{Int64,2}(undef, nλ))
+        write(file, "time", Array{Float64,2}(undef, nλ))
+
+        write(file, "packets", Array{Int32,5}(undef, nλ, nz, nx, ny))
+        write(file, "boundary", Array{Int32,4}(undef, nλ, nx, ny))
+        write(file, "intensity_per_packet", Array{Float64,2}(undef, nλ))
+    end
+end
+
+
+function cut_output_file(output_path, final_iteration)
+    h5open(output_path, "w") do file
+        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+        J_new = read(file, "J")[1:final_iteration,:,:,:,:]
+        delete_object(file, "J")
+        write(file, "J", J_new)
+        # repeat....
+        write(file, "total_destroyed", Array{Int32,2}(undef, max_iterations, nλ))
+        write(file, "total_scatterings", Array{Int32,2}(undef,max_iterations, nλ))
+        write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
+
+        write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
+        write(file, "boundary", Array{Int32,4}(undef,max_iterations, nλ, nx, ny))
+        write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
+
+        write(file, "populations", Array{Float64,5}(undef, max_iterations, nz, nx, ny, 3))
+    end
+end
+
+function how_much_data(max_iterations, nλ, atmosphere_size)
+    λ_data = 8*nλ + 8*2
+
+    nz, nx, ny = atmosphere_size
+    boxes = nz*nx*ny
+    slice = nx*ny
+
+    # Iteration data
+    J_data = 4boxes*nλ
+    sim_data = 2 * 4nλ + 8nλ
+    rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
+    pop_data = 8boxes*3
+
+    min_data = ( λ_data +  J_data + sim_data + rad_data + pop_data ) /1e9
+    max_data = ( λ_data + (J_data + sim_data + rad_data + pop_data) * max_iterations ) / 1e9
+
+    return max_data
 end

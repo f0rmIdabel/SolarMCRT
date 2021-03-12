@@ -32,7 +32,6 @@ end
 
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
-                                      output_path::String,
                                       criterion::Real = 1e-3)
     N = length(populations)
     error = sum( abs.(populations .- new_populations) ./populations ) ./N
@@ -47,7 +46,9 @@ end
 
 
 function get_revised_populations(rates::TransitionRates,
-                                 atom_density::Array{<:NumberDensity, 3})
+                                 atom_density::Array{<:NumberDensity, 3},
+                                 iteration::Int64,
+                                 output_path::String)
 
     # Transition probabilities
     P12 = rates.R12 .+ rates.C12
@@ -66,6 +67,8 @@ function get_revised_populations(rates::TransitionRates,
 
     @test all( Inf .> ustrip.(revised_populations) .> 0.0 )
     @test all( sum(revised_populations, dims=4)[:,:,:,1] .≈ atom_density )
+
+    write_to_file(revised_populations, iteration, output_path)
 
     return revised_populations
 end
@@ -101,25 +104,11 @@ function n1(N::Array{<:NumberDensity,3},
     return N .- n3 .- n2
 end
 
+
 function write_to_file(populations::Array{<:NumberDensity,4},
+                       iteration::Int64,
                        output_path::String)
     h5open(output_path, "r+") do file
-        write(file, "iterations/populations", ustrip(populations))
-    end
-end
-
-function write_error(error::Float64,
-                     n::Int64,
-                     output_path::String)
-
-    if n == 1
-        h5open(output_path, "r+") do file
-            write(file, "error", Array{Float64,1}(undef, get_max_iterations()))
-            file["error"][1] = error
-        end
-    else
-        h5open(output_path, "r+") do file
-            file["error"][n] = error
-        end
+        file["populations"][iteration+1,:,:,:,:] = ustrip.(populations)
     end
 end

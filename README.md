@@ -53,17 +53,17 @@ With appropriate input parameters, the code can be executed from the run/ direct
 ## Output
 The code outputs
 
-	* Radiation data
-    	* Wavelengths, wavelengths [nm] (nλ)
-		* Sourface boundary, boundary (nλ, nx, ny)
-    	* Packet distribution, packets (nλ, nz, nx, ny)
-		* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)
 	* Simulation result from every iteration
     	* Mean radiation field, J (ni, nλ, nz, nx, ny)
     	* Total destroyed packets, total_destroyed (ni, nλ)
     	* Total scatterings, total_scatterings (ni, nλ)
 		* Atom populations, populations (ni, nz, nx, ny, nl)
 		* Time, time (ni, nλ)
+	* Radiation data from last iteration
+    	* Wavelengths, wavelengths [nm] (nλ)
+		* Sourface boundary, boundary (nλ, nx, ny)
+    	* Packet distribution, packets (nλ, nz, nx, ny)
+		* Intensity per packet, intensity_per_packet [kW / m^2 / sr / nm] (nλ)
 
 To get the radiation field in units of intensity, you need to multiply it by the intensity_per_packet variable. All output is collected in the file *output.h5* in the out/ directory. For one wavelength in a ~500x500x450 atmosphere with no cut-offs, this will be around X GBs of data.
 
