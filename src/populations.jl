@@ -65,8 +65,11 @@ function get_revised_populations(rates::TransitionRates,
     revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
 
-    @test all( Inf .> ustrip.(revised_populations) .> 0.0 )
+
     @test all( sum(revised_populations, dims=4)[:,:,:,1] .≈ atom_density )
+    @test all( Inf .> ustrip.(revised_populations[:,:,:,3]) .>= 0.0 )
+    @test all( Inf .> ustrip.(revised_populations[:,:,:,2]) .>= 0.0 )
+    @test all( Inf .> ustrip.(revised_populations[:,:,:,1]) .>= 0.0 )
 
     write_to_file(revised_populations, iteration, output_path)
 
@@ -85,6 +88,11 @@ function n3(N::Array{<:NumberDensity,3},
     b = (P32 .- P12) ./ (P21 .+ P23 .+ P12)
     c = N .* (P12 .+ P13) .- a .* (P21 .+ P12 .+ P13)
     d = b .* (P21 .+ P12 .+ P13) .+ P31 .+ P12 .+ P13
+
+    @test all( Inf .> ustrip.(c) .>= 0.0 )
+    @test all( Inf .> ustrip.(d) .>= 0.0 )
+    println(minimum(c))
+    println(minimum(d))
 
     return c ./ d
 end

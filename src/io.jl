@@ -131,6 +131,8 @@ function get_Jλ(output_path, iteration, intensity_per_packet)
         J = read(file, "J")[iteration,:,:,:,:]
     end
 
+    @test all( Inf .> J .>= 0)
+
     nλ, nz, nx, ny = size(J)
     Jλ = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
 
@@ -345,7 +347,7 @@ function cut_output_file(output_path, final_iteration)
         write(file, "J", J_new)
         # repeat....
         write(file, "total_destroyed", Array{Int32,2}(undef, max_iterations, nλ))
-        write(file, "total_scatterings", Array{Int32,2}(undef,max_iterations, nλ))
+        write(file, "total_scatterings", Array{Int64,2}(undef,max_iterations, nλ))
         write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
 
         write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
@@ -365,7 +367,7 @@ function how_much_data(max_iterations, nλ, atmosphere_size)
 
     # Iteration data
     J_data = 4boxes*nλ
-    sim_data = 2 * 4nλ + 8nλ
+    sim_data = 4nλ + 2 * 8nλ
     rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
     pop_data = 8boxes*3
 

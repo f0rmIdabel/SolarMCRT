@@ -81,6 +81,7 @@ function collect_atom_data(atmosphere::Atmosphere)
     # ===========================================================
     # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
+    @test all( Inf .> ustrip(density) .>= 0.0 )
     @test all( Inf > ustrip(line.Aji) >= 0.0 )
     @test all( Inf > ustrip(line.Bji) >= 0.0 )
     @test all( Inf > ustrip(line.Bij) >= 0.0 )
