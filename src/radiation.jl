@@ -22,7 +22,11 @@ struct RadiationBackground
 end
 
 """
-TEST MODE: BACKGROUND PROCESSES
+    collect_radiation_data(atmosphere::Atmosphere,
+                           λ::Unitful.Length,
+                           τ_max::Float64,
+                           target_packets::Float64)
+
 Collects radition data for background processes at a single wavelength
 Returns data to go into structure.
 """
@@ -89,9 +93,15 @@ function collect_radiation_data(atmosphere::Atmosphere,
 end
 
 """
-FULL MODE: POPULATION ITERATION
-Collects radition data wavelength associated with bound-bound and bound-free processes.
-Returns data to go into structure.
+    collect_radiation_data(atmosphere::Atmosphere,
+                           atom::Atom,
+                           rates::TransitionRates,
+                           populations::Array{<:NumberDensity,4},
+                           τ_max::Float64,
+                           target_packets::Float64)
+
+Collects radition data wavelength associated with bound-bound and
+bound-free processes. Returns data to go into structure.
 """
 function collect_radiation_data(atmosphere::Atmosphere,
                                 atom::Atom,
@@ -174,6 +184,21 @@ function collect_radiation_data(atmosphere::Atmosphere,
 
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet
 end
+
+# ==================================================================
+# EXTINCTION AND DESTRUCTION
+# ==================================================================
+
+"""
+    continuum_extinction_destruction(atmosphere::Atmosphere,
+                                     atom::Atom,
+                                     rates::TransitionRates,
+                                     atom_populations::Array{<:NumberDensity,4},
+                                     λ::Array{<:Unitful.Length, 1})
+
+Collect non-line extinction and destruction for all wavelengths.
+Includes H bf, H- bf and ff, H2+ bf and ff, thomson and rayleigh.
+"""
 
 function continuum_extinction_destruction(atmosphere::Atmosphere,
                                           atom::Atom,
@@ -265,6 +290,17 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     return α_continuum, ε_continuum
 end
 
+"""
+    line_extinction(λ::Unitful.Length,
+                    λ0::Unitful.Length,
+                    ΔλD::Unitful.Length,
+                    damping_constant::PerArea,
+                    α_line_constant::Float64,
+                    v_los::Unitful.Velocity=0u"m/s")
+
+Calculate line profile and return bound-bound
+extinction contribution for a line wavelength.
+"""
 function line_extinction(λ::Unitful.Length,
                          λ0::Unitful.Length,
                          ΔλD::Unitful.Length,
@@ -280,6 +316,11 @@ function line_extinction(λ::Unitful.Length,
     return α
 end
 
+"""
+    line_destruction(rates::TransitionRates)
+
+Returns line destruction probability for the two level atom.
+"""
 function line_destruction(rates::TransitionRates)
     C21 = rates.C21
     R21 = rates.R21
@@ -287,17 +328,24 @@ function line_destruction(rates::TransitionRates)
 end
 
 """
-Compute line extinction given an `AtomicLine` struct, `profile` defined per wavelength,
-and upper and lower population densities `n_u` and `n_l`.
+    line_extinction_constant(line::AtomicLine, n_l::NumberDensity, n_u::NumberDensity)
+
+Compute the line extinction constant to be
+multiplied by the profile (per length).
 """
 function line_extinction_constant(line::AtomicLine, n_l::NumberDensity, n_u::NumberDensity)
     (h * c_0 / (4 * π * line.λ0) * (n_l * line.Bij - n_u * line.Bji)) |> u"m/m"
 end
 
 """
+    α_cont_abs(λ::Unitful.Length,
+               temperature::Unitful.Temperature,
+               electron_density::NumberDensity,
+               h_neutral_density::NumberDensity,
+               proton_density::NumberDensity)
+
 The extinction from continuum absorption processes for a given λ.
-Includes H- ff, H- bf, H ff, H2+ ff and H2+ bf.
-Credit: Tiago
+Includes H- ff, H- bf, H ff, H2+ ff and H2+ bf. Credit: Tiago
 """
 function α_cont_abs(λ::Unitful.Length,
                     temperature::Unitful.Temperature,
@@ -314,8 +362,12 @@ function α_cont_abs(λ::Unitful.Length,
 end
 
 """
-The extincion from Thomson and Rayleigh scattering for a given λ.
-Credit: Tiago
+    α_cont_scatt(λ::Unitful.Length,
+                 electron_density::NumberDensity,
+                 h_ground_density::NumberDensity)
+
+The extincion from Thomson and Rayleigh scattering
+for a given λ. Credit: Tiago
 """
 function α_cont_scatt(λ::Unitful.Length,
                       electron_density::NumberDensity,
@@ -327,6 +379,9 @@ function α_cont_scatt(λ::Unitful.Length,
 end
 
 """
+    optical_depth(α::Array{<:PerLength, 3},
+                  z::Array{<:Unitful.Length, 1})
+
 Calculates the vertical optical depth of the atmosphere.
 """
 function optical_depth(α::Array{<:PerLength, 3},
@@ -350,6 +405,10 @@ function optical_depth(α::Array{<:PerLength, 3},
 end
 
 """
+    optical_depth_boundary(α::Array{<:PerLength, 3},
+                           z::Array{<:Unitful.Length, 1},
+                           τ_max::Real)
+
 Returns 2D array containing the z-indices
 where the optical depth reaches τ_max.
 """
@@ -380,9 +439,18 @@ function optical_depth_boundary(α::Array{<:PerLength, 3},
 end
 
 """
+    distribute_packets(λ::Unitful.Length,
+                       target_packets::Real,
+                       x::Array{<:Unitful.Length, 1},
+                       y::Array{<:Unitful.Length, 1},
+                       z::Array{<:Unitful.Length, 1},
+                       temperature::Array{<:Unitful.Temperature, 3},
+                       α::Array{<:PerLength, 3},
+                       boundary::Array{Int32,2})
+
 Returns a 3D array of the # of packets to be
 generated in each box above the boundary.
-As well as the scale
+As well as the intensity contained in each packet.
 """
 function distribute_packets(λ::Unitful.Length,
                             target_packets::Real,
@@ -419,15 +487,26 @@ function distribute_packets(λ::Unitful.Length,
 end
 
 """
-Calculates the Blackbody (Planck) function per wavelength,
-for given arrays of wavelength and temperature.
-Returns monochromatic intensity.
+    blackbody_lambda(λ::Unitful.Length,
+                     temperature::Unitful.Temperature)
+
+Calculates the Blackbody (Planck) function per
+wavelength, for a given wavelength and temperature.
+Returns monochromatic intensity. Credit: Tiago
 """
 function blackbody_lambda(λ::Unitful.Length,
                           temperature::Unitful.Temperature)
     B = (2h * c_0^2) / ( λ^5 * (exp((h * c_0 / k_B) / (λ * temperature)) - 1) ) |> u"kW / m^2 / sr / nm"
 end
 
+"""
+    blackbody_lambda(λ::Array{<:Unitful.Length,1},
+                     temperature::Unitful.Temperature)
+
+Calculates the Blackbody (Planck) function per
+wavelength, for an array of wavelengths and 3D temperature.
+Returns monochromatic intensity.
+"""
 function blackbody_lambda(λ::Array{<:Unitful.Length,1},
                           temperature::Array{<:Unitful.Temperature,3})
     nλ = length(λ)
@@ -441,24 +520,33 @@ function blackbody_lambda(λ::Array{<:Unitful.Length,1},
     return B
 end
 
-function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
-    ((h * c_0) / (χ2-χ1)) |> u"nm"
-end
 
-function write_to_file(radiation::RadiationBackground, output_path)
+# ==================================================================
+#  WRITE TO FILE
+# ==================================================================
+
+"""
+    write_to_file(radiation::RadiationBackground, output_path)
+
+Write the relevant radition data to the output file.
+"""
+function write_to_file(radiation::RadiationBackground, output_path::String)
     h5open(output_path, "r+") do file
-        write(file, "extinction_continuum", ustrip(radiation.α_continuum))
-        write(file, "destruction_continuum", radiation.ε_continuum)
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        file["packets"]= ustrip(radiation.packets)
+        file["boundary"] = radiation.boundary
+        file["intensity_per_packet"] = ustrip(radiation.intensity_per_packet)
     end
 end
 
-function write_to_file(radiation::Radiation, output_path)
+"""
+    write_to_file(radiation::Radiation, iteration::Int64, output_path::String)
+
+Write the relevant radition data to the output file.
+"""
+function write_to_file(radiation::Radiation, iteration::Int64, output_path::String)
     h5open(output_path, "r+") do file
-        write(file, "packets", ustrip(radiation.packets))
-        write(file, "boundary", radiation.boundary)
-        write(file, "intensity_per_packet", ustrip(radiation.intensity_per_packet))
+        file["packets"][iteration,:,:,:,:] = ustrip(radiation.packets)
+        file["boundary"][iteration,:,:,:] = radiation.boundary
+        file["intensity_per_packet"][iteration,:] = ustrip(radiation.intensity_per_packet)
     end
 end

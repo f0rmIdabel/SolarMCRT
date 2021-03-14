@@ -22,7 +22,11 @@ struct Atom
 end
 
 """
-Collection of 2 level atoms.
+    collect_atom_data(atmosphere::Atmosphere)
+
+Reads a two-level atom file, samples wavelengths from its
+bound-bound and bound-free transitions and returns all
+relevant data for the simulation.
 """
 function collect_atom_data(atmosphere::Atmosphere)
 
@@ -104,7 +108,16 @@ function collect_atom_data(atmosphere::Atmosphere)
            density
 end
 
-function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
+"""
+    sample_λ(nλ_bb::Int64, nλ_bf::Int64,
+             χl::Unitful.Energy, χu::Unitful.Energy, χ∞::Unitful.Energy)
+
+Get sampling wavelengths. Bound free wavelengths are
+linearly sampled, while th bound-bound follow the
+log-sampling from github.com/ITA-Solar/rh.
+"""
+function sample_λ(nλ_bb::Int64, nλ_bf::Int64,
+                  χl::Unitful.Energy, χu::Unitful.Energy, χ∞::Unitful.Energy)
 
     atom_file = h5open(get_atom_path(), "r")
     λ_bf_l_min = read(atom_file, "bfl_min")u"nm"
@@ -175,17 +188,51 @@ function sample_λ(nλ_bb, nλ_bf, χl, χu, χ∞)
     return λ
 end
 
+"""
+    transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
+
+Get the corresponding wavelength for
+the energy difference between two levels.
+"""
+function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
+    ((h * c_0) / (χ2-χ1)) |> u"nm"
+end
+
+"""
+    damping_constant(γ::Unitful.Frequency,
+                     ΔλD::Unitful.Length)
+
+Get daping constant to be multiplied with λ^2.
+"""
 function damping_constant(γ::Unitful.Frequency,
                           ΔλD::Unitful.Length)
     (γ / (4 * π * c_0 * ΔλD))
 end
 
+
+
+# ==================================================================
+#  WRITE TO FILE
+# ==================================================================
+
+
+"""
+    write_to_file(atom::Atom, output_path::String)
+
+Writes wavelengths to the output file.
+"""
 function write_to_file(λ::Array{<:Unitful.Length,1})
     h5open("../out/output.h5", "r+") do file
         write(file, "wavelength", ustrip(λ))
     end
 end
 
+"""
+    write_to_file(atom::Atom, output_path::String)
+
+Writes wavelength and number of bound-bound and
+bound-free wavelengths to the output file.
+"""
 function write_to_file(atom::Atom, output_path::String)
     h5open(output_path, "r+") do file
         write(file, "wavelength", ustrip(atom.λ))

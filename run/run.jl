@@ -139,6 +139,7 @@ function run()
 
             if converged
                 println(@sprintf("--Convergence at iteration n = %d. Error = %.1e.\n", n, error))
+                cut_output_file(output_path, n)
                 break
             else
                 println(@sprintf("\n--No convergence. Error = %.1e.\n", error))

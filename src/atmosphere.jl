@@ -7,14 +7,18 @@ struct Atmosphere
     velocity::Array{Array{<:Unitful.Velocity, 1}, 3}    # (nx, ny, nz)
     velocity_z::Array{<:Unitful.Velocity, 3}            # (nx, ny, nz)
     temperature::Array{<:Unitful.Temperature, 3}        # (nx, ny, nz)
-    electron_density::Array{<:NumberDensity, 3}      # (nx, ny, nz)
-    hydrogen_populations::Array{<:NumberDensity, 4}  # (nx, ny, nz, nl)
+    electron_density::Array{<:NumberDensity, 3}         # (nx, ny, nz)
+    hydrogen_populations::Array{<:NumberDensity, 4}     # (nx, ny, nz, 3)
 end
 
-"""
-Reads and slices atmosphere parameters accoring to inputs.
-"""
 
+"""
+    collect_atmosphere_data()
+
+Reads and slices atmosphere parameters according to
+keyword.input file. Returns atmosphere dimensions, velocity,
+temperature, electron_density and hydrogen populations.
+"""
 function collect_atmosphere_data()
 
     # ===========================================================

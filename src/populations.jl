@@ -89,11 +89,6 @@ function n3(N::Array{<:NumberDensity,3},
     c = N .* (P12 .+ P13) .- a .* (P21 .+ P12 .+ P13)
     d = b .* (P21 .+ P12 .+ P13) .+ P31 .+ P12 .+ P13
 
-    @test all( Inf .> ustrip.(c) .>= 0.0 )
-    @test all( Inf .> ustrip.(d) .>= 0.0 )
-    println(minimum(c))
-    println(minimum(d))
-
     return c ./ d
 end
 

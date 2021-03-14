@@ -2,7 +2,15 @@ include("radiation.jl")
 
 
 """
-ATOM MODE
+    mcrt(atmosphere::Atmosphere,
+         radiation::Radiation,
+         atom::Atom,
+         max_scatterings::Real,
+         iteration::Int64,
+         output_path::String)
+
+Monte Carlo radiative transfer simulation
+in full atom mode.
 """
 function mcrt(atmosphere::Atmosphere,
               radiation::Radiation,
@@ -11,7 +19,7 @@ function mcrt(atmosphere::Atmosphere,
               iteration::Int64,
               output_path::String)
 
-    # ================================PARAMETERS==================================
+    # ==================================================================
     # ATMOSPHERE DATA
     # ==================================================================
     x = atmosphere.x
@@ -260,7 +268,27 @@ function mcrt(atmosphere::Atmosphere,
 end
 
 """
-ATOM MODE
+    scatter_packet(x::Array{<:Unitful.Length, 1},
+                   y::Array{<:Unitful.Length, 1},
+                   z::Array{<:Unitful.Length, 1},
+                   velocity::Array{Array{<:Unitful.Velocity, 1}, 3},
+
+                   α_continuum::Array{<:PerLength, 3},
+                   α_line_constant::Array{Float64, 3},
+                   boundary::Array{Int32, 2},
+
+                   box_id::Array{Int64,1},
+                   r::Array{<:Unitful.Length, 1},
+                   J::Array{Int32, 3},
+
+                   damping_constant::Array{<:PerArea, 3},
+                   ΔλD::Array{<:Unitful.Length, 3},
+
+                   λ0::Unitful.Length,
+                   λ::Unitful.Length)
+
+Traverse boxes until optical depth target reached
+for scattering event and return new position.
 """
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},
@@ -385,6 +413,10 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
 end
 
 """
+    closest_edge(next_edges::Array{<:Unitful.Length, 1},
+                      r::Array{<:Unitful.Length, 1},
+                      unit_vector::Array{Float64, 1})
+
 Returns the face (1=z,2=x or 3=y) that
 the packet will cross next and the distance to it.
 """
@@ -404,9 +436,13 @@ end
 
 
 """
-TEST MODE
-Simulates the radiation field in a given atmosphere with
-a lower optical depth boundary given by a maximum τ.
+    mcrt(atmosphere::Atmosphere,
+         radiation::RadiationBackground,
+         max_scatterings::Real,
+         output_path::String)
+
+Monte Carlo radiative transfer simulation
+in background radiation test mode.
 """
 function mcrt(atmosphere::Atmosphere,
               radiation::RadiationBackground,
@@ -541,9 +577,17 @@ function mcrt(atmosphere::Atmosphere,
 end
 
 """
-TEST MODE
-Scatters photon packet once.
-Returns new position, box_id and lost-status.
+    scatter_packet(x::Array{<:Unitful.Length, 1},
+                   y::Array{<:Unitful.Length, 1},
+                   z::Array{<:Unitful.Length, 1},
+                   α::Array{<:PerLength, 3},
+                   boundary::Array{Int32, 2},
+                   box_id::Array{Int64,1},
+                   r::Array{<:Unitful.Length, 1},
+                   J::Array{Int32, 3})
+
+Traverse boxes until optical depth target reached
+for scattering event and return new position.
 """
 function scatter_packet(x::Array{<:Unitful.Length, 1},
                         y::Array{<:Unitful.Length, 1},

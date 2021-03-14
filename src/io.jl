@@ -1,7 +1,3 @@
-"""
-Collection of all imports and functions to read simulation input.
-"""
-
 using DelimitedFiles
 using BenchmarkTools
 using ProgressMeter
@@ -23,6 +19,11 @@ const hc = h * c_0
 @derived_dimension PerTime Unitful.𝐓^-1
 @derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
+"""
+    test_mode()
+
+Get the test mode status.
+"""
 function test_mode()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("test_mode", input_file)[end] + 1
@@ -33,6 +34,11 @@ function test_mode()
     return tm
 end
 
+"""
+    get_output_path()
+
+Get the path to the output file.
+"""
 function get_output_path()
 
     if test_mode()
@@ -53,6 +59,26 @@ function get_output_path()
     return path
 end
 
+"""
+    get_iteration_mode()
+
+Get the iteration mode (populations or lambda)
+"""
+function get_iteration_mode()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("iteration_mode", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end]
+    j = findfirst("\n", file[i+1:end])[end] + i
+    im = strip(file[i+1:j-1])
+    return im
+end
+
+"""
+    get_max_iterations()
+
+Get the maximum number of iterations.
+"""
 function get_max_iterations()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("max_iterations", input_file)[end] + 1
@@ -63,18 +89,15 @@ function get_max_iterations()
     return max_iterations
 end
 
-function get_error(output_path, n)
-    error = nothing
-    h5open(output_path, "r") do file
-        error = read(file, "error")
-    end
-    return error[n] # DELETE
-end
-
 # =============================================================================
 # RADIATION
 # =============================================================================
 
+"""
+    get_target_packets()
+
+Get the number of packets to be created for each wavelength.
+"""
 function get_target_packets()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("target_packets", input_file)[end] + 1
@@ -85,6 +108,12 @@ function get_target_packets()
     return target_packets # move
 end
 
+"""
+    get_max_scatterings()
+
+Get the maximum number of scatterings
+before moving on to the next photon.
+"""
 function get_max_scatterings()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("max_scatterings", input_file)[end] + 1
@@ -95,6 +124,11 @@ function get_max_scatterings()
     return max_scatterings # move
 end
 
+"""
+    get_cut_off()
+
+Get optical depth where the atmosphere will be cut.
+"""
 function get_cut_off()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("cut_off", input_file)[end] + 1
@@ -113,6 +147,11 @@ function get_cut_off()
     return cut_off # move
 end
 
+"""
+    get_background_λ()
+
+Get the wavelength where to perform the background radiation MC test.
+"""
 function get_background_λ()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("background_wavelength", input_file)[end] + 1
@@ -125,7 +164,12 @@ function get_background_λ()
     return λ
 end
 
-function get_Jλ(output_path, iteration, intensity_per_packet)
+"""
+    get_Jλ(output_path::String, iteration::Int64, intensity_per_packet::Array{<:UnitsIntensity_λ,1})
+
+Get the radiation field from the output file.
+"""
+function get_Jλ(output_path::String, iteration::Int64, intensity_per_packet::Array{<:UnitsIntensity_λ,1})
     J = nothing
     h5open(output_path, "r") do file
         J = read(file, "J")[iteration,:,:,:,:]
@@ -143,6 +187,11 @@ function get_Jλ(output_path, iteration, intensity_per_packet)
     return Jλ
 end
 
+"""
+    get_nλ()
+
+Get the number of bound-bound and bound-free wavelengths to sample.
+"""
 function get_nλ()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("nλ_bb", input_file)[end] + 1
@@ -163,6 +212,11 @@ end
 # ATOM
 # =============================================================================
 
+"""
+    get_atom_path()
+
+Get path to atom file.
+"""
 function get_atom_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("atom_path", input_file)[end] + 1
@@ -173,6 +227,11 @@ function get_atom_path()
     return atmosphere_path
 end
 
+"""
+    get_population_distribution()
+
+Get the initial population configuration (LTE or zero-radiation)
+"""
 function get_population_distribution()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("population_distribution", input_file)[end] + 1
@@ -183,20 +242,14 @@ function get_population_distribution()
     return distribution
 end
 
-function get_initial_populations_path()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("initial_populations_path", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("\"", file)[end]
-    j = findfirst("\"", file[i+1:end])[end] + i
-    initial_populations_path = string(file[i+1:j-1])
-    return initial_populations_path  # DELETE
-end
-
 # =============================================================================
 # ATMOSPHERE
 # =============================================================================
+"""
+    get_atmosphere_path()
 
+Fetch the atmosphere path.
+"""
 function get_atmosphere_path()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("atmosphere_path", input_file)[end] + 1
@@ -207,6 +260,11 @@ function get_atmosphere_path()
     return atmosphere_path
 end
 
+"""
+    get_step()
+
+Fetch the step-size in the z, x and y-direction.
+"""
 function get_step()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("step", input_file)[end] + 1
@@ -228,6 +286,11 @@ function get_step()
     return steps
 end
 
+"""
+    get_stop()
+
+Fetch the stop indices in the z, x and y-direction.
+"""
 function get_stop()
 
     nz = nothing
@@ -270,6 +333,11 @@ function get_stop()
     return stop
 end
 
+"""
+    get_start()
+
+Fetch the start indices in the z, x and y-direction.
+"""
 function get_start()
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("start", input_file)[end] + 1
@@ -300,7 +368,11 @@ end
 # OUTPUT FILE
 # =============================================================================
 
-function create_output_file(output_path, max_iterations, nλ, atmosphere_size)
+"""
+    create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+Initialise all output variables for the full atom mode.
+"""
+function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
 
     nz, nx, ny = atmosphere_size
 
@@ -316,17 +388,19 @@ function create_output_file(output_path, max_iterations, nλ, atmosphere_size)
         write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
 
         write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
-        write(file, "error", Array{Float64,1}(undef, max_iterations))
     end
 end
 
+"""
+    create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tuple)
 
-function create_output_file(output_path, nλ, atmosphere_size)
+Initialise all output variables for the test mode.
+"""
+function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tuple)
 
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
         write(file, "J", Array{Int32,5}(undef, nλ, nz, nx,ny))
         write(file, "total_destroyed", Array{Int32,2}(undef, nλ))
         write(file, "total_scatterings", Array{Int64,2}(undef, nλ))
@@ -338,40 +412,66 @@ function create_output_file(output_path, nλ, atmosphere_size)
     end
 end
 
+"""
+    cut_output_file(output_path::String, final_iteration::Int64)
 
-function cut_output_file(output_path, final_iteration)
-    h5open(output_path, "w") do file
-        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
+Cut output data at a given iteration.
+"""
+function cut_output_file(output_path::String, final_iteration::Int64)
+    h5open(output_path, "r+") do file
+        # Slice
         J_new = read(file, "J")[1:final_iteration,:,:,:,:]
+        total_destroyed_new = read(file, "total_destroyed")[1:final_iteration,:]
+        total_scatterings_new = read(file, "total_scatterings")[1:final_iteration,:]
+        time_new = read(file, "time")[1:final_iteration,:]
+        packets_new = read(file, "packets")[1:final_iteration,:,:,:,:]
+        boundary_new = read(file, "boundary")[1:final_iteration,:,:,:]
+        intensity_per_packet_new = read(file, "intensity_per_packet")[1:final_iteration,:]
+        populations_new = read(file, "populations")[1:final_iteration,:,:,:,:]
+
+        # Delete
         delete_object(file, "J")
+        delete_object(file, "total_destroyed")
+        delete_object(file, "total_scatterings")
+        delete_object(file, "time")
+        delete_object(file, "packets")
+        delete_object(file, "boundary")
+        delete_object(file, "intensity_per_packet")
+        delete_object(file, "populations")
+
+        # Write
         write(file, "J", J_new)
-        # repeat....
-        write(file, "total_destroyed", Array{Int32,2}(undef, max_iterations, nλ))
-        write(file, "total_scatterings", Array{Int64,2}(undef,max_iterations, nλ))
-        write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
-
-        write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
-        write(file, "boundary", Array{Int32,4}(undef,max_iterations, nλ, nx, ny))
-        write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
-
-        write(file, "populations", Array{Float64,5}(undef, max_iterations, nz, nx, ny, 3))
+        write(file, "total_destroyed", total_destroyed_new)
+        write(file, "total_scatterings", total_scatterings_new)
+        write(file, "time", time_new)
+        write(file, "packets", packets_new)
+        write(file, "boundary", boundary_new)
+        write(file, "intensity_per_packet", intensity_per_packet_new)
+        write(file, "populations", populations_new)
     end
 end
 
-function how_much_data(max_iterations, nλ, atmosphere_size)
-    λ_data = 8*nλ + 8*2
+"""
+    how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+
+Returns the maximum amount of GBs written to file if the
+simulation runs for max_iterations.
+"""
+function how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
 
     nz, nx, ny = atmosphere_size
     boxes = nz*nx*ny
     slice = nx*ny
 
+    λ_data = 8*nλ + 8*2
+
     # Iteration data
-    J_data = 4boxes*nλ
+    J_data   = 4boxes*nλ
     sim_data = 4nλ + 2 * 8nλ
     rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
     pop_data = 8boxes*3
 
-    min_data = ( λ_data +  J_data + sim_data + rad_data + pop_data ) /1e9
+    #min_data = ( λ_data +  J_data + sim_data + rad_data + pop_data ) /1e9
     max_data = ( λ_data + (J_data + sim_data + rad_data + pop_data) * max_iterations ) / 1e9
 
     return max_data
