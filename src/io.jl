@@ -418,6 +418,7 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
             write(file, "C21", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
             write(file, "C31", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
             write(file, "C32", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+        end
     end
 end
 
@@ -518,6 +519,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
             write(file, "C21", C21_new)
             write(file, "C31", C31_new)
             write(file, "C32", C32_new)
+        end
     end
 end
 
@@ -549,7 +551,8 @@ function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64
                                       pop_data * (max_iterations + 1) ) / 1e9
 
     if write_rates
-        max_data += rate_data * (max_iterations+1)
+        max_data += rate_data * (max_iterations+1)/1e9
+    end
 
     return max_data
 end
