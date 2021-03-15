@@ -6,10 +6,10 @@
 
 
 # ======================================================================================================== #
-#  When the test mode is set to "true", the MC simulation is run with the background opacity at the        #
+#  When the background mode is set to "true", the MC simulation is run with the background opacity at the  #
 #  given λ (nm). A convenient quick test, without going into the involved population-iteration routine.    #
 # ======================================================================================================== #
-test_mode = false
+background_mode = false
 background_wavelength = 500.0
 
 # ======================================================================================================== #
@@ -31,14 +31,14 @@ population_distribution = "LTE"
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 20
-nλ_bf = 15
+nλ_bb = 5
+nλ_bf = 2
 
 # ======================================================================================================== #
 #  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.                    #
 # ======================================================================================================== #
-target_packets = 1e6
+target_packets = 1e4
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -61,4 +61,4 @@ max_scatterings = 1e8
 # ======================================================================================================== #
 #  Maximum number of population iterations before quitting.                                                #
 # ======================================================================================================== #
-max_iterations = 10 
+max_iterations = 10

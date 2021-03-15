@@ -221,8 +221,8 @@ end
 
 Writes wavelengths to the output file.
 """
-function write_to_file(λ::Array{<:Unitful.Length,1})
-    h5open("../out/output.h5", "r+") do file
+function write_to_file(λ::Array{<:Unitful.Length,1}, output_path::String)
+    h5open(output_path, "r+") do file
         write(file, "wavelength", ustrip(λ))
     end
 end

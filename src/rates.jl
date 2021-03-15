@@ -16,6 +16,17 @@ struct TransitionRates
     C32::Array{<:Unitful.Frequency,3}
 end
 
+"""
+    calculate_transition_rates(atom::Atom,
+                               temperature::Array{<:Unitful.Temperature, 3},
+                               electron_density::Array{<:NumberDensity,3},
+                               J::Array{<:UnitsIntensity_λ, 4})
+
+Given the radiation field, calculate all transition rates for
+the excitation, de-excitation, ionisations and re-combiantions
+of a two level atom. Level 1,2 and 3 represent the ground level,
+excited level and ionised level respectively.
+"""
 function calculate_transition_rates(atom::Atom,
                                     temperature::Array{<:Unitful.Temperature, 3},
                                     electron_density::Array{<:NumberDensity,3},
@@ -89,10 +100,17 @@ function calculate_transition_rates(atom::Atom,
            C12, C13, C23, C21, C31, C32
 end
 
+"""
+    Rij(J::Array{<:UnitsIntensity_λ, 4},
+        σij::Array{<:Unitful.Area, 4},
+        λ::Array{<:Unitful.Length, 1})
+
+Raditive rate for excitation transitions.
+"""
 function Rij(J::Array{<:UnitsIntensity_λ, 4},
              σij::Array{<:Unitful.Area, 4},
              λ::Array{<:Unitful.Length, 1})
-    # Rij  = ∫4πλ/(hc) σij J dλ
+
     nλ, nz, nx, ny = size(J)
     R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
     fill!(R,0.0u"s^-1")
@@ -105,10 +123,17 @@ function Rij(J::Array{<:UnitsIntensity_λ, 4},
     return R
 end
 
+"""
+    Rij(J::Array{<:UnitsIntensity_λ, 4},
+        σij::Array{<:Unitful.Area, 1},
+        λ::Array{<:Unitful.Length, 1})
+
+Radiative rate for ionisation transitions.
+"""
 function Rij(J::Array{<:UnitsIntensity_λ, 4},
              σij::Array{<:Unitful.Area, 1},
              λ::Array{<:Unitful.Length, 1})
-    # Rij  = ∫4πλ/(hc) σij J dλ
+
     nλ, nz, nx, ny = size(J)
     R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
     fill!(R,0.0u"s^-1")
@@ -121,12 +146,19 @@ function Rij(J::Array{<:UnitsIntensity_λ, 4},
     return R
 end
 
+"""
+    Rji(J::Array{<:UnitsIntensity_λ, 4},
+        σij::Array{<:Unitful.Area, 4},
+        Gij::Array{Float64, 4},
+        λ::Array{<:Unitful.Length, 1})
+
+Radiative rate for de-excitation transitions.
+"""
 function Rji(J::Array{<:UnitsIntensity_λ, 4},
              σij::Array{<:Unitful.Area, 4},
              Gij::Array{Float64, 4},
              λ::Array{<:Unitful.Length, 1})
-    # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
-    # Rji = ∫4π/λ σij Gij (2c/λ^3 + Jλ^2/(hc)) dλ
+
     nλ, nz, nx, ny = size(J)
     R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
     fill!(R,0.0u"s^-1")
@@ -140,12 +172,18 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
     return R
 end
 
+"""
+    Rji(J::Array{<:UnitsIntensity_λ, 4},
+        σij::Array{<:Unitful.Area, 1},
+        Gij::Array{Float64, 4},
+        λ::Array{<:Unitful.Length, 1})
+
+Radiative rate for recombination transitions.
+"""
 function Rji(J::Array{<:UnitsIntensity_λ, 4},
              σij::Array{<:Unitful.Area, 1},
              Gij::Array{Float64, 4},
              λ::Array{<:Unitful.Length, 1})
-    # Rji  = ∫4π/(hν) σij Gij (2hν^3/c_0^2 + J)dν
-    # Rji = ∫4π/λ σij Gij (2c/λ^3 + Jλ^2/(hc)) dλ
 
     nλ, nz, nx, ny = size(J)
     R = Array{Unitful.Frequency,3}(undef,nz,nx,ny)
@@ -160,12 +198,19 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
     return R
 end
 
+"""
+    σij(i::Integer,
+        j::Integer,
+        atom::Atom,
+        λ::Array{<:Unitful.Length, 1})
+
+Calculates the bound-bound cross section.
+"""
 function σij(i::Integer,
              j::Integer,
              atom::Atom,
              λ::Array{<:Unitful.Length, 1})
 
-    # σij = hc/(4π*λij)*Bij ϕλ
     damping_constant = atom.damping_constant
     ΔλD = atom.doppler_width
     λ0 = atom.line.λ0
@@ -185,6 +230,13 @@ function σij(i::Integer,
     return σ
 end
 
+"""
+    σic(i::Integer,
+        atom::Atom,
+        λ::Array{<:Unitful.Length, 1})
+
+Calculates the bound-free cross-section.
+"""
 function σic(i::Integer,
              atom::Atom,
              λ::Array{<:Unitful.Length, 1})
@@ -200,13 +252,21 @@ function σic(i::Integer,
     return σ
 end
 
+"""
+    Gij(i::Integer,
+        j::Integer,
+        λ::Array{<:Unitful.Length, 1},
+        temperature::Array{<:Unitful.Temperature, 3},
+        LTE_populations::Array{<:NumberDensity, 4})
+
+Factor to go into the de-excitation and recombination expressions.
+"""
 function Gij(i::Integer,
              j::Integer,
              λ::Array{<:Unitful.Length, 1},
              temperature::Array{<:Unitful.Temperature, 3},
              LTE_populations::Array{<:NumberDensity, 4})
 
-    # Gij = [ni/nj]LTE exp(-hc/λkT)
     nλ = length(λ)
     nz, nx, ny = size(temperature)
     G = Array{Float64, 4}(undef, nλ, nz, nx, ny)
@@ -220,6 +280,16 @@ function Gij(i::Integer,
     return G
 end
 
+"""
+    Cij(i::Integer,
+        j::Integer,
+        electron_density::Array{<:NumberDensity,3},
+        temperature::Array{<:Unitful.Temperature,3},
+        LTE_populations::Array{<:NumberDensity,4})
+
+Calculates the collisional rates for all possible
+two-level atom transitions.
+"""
 function Cij(i::Integer,
              j::Integer,
              electron_density::Array{<:NumberDensity,3},
@@ -250,13 +320,12 @@ function Cij(i::Integer,
 end
 
 """
-Stolen from Transparency repo
-Recipes from Seaton
     gaunt_bf(charge::Int, n_eff::Number, λ::Unitful.Length)::Float64
+
 Compute bound-free Gaunt factor for a given charge, effective principal
 quantum number and wavelength λ. Taken from RH. Formula from
 [Seaton (1960), Rep. Prog. Phys. 23, 313](https://ui.adsabs.harvard.edu/abs/1960RPPh...23..313S/abstract),
-page 316.
+page 316. Recipes from Seaton. (This is copied from github.com/tiagopereira/Transparency.jl)
 """
 function gaunt_bf(λ::Unitful.Length,
                   charge::Real,
@@ -270,7 +339,12 @@ function gaunt_bf(λ::Unitful.Length,
     return g_bf
 end
 
-
+"""
+    LTE_populations(atom::Atom,
+                    temperature::Array{<:Unitful.Temperature, 3},
+                    electron_density::Array{<:NumberDensity, 3})
+Given the atom density, calculate the atom populations according to LTE.
+"""
 function LTE_populations(atom::Atom,
                          temperature::Array{<:Unitful.Temperature, 3},
                          electron_density::Array{<:NumberDensity, 3})
@@ -301,6 +375,7 @@ function LTE_populations(atom::Atom,
     populations[:,:,:,2] = n2
     populations[:,:,:,3] = n3
 
+    @test all( Inf .> ustrip.(populations) .>= 0.0 )
 
     return populations
 end

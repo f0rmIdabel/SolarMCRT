@@ -1,5 +1,12 @@
 include("rates.jl")
 
+"""
+    collect_initial_populations(atom::Atom,
+                                temperature::Array{<:Unitful.Temperature, 3},
+                                electron_density::Array{<:NumberDensity,3})
+
+Collect initial population distribution. Either LTE or zero-radiation.
+"""
 function collect_initial_populations(atom::Atom,
                                      temperature::Array{<:Unitful.Temperature, 3},
                                      electron_density::Array{<:NumberDensity,3})
@@ -16,7 +23,13 @@ function collect_initial_populations(atom::Atom,
     return initial_populations
 end
 
+"""
+    zero_radiation_populations(atom::Atom,
+                               temperature::Array{<:Unitful.Temperature, 3},
+                               electron_density::Array{<:NumberDensity,3})
 
+For a given atom density, calculate the populations according to zero-radiation.
+"""
 function zero_radiation_populations(atom::Atom,
                                     temperature::Array{<:Unitful.Temperature, 3},
                                     electron_density::Array{<:NumberDensity,3})
@@ -26,10 +39,20 @@ function zero_radiation_populations(atom::Atom,
     J0 = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
     rates0 = TransitionRates(calculate_transition_rates(atom, temperature, electron_density, J0)...)
     populations = get_revised_populations(rates0, atom.density)
+
+    @test all( Inf .> ustrip.(populations) .>= 0.0 )
+
     return populations
 end
 
+"""
+    check_population_convergence(populations::Array{<:NumberDensity, 4},
+                                 new_populations::Array{<:NumberDensity, 4},
+                                 criterion::Real = 1e-3)
 
+Check if the relative difference between two populations satisfy
+the convergence criterion. Return convergence status and error.
+"""
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
                                       criterion::Real = 1e-3)
@@ -44,7 +67,14 @@ function check_population_convergence(populations::Array{<:NumberDensity, 4},
     return converged, error
 end
 
+"""
+    get_revised_populations(rates::TransitionRates,
+                            atom_density::Array{<:NumberDensity, 3},
+                            iteration::Int64,
+                            output_path::String)
 
+Calculate the population distribution using statistical equlibrium.
+"""
 function get_revised_populations(rates::TransitionRates,
                                  atom_density::Array{<:NumberDensity, 3},
                                  iteration::Int64,
@@ -65,18 +95,26 @@ function get_revised_populations(rates::TransitionRates,
     revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
 
-
-    @test all( sum(revised_populations, dims=4)[:,:,:,1] .≈ atom_density )
-    @test all( Inf .> ustrip.(revised_populations[:,:,:,3]) .>= 0.0 )
-    @test all( Inf .> ustrip.(revised_populations[:,:,:,2]) .>= 0.0 )
-    @test all( Inf .> ustrip.(revised_populations[:,:,:,1]) .>= 0.0 )
+    @test all( sum(revised_populations, dims=4) .≈ atom_density )
+    @test all( Inf .> ustrip.(revised_populations) .>= 0.0 )
 
     write_to_file(revised_populations, iteration, output_path)
 
     return revised_populations
 end
 
+"""
+    n3(N::Array{<:NumberDensity,3},
+       P12::Array{<:Unitful.Frequency,3},
+       P13::Array{<:Unitful.Frequency,3},
+       P21::Array{<:Unitful.Frequency,3},
+       P23::Array{<:Unitful.Frequency,3},
+       P31::Array{<:Unitful.Frequency,3},
+       P32::Array{<:Unitful.Frequency,3})
 
+Given the atom density and selected transition rates,
+calculate the ionised population density.
+"""
 function n3(N::Array{<:NumberDensity,3},
             P12::Array{<:Unitful.Frequency,3},
             P13::Array{<:Unitful.Frequency,3},
@@ -92,6 +130,17 @@ function n3(N::Array{<:NumberDensity,3},
     return c ./ d
 end
 
+"""
+    n2(N::Array{<:NumberDensity,3},
+       n3::Array{<:NumberDensity,3},
+       P12::Array{<:Unitful.Frequency,3},
+       P21::Array{<:Unitful.Frequency,3},
+       P23::Array{<:Unitful.Frequency,3},
+       P32::Array{<:Unitful.Frequency,3})
+
+Given the atom density, ionised density and selected rates,
+calculate the excited level population.
+"""
 function n2(N::Array{<:NumberDensity,3},
             n3::Array{<:NumberDensity,3},
             P12::Array{<:Unitful.Frequency,3},
@@ -101,13 +150,27 @@ function n2(N::Array{<:NumberDensity,3},
     return (N .* P12  + n3 .* (P32 .- P12) ) ./ (P21 .+ P23 .+ P12)
 end
 
+"""
+    n1(N::Array{<:NumberDensity,3},
+       n3::Array{<:NumberDensity,3},
+       n2::Array{<:NumberDensity,3})
+
+Given the atom density, ionised density and excited density,
+get the remaining ground density.
+"""
 function n1(N::Array{<:NumberDensity,3},
             n3::Array{<:NumberDensity,3},
             n2::Array{<:NumberDensity,3})
     return N .- n3 .- n2
 end
 
+"""
+    write_to_file(populations::Array{<:NumberDensity,4},
+                  iteration::Int64,
+                  output_path::String)
 
+Write the populations for a given iteration to the output file.
+"""
 function write_to_file(populations::Array{<:NumberDensity,4},
                        iteration::Int64,
                        output_path::String)

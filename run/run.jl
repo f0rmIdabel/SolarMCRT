@@ -1,6 +1,7 @@
 include("../src/mcrt.jl")
 include("../src/populations.jl")
 
+
 function run()
     println("\n", "="^91, "\n", " "^34,
             "SOLAR ATMOSPHERE MCRT",
@@ -15,7 +16,7 @@ function run()
     atmosphere_size = size(atmosphere.temperature)
     println("Atmosphere loaded with dimensions ", atmosphere_size, ".")
 
-    if test_mode()
+    if background_mode()
         # =============================================================================
         # READ CONFIG FILE
         # =============================================================================
@@ -29,6 +30,7 @@ function run()
         # =============================================================================
         print("--Loading wavelength.......................")
         λ = get_background_λ()
+        nλ = length(λ)
         println("Wavelength λ = ", λ, " loaded.")
 
         # =============================================================================
@@ -38,6 +40,14 @@ function run()
         radiation_parameters = collect_radiation_data(atmosphere, λ, cut_off, target_packets)
         radiation = RadiationBackground(radiation_parameters...)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
+
+        # =============================================================================
+        # CREATE OUTPUT FILE
+        # =============================================================================
+        print("--Initialise output file...................")
+        create_output_file(output_path, nλ, atmosphere_size)
+        write_to_file([λ], output_path)
+        println(@sprintf("%.1f GBs of data initialised.", how_much_data(nλ, atmosphere_size)))
 
         # =============================================================================
         # SIMULATION
@@ -92,7 +102,7 @@ function run()
         create_output_file(output_path, max_iterations, nλ, atmosphere_size)
         write_to_file(atom, output_path)
         write_to_file(populations, 0, output_path)
-        println(@sprintf("%.1f GBs of data initialised.", how_much_data(max_iterations, nλ, atmosphere_size)))
+        println(@sprintf("%.1f GBs of data initialised.", how_much_data(nλ, atmosphere_size, max_iterations)))
 
         # =============================================================================
         # RUN MCRT UNTIL POPULATIONS CONVERGE

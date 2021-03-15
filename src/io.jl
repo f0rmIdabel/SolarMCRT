@@ -24,9 +24,9 @@ const hc = h * c_0
 
 Get the test mode status.
 """
-function test_mode()
+function background_mode()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("test_mode", input_file)[end] + 1
+    i = findfirst("background_mode", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end]
     j = findfirst("\n", file[i+1:end])[end] + i
@@ -41,7 +41,7 @@ Get the path to the output file.
 """
 function get_output_path()
 
-    if test_mode()
+    if background_mode()
         path = "../out/output_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
     else
         nλ_bb, nλ_bf = get_nλ()
@@ -377,10 +377,9 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        #J = create_dataset(file, "J", datatype(Int32), dataspace(nλ,nz,nx,ny), chunk=(1,nz,nx,ny))
         write(file, "J", Array{Int32,5}(undef, max_iterations, nλ, nz, nx,ny))
-        write(file, "total_destroyed", Array{Int32,2}(undef, max_iterations, nλ))
-        write(file, "total_scatterings", Array{Int32,2}(undef,max_iterations, nλ))
+        write(file, "total_destroyed", Array{Int64,2}(undef, max_iterations, nλ))
+        write(file, "total_scatterings", Array{Int64,2}(undef,max_iterations, nλ))
         write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
 
         write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
@@ -401,14 +400,14 @@ function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tu
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        write(file, "J", Array{Int32,5}(undef, nλ, nz, nx,ny))
-        write(file, "total_destroyed", Array{Int32,2}(undef, nλ))
-        write(file, "total_scatterings", Array{Int64,2}(undef, nλ))
-        write(file, "time", Array{Float64,2}(undef, nλ))
+        write(file, "J", Array{Int32,4}(undef, nλ, nz, nx,ny))
+        write(file, "total_destroyed", Array{Int64,1}(undef, nλ))
+        write(file, "total_scatterings", Array{Int64,1}(undef, nλ))
+        write(file, "time", Array{Float64,1}(undef, nλ))
 
-        write(file, "packets", Array{Int32,5}(undef, nλ, nz, nx, ny))
-        write(file, "boundary", Array{Int32,4}(undef, nλ, nx, ny))
-        write(file, "intensity_per_packet", Array{Float64,2}(undef, nλ))
+        write(file, "packets", Array{Int32,4}(undef, nλ, nz, nx, ny))
+        write(file, "boundary", Array{Int32,3}(undef, nλ, nx, ny))
+        write(file, "intensity_per_packet", Array{Float64,1}(undef, nλ))
     end
 end
 
@@ -427,7 +426,7 @@ function cut_output_file(output_path::String, final_iteration::Int64)
         packets_new = read(file, "packets")[1:final_iteration,:,:,:,:]
         boundary_new = read(file, "boundary")[1:final_iteration,:,:,:]
         intensity_per_packet_new = read(file, "intensity_per_packet")[1:final_iteration,:]
-        populations_new = read(file, "populations")[1:final_iteration,:,:,:,:]
+        populations_new = read(file, "populations")[1:final_iteration+1,:,:,:,:]
 
         # Delete
         delete_object(file, "J")
@@ -457,7 +456,7 @@ end
 Returns the maximum amount of GBs written to file if the
 simulation runs for max_iterations.
 """
-function how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64)
 
     nz, nx, ny = atmosphere_size
     boxes = nz*nx*ny
@@ -471,8 +470,33 @@ function how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple
     rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
     pop_data = 8boxes*3
 
-    #min_data = ( λ_data +  J_data + sim_data + rad_data + pop_data ) /1e9
-    max_data = ( λ_data + (J_data + sim_data + rad_data + pop_data) * max_iterations ) / 1e9
+    max_data = ( λ_data +
+               ( J_data + sim_data + rad_data) * max_iterations +
+                                      pop_data * (max_iterations + 1) ) / 1e9
+
+    return max_data
+end
+
+"""
+    how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+
+Returns the maximum amount of GBs written
+to file for the background mode.
+"""
+function how_much_data(nλ::Int64, atmosphere_size::Tuple)
+
+    nz, nx, ny = atmosphere_size
+    boxes = nz*nx*ny
+    slice = nx*ny
+
+    λ_data = 8*nλ + 8*2
+
+    # Iteration data
+    J_data   = 4boxes*nλ
+    sim_data = 4nλ + 2 * 8nλ
+    rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
+
+    max_data = ( λ_data +  J_data + sim_data + rad_data ) / 1e9
 
     return max_data
 end
