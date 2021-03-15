@@ -3,6 +3,7 @@ using BenchmarkTools
 using ProgressMeter
 using Transparency
 using StaticArrays
+using AtomicData
 using Unitful
 using Random
 using Printf
@@ -50,7 +51,7 @@ function get_output_path()
         nλ = 2nλ_bf + nλ_bb
         pop_distrib = get_population_distribution()
         if pop_distrib == "LTE"
-            d = "_LTE"
+            d = "_LTEp"
         elseif pop_distrib == "zero_radiation"
             d = "_ZR"
         end

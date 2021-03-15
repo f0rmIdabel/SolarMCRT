@@ -8,7 +8,7 @@ struct Atom
     gl::Int64
     gu::Int64
     g∞::Int64
-    U0::Float64
+    U0
     U1::Float64
     Z::Int64
 
@@ -33,8 +33,9 @@ function collect_atom_data(atmosphere::Atmosphere)
     # ==================================================================
     # READ ATOM FILE
     # ==================================================================
-
     atom = h5open(get_atom_path(), "r")
+    element = read(atom, "element")
+    stage = read(atom, "stage")
     χl = read(atom, "chi_l")u"cm^-1"
     χu = read(atom, "chi_u")u"cm^-1"
     χ∞ = read(atom, "chi_inf")u"cm^-1"
@@ -44,8 +45,6 @@ function collect_atom_data(atmosphere::Atmosphere)
     f_value = read(atom, "f_value")
     atom_weight = read(atom, "atom_weight")u"kg"
     Z = read(atom, "Z")
-    U0 = read(atom, "U_neutral")
-    U1 = read(atom, "U_ionised")
     density = read(atom, "density")u"m^-3"
     close(atom)
 
@@ -54,6 +53,12 @@ function collect_atom_data(atmosphere::Atmosphere)
     χl = line.χi
     χu = line.χj
     χ∞ = line.χ∞
+
+    # ==================================================================
+    # GET PARTITION FUNCTION
+    # ==================================================================
+    U0 = get_partition_function(element, stage, atmosphere.temperature)
+    U1 = 1 # Always true for two-level toy-atoms :)
 
     # ==================================================================
     # SAMPLE ATOM TRANSITION WAVELENGTHS
@@ -86,6 +91,7 @@ function collect_atom_data(atmosphere::Atmosphere)
     # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
     @test all( Inf .> ustrip(density) .>= 0.0 )
+    @test all( Inf .> U0 .>= 0.0 )
     @test all( Inf > ustrip(line.Aji) >= 0.0 )
     @test all( Inf > ustrip(line.Bji) >= 0.0 )
     @test all( Inf > ustrip(line.Bij) >= 0.0 )
@@ -106,6 +112,34 @@ function collect_atom_data(atmosphere::Atmosphere)
            λ, nλ_bb, nλ_bf,
            ΔλD, damping_const,
            density
+end
+
+
+"""
+    get_partition_function(atom_name::String,
+                           atom_stage::String,
+                           temperature::Array{<:Unitful.Temperature,3})
+Get the partition function for a given atom in
+a given state, using AtomicData.jl.
+"""
+function get_partition_function(atom_name::String,
+                                atom_stage::String,
+                                temperature::Array{<:Unitful.Temperature,3})
+
+    nz, nx, ny = size(temperature)
+    U0 = Array{Float64,3}(undef,nz,nx,ny)
+
+    atomic_stage = get_atomic_stage(atom_name, atom_stage)
+
+    for j=1:ny
+        for i=1:nx
+            for k=1:nz
+                U0[k,i,j] = partition_function(atomic_stage, temperature[k,i,j])
+            end
+        end
+    end
+
+    return U0
 end
 
 """
