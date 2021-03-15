@@ -36,7 +36,6 @@ function mcrt(atmosphere::Atmosphere,
     ε_line = radiation.ε_line
     boundary = radiation.boundary
     packets = radiation.packets
-    intensity_per_packet = radiation.intensity_per_packet
 
     # ===================================================================
     # ATOM DATA
@@ -71,7 +70,6 @@ function mcrt(atmosphere::Atmosphere,
         total_scatterings = Threads.Atomic{Int64}(0)
 
         # Pick out wavelength data
-        intensity_per_packet_λ = intensity_per_packet[λi]
         packets_λ = packets[λi,:,:,:]
         α_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
@@ -151,10 +149,6 @@ function mcrt(atmosphere::Atmosphere,
             file["total_scatterings"][iteration,λi] = total_scatterings.value
             file["total_destroyed"][iteration,λi] = total_destroyed.value
             file["time"][iteration,λi] = et
-
-            file["packets"][iteration,λi,:,:,:] = packets_λ
-            file["boundary"][iteration,λi,:,:] = boundary_λ
-            file["intensity_per_packet"][iteration,λi] = ustrip(intensity_per_packet_λ)
         end
     end
 
@@ -167,7 +161,6 @@ function mcrt(atmosphere::Atmosphere,
         total_scatterings = Threads.Atomic{Int64}(0)
 
         # Pick out wavelength data
-        intensity_per_packet_λ = intensity_per_packet[λi]
         packets_λ = packets[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
         α_continuum_λ = α_continuum[λi,:,:,:]
@@ -258,10 +251,6 @@ function mcrt(atmosphere::Atmosphere,
             file["total_scatterings"][iteration,λi] = total_scatterings.value
             file["total_destroyed"][iteration,λi] = total_destroyed.value
             file["time"][iteration,λi] = et
-
-            file["packets"][iteration,λi,:,:,:] = packets_λ
-            file["boundary"][iteration,λi,:,:] = boundary_λ
-            file["intensity_per_packet"][iteration,λi] = ustrip(intensity_per_packet_λ)
 
         end
     end
@@ -464,7 +453,6 @@ function mcrt(atmosphere::Atmosphere,
     ε = radiation.ε_continuum
     boundary = radiation.boundary
     packets = radiation.packets
-    intensity_per_packet = radiation.intensity_per_packet
 
     # ===================================================================
     # SET UP VARIABLES
@@ -492,7 +480,6 @@ function mcrt(atmosphere::Atmosphere,
         α_λ = α[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
         ε_λ = ε[λi,:,:,:]
-        intensity_per_packet_λ = intensity_per_packet[λi]
 
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
@@ -568,10 +555,6 @@ function mcrt(atmosphere::Atmosphere,
             file["total_scatterings"][λi] = total_scatterings.value
             file["total_destroyed"][λi] = total_destroyed.value
             file["time"][λi] = et
-
-            file["packets"][λi,:,:,:] = packets_λ
-            file["boundary"][λi,:,:] = boundary_λ
-            file["intensity_per_packet"][λi] = ustrip(intensity_per_packet_λ)
         end
     end
 end

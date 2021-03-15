@@ -65,15 +65,21 @@ end
 
 Plot the population distribution for a 2-level atom with continuum.
 """
-function plot_populations(populations::Array{<:NumberDensity, 4},
+function plot_populations(populations_LTE::Array{<:NumberDensity, 4},
+                          populations_zero_radiation::Array{<:NumberDensity, 4},
                           z::Array{<:Unitful.Length,1})
     # ===========================================================
     # GET AVERAGE COLUMN
     # ===========================================================
-    mean_p1 = average_column(populations[:,:,:,1])
-    mean_p2 = average_column(populations[:,:,:,2])
-    mean_p3 = average_column(populations[:,:,:,3])
+    mean_p1 = average_column(populations_LTE[:,:,:,1])
+    mean_p2 = average_column(populations_LTE[:,:,:,2])
+    mean_p3 = average_column(populations_LTE[:,:,:,3])
     total =  mean_p1 .+ mean_p2 .+ mean_p3
+
+    mean_p1_z = average_column(populations_zero_radiation[:,:,:,1])
+    mean_p2_z = average_column(populations_zero_radiation[:,:,:,2])
+    mean_p3_z = average_column(populations_zero_radiation[:,:,:,3])
+    total_z =  mean_p1_z .+ mean_p2_z .+ mean_p3_z
 
     # ===========================================================
     # PLOT
@@ -81,9 +87,13 @@ function plot_populations(populations::Array{<:NumberDensity, 4},
     ENV["GKSwstype"]="nul"
     z = ustrip.(z .|>u"Mm")
 
-    Plots.plot(z, [mean_p1./total, mean_p2./total, mean_p3./total],
-                xlabel = "z (Mm)", ylabel = "population density (m^-3)",
-                yscale=:log10, label=permutedims(["ground","excited","ionised"]))
+    p1 = Plots.plot(z, [mean_p1./total, mean_p2./total, mean_p3./total],
+                    xlabel = "z (Mm)", ylabel = "population density (m^-3)",
+                    yscale=:log10, label=permutedims(["ground","excited","ionised"]))
+    p2 = Plots.plot(z, [mean_p1_z./total_z, mean_p2_z./total_z, mean_p3_z./total_z],
+                    xlabel = "z (Mm)", ylabel = "population density (m^-3)",
+                    yscale=:log10, label=permutedims(["ground","excited","ionised"]))
+    Plots.plot(p1, p2, title=permutedims(["LTE", "Zero radiation"]), layout=(2,1))
     Plots.png("plots/initial_populations")
 end
 

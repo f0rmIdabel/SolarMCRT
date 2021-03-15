@@ -31,14 +31,14 @@ population_distribution = "LTE"
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.                   #
 #  If an even # is given for the bound-bound, an additional wavelength will be added by default.           #
 # ======================================================================================================== #
-nλ_bb = 5
-nλ_bf = 2
+nλ_bb = 30
+nλ_bf = 25
 
 # ======================================================================================================== #
 #  The intended number of packets to be created for each wavelength.                                       #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.                    #
 # ======================================================================================================== #
-target_packets = 1e4
+target_packets = 1e8
 
 # ======================================================================================================== #
 #  Optical depth where atmosphere is cut off for each wavelength.                                          #
@@ -62,3 +62,8 @@ max_scatterings = 1e8
 #  Maximum number of population iterations before quitting.                                                #
 # ======================================================================================================== #
 max_iterations = 10
+
+# ======================================================================================================== #
+#  Option to write all transition rates to output file for each iteration.                                 #
+# ======================================================================================================== #
+write_rates = false

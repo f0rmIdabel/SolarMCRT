@@ -3,7 +3,8 @@ include("rates.jl")
 """
     collect_initial_populations(atom::Atom,
                                 temperature::Array{<:Unitful.Temperature, 3},
-                                electron_density::Array{<:NumberDensity,3})
+                                electron_density::Array{<:NumberDensity,3},
+                                population_mode=nothing)
 
 Collect initial population distribution. Either LTE or zero-radiation.
 """
@@ -76,9 +77,7 @@ end
 Calculate the population distribution using statistical equlibrium.
 """
 function get_revised_populations(rates::TransitionRates,
-                                 atom_density::Array{<:NumberDensity, 3},
-                                 iteration::Int64,
-                                 output_path::String)
+                                 atom_density::Array{<:NumberDensity, 3})
 
     # Transition probabilities
     P12 = rates.R12 .+ rates.C12
@@ -97,8 +96,6 @@ function get_revised_populations(rates::TransitionRates,
 
     @test all( sum(revised_populations, dims=4) .≈ atom_density )
     @test all( Inf .> ustrip.(revised_populations) .>= 0.0 )
-
-    write_to_file(revised_populations, iteration, output_path)
 
     return revised_populations
 end

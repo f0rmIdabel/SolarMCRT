@@ -34,6 +34,7 @@ function background_mode()
     return tm
 end
 
+
 """
     get_output_path()
 
@@ -242,6 +243,22 @@ function get_population_distribution()
     return distribution
 end
 
+
+"""
+    test_mode()
+
+Check whether to write rates or not.
+"""
+function get_write_rates()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("write_rates", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end]
+    j = findfirst("\n", file[i+1:end])[end] + i
+    tm = parse(Bool, file[i+1:j-1])
+    return tm
+end
+
 # =============================================================================
 # ATMOSPHERE
 # =============================================================================
@@ -369,10 +386,10 @@ end
 # =============================================================================
 
 """
-    create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+    create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
 Initialise all output variables for the full atom mode.
 """
-function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
 
     nz, nx, ny = atmosphere_size
 
@@ -387,6 +404,20 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
         write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
 
         write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
+
+        if write_rates
+            write(file, "R12", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "R13", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "R23", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "R21", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "R31", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "R32", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C12", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C13", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C23", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C21", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C31", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "C32", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
     end
 end
 
@@ -412,11 +443,11 @@ function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tu
 end
 
 """
-    cut_output_file(output_path::String, final_iteration::Int64)
+    cut_output_file(output_path::String, final_iteration::Int64, write_rates::Bool)
 
 Cut output data at a given iteration.
 """
-function cut_output_file(output_path::String, final_iteration::Int64)
+function cut_output_file(output_path::String, final_iteration::Int64, write_rates::Bool)
     h5open(output_path, "r+") do file
         # Slice
         J_new = read(file, "J")[1:final_iteration,:,:,:,:]
@@ -447,16 +478,56 @@ function cut_output_file(output_path::String, final_iteration::Int64)
         write(file, "boundary", boundary_new)
         write(file, "intensity_per_packet", intensity_per_packet_new)
         write(file, "populations", populations_new)
+
+        if write_rates
+            R12_new = read(file, "R12")[1:final_iteration,:,:,:]
+            R13_new = read(file, "R13")[1:final_iteration,:,:,:]
+            R23_new = read(file, "R23")[1:final_iteration,:,:,:]
+            R21_new = read(file, "R21")[1:final_iteration,:,:,:]
+            R31_new = read(file, "R31")[1:final_iteration,:,:,:]
+            R32_new = read(file, "R32")[1:final_iteration,:,:,:]
+            C12_new = read(file, "C12")[1:final_iteration,:,:,:]
+            C13_new = read(file, "C13")[1:final_iteration,:,:,:]
+            C23_new = read(file, "C23")[1:final_iteration,:,:,:]
+            C21_new = read(file, "C21")[1:final_iteration,:,:,:]
+            C31_new = read(file, "C31")[1:final_iteration,:,:,:]
+            C32_new = read(file, "C32")[1:final_iteration,:,:,:]
+
+            delete_object(file, "R12")
+            delete_object(file, "R13")
+            delete_object(file, "R23")
+            delete_object(file, "R21")
+            delete_object(file, "R31")
+            delete_object(file, "R32")
+            delete_object(file, "C12")
+            delete_object(file, "C13")
+            delete_object(file, "C23")
+            delete_object(file, "C21")
+            delete_object(file, "C31")
+            delete_object(file, "C32")
+
+            write(file, "R12", R12_new)
+            write(file, "R13", R13_new)
+            write(file, "R23", R23_new)
+            write(file, "R21", R21_new)
+            write(file, "R31", R31_new)
+            write(file, "R32", R32_new)
+            write(file, "C12", C12_new)
+            write(file, "C13", C13_new)
+            write(file, "C23", C23_new)
+            write(file, "C21", C21_new)
+            write(file, "C31", C31_new)
+            write(file, "C32", C32_new)
     end
 end
 
 """
-    how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple)
+    how_much_data(max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
 
 Returns the maximum amount of GBs written to file if the
 simulation runs for max_iterations.
 """
-function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64)
+function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64, write_rates::Bool)
 
     nz, nx, ny = atmosphere_size
     boxes = nz*nx*ny
@@ -470,9 +541,15 @@ function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64
     rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
     pop_data = 8boxes*3
 
+    # Rates
+    rate_data = 8*12boxes
+
     max_data = ( λ_data +
                ( J_data + sim_data + rad_data) * max_iterations +
                                       pop_data * (max_iterations + 1) ) / 1e9
+
+    if write_rates
+        max_data += rate_data * (max_iterations+1)
 
     return max_data
 end

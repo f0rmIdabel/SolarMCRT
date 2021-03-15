@@ -28,8 +28,10 @@ function run_tests(check=true, plot=false)
     # =============================================================================
     # INITIAL POPULATIONS
     # =============================================================================
-    populations = collect_initial_populations(atom, atmosphere.temperature,
-                                                    atmosphere.electron_density)
+    populations_LTE = LTE_populations(atom, atmosphere.temperature,
+                                            atmosphere.electron_density)
+    populations_zero_radiation = zero_radiation_populations(atom, atmosphere.temperature,
+                                                                  atmosphere.electron_density)
 
     # =============================================================================
     # INITIAL TRANSITION RATES
@@ -42,7 +44,7 @@ function run_tests(check=true, plot=false)
     # =============================================================================
     # RADIATION
     # =============================================================================
-    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations, cut_off, target_packets)
+    radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations_LTE, cut_off, target_packets)
     radiation = Radiation(radiation_parameters...)
 
     if check == true
@@ -51,7 +53,8 @@ function run_tests(check=true, plot=false)
         check_atmosphere(atmosphere)
         check_radiationBackground(radiationBackground, atmosphere_size)
         check_atom(atom, atmosphere_size)
-        check_populations(populations, atmosphere_size)
+        check_populations(populations_LTE, atmosphere_size)
+        check_populations(populations_zero_radiation, atmosphere_size)
         check_rates(rates, atmosphere_size)
         check_radiation(radiation, atom, atmosphere_size)
         println("All tests passed.")
@@ -62,7 +65,7 @@ function run_tests(check=true, plot=false)
         z = atmosphere.z[1:end-1]
         plot_atmosphere(atmosphere)
         plot_radiationBackground(radiationBackground, z)
-        plot_populations(populations, z)
+        plot_populations(populations_LTE, populations_zero_radiation, z)
         plot_rates(rates, z)
         plot_radiation(radiation, atom, z)
         println("All parameters plotted.\n")

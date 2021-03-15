@@ -379,3 +379,29 @@ function LTE_populations(atom::Atom,
 
     return populations
 end
+
+"""
+    write_to_file(populations::Array{<:NumberDensity,4},
+                  iteration::Int64,
+                  output_path::String)
+
+Write the populations for a given iteration to the output file.
+"""
+function write_to_file(rates::TransitionRates,
+                       iteration::Int64,
+                       output_path::String)
+    h5open(output_path, "r+") do file
+        file["R12"][iteration+1,:,:,:] = ustrip.(rates.R12)
+        file["R13"][iteration+1,:,:,:] = ustrip.(rates.R13)
+        file["R23"][iteration+1,:,:,:] = ustrip.(rates.R23)
+        file["R21"][iteration+1,:,:,:] = ustrip.(rates.R21)
+        file["R31"][iteration+1,:,:,:] = ustrip.(rates.R31)
+        file["R32"][iteration+1,:,:,:] = ustrip.(rates.R32)
+        file["C12"][iteration+1,:,:,:] = ustrip.(rates.C12)
+        file["C13"][iteration+1,:,:,:] = ustrip.(rates.C13)
+        file["C23"][iteration+1,:,:,:] = ustrip.(rates.C23)
+        file["C21"][iteration+1,:,:,:] = ustrip.(rates.C21)
+        file["C31"][iteration+1,:,:,:] = ustrip.(rates.C31)
+        file["C32"][iteration+1,:,:,:] = ustrip.(rates.C32)
+    end
+end

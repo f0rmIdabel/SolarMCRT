@@ -39,6 +39,7 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_radiation_data(atmosphere, λ, cut_off, target_packets)
         radiation = RadiationBackground(radiation_parameters...)
+        write_to_file(radiation, output_path)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # =============================================================================
@@ -67,6 +68,7 @@ function run()
         target_packets = get_target_packets()
         cut_off = get_cut_off()
         population_distribution = get_population_distribution()
+        write_rates = get_write_rates()
 
         # =============================================================================
         # LOAD ATOM
@@ -99,10 +101,11 @@ function run()
         # CREATE OUTPUT FILE
         # =============================================================================
         print("--Initialise output file...................")
-        create_output_file(output_path, max_iterations, nλ, atmosphere_size)
+        create_output_file(output_path, max_iterations, nλ, atmosphere_size, write_rates)
         write_to_file(atom, output_path)
         write_to_file(populations, 0, output_path)
-        println(@sprintf("%.1f GBs of data initialised.", how_much_data(nλ, atmosphere_size, max_iterations)))
+        if write_rates; write_to_file(rates, 0, output_path); end
+        println(@sprintf("%.1f GBs of data initialised.", how_much_data(nλ, atmosphere_size, max_iterations, write_rates)))
 
         # =============================================================================
         # RUN MCRT UNTIL POPULATIONS CONVERGE
@@ -117,6 +120,7 @@ function run()
             print("--Loading radiation data...................")
             radiation_parameters = collect_radiation_data(atmosphere, atom, rates, populations, cut_off, target_packets)
             radiation = Radiation(radiation_parameters...)
+            write_to_file(radiation, n, output_path)
             println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
 
             # =============================================================================
@@ -132,13 +136,15 @@ function run()
             rate_parameters = calculate_transition_rates(atom, atmosphere.temperature,
                                                                atmosphere.electron_density, Jλ)
             rates = TransitionRates(rate_parameters...)
+            if write_rates; write_to_file(rates, n, output_path); end
             println("Transition rates updated.")
 
             # =============================================================================
             # CALCULATE NEW POPULATIONS
             # =============================================================================
             print("--Update populations.......................")
-            new_populations = get_revised_populations(rates, atom.density, n, output_path)
+            new_populations = get_revised_populations(rates, atom.density)
+            write_to_file(new_populations, n, output_path)
             println("Populations updated.")
 
             # =============================================================================
@@ -149,7 +155,7 @@ function run()
 
             if converged
                 println(@sprintf("--Convergence at iteration n = %d. Error = %.1e.\n", n, error))
-                cut_output_file(output_path, n)
+                cut_output_file(output_path, n, write_rates)
                 break
             else
                 println(@sprintf("\n--No convergence. Error = %.1e.\n", error))
@@ -164,6 +170,7 @@ function run()
         # END OF ATOM MODE
         # =============================================================================
     end
+
 end
 
 run()
