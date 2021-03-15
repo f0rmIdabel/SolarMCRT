@@ -532,9 +532,9 @@ Write the relevant radition data to the output file.
 """
 function write_to_file(radiation::RadiationBackground, output_path::String)
     h5open(output_path, "r+") do file
-        file["packets"]= ustrip(radiation.packets)
-        file["boundary"] = radiation.boundary
-        file["intensity_per_packet"] = ustrip(radiation.intensity_per_packet)
+        file["packets"][:,:,:,:] = ustrip(radiation.packets)
+        file["boundary"][:,:,:] = radiation.boundary
+        file["intensity_per_packet"][:] = ustrip(radiation.intensity_per_packet)
     end
 end
 

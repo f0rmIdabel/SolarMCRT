@@ -8,7 +8,7 @@ struct Atom
     gl::Int64
     gu::Int64
     g∞::Int64
-    U0
+    U0::Array{Float64,3}                             # (nz, nx, ny)
     U1::Float64
     Z::Int64
 
@@ -16,9 +16,9 @@ struct Atom
     nλ_bb::Int64
     nλ_bf::Int64
 
-    doppler_width::Array{<:Unitful.Length, 3}      # (nz, nx, ny)
+    doppler_width::Array{<:Unitful.Length, 3}        # (nz, nx, ny)
     damping_constant::Array{<:PerArea,3}             # (nz, nx, ny)
-    density::Array{<:NumberDensity}
+    density::Array{<:NumberDensity}                  # (nz, nx, ny)
 end
 
 """
