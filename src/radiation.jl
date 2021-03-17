@@ -185,6 +185,8 @@ function collect_radiation_data(atmosphere::Atmosphere,
     return α_continuum, ε_continuum, α_line_constant, ε_line, boundary, packets, intensity_per_packet
 end
 
+
+
 # ==================================================================
 # EXTINCTION AND DESTRUCTION
 # ==================================================================
