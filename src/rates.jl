@@ -313,7 +313,7 @@ function Cij(i::Integer,
         elseif i == ionisation_level
             C = coll_ion_hydrogen_johnson.(j, electron_density, temperature)
         end
-        C = C .* ( LTE_populations[:,:,:,i] ./ LTE_populations[:,:,:,j] )
+        C = C .* ( LTE_populations[:,:,:,j] ./ LTE_populations[:,:,:,i] )
     end
 
     return C
