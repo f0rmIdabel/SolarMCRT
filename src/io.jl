@@ -51,7 +51,7 @@ function get_output_path()
         nλ = 2nλ_bf + nλ_bb
         pop_distrib = get_population_distribution()
         if pop_distrib == "LTE"
-            d = "_LTEp"
+            d = "_LTE"
         elseif pop_distrib == "zero_radiation"
             d = "_ZR"
         end

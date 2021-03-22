@@ -37,6 +37,8 @@ function mcrt(atmosphere::Atmosphere,
     boundary = radiation.boundary
     packets = radiation.packets
 
+    nλ, nz, nx, ny = size(α_continuum)
+
     # ===================================================================
     # ATOM DATA
     # ===================================================================
@@ -48,18 +50,13 @@ function mcrt(atmosphere::Atmosphere,
     λ0 = line.λ0
 
     # ===================================================================
-    # SET UP VARIABLES
-    # ===================================================================
-    nλ, nz, nx, ny = size(α_continuum)
-
-    # Initialise placeholder variable
-    J_λ = zeros(Int32, nz, nx, ny)
-
-    # ===================================================================
     # SIMULATION
     # ===================================================================
     println(@sprintf("--Starting simulation, using %d thread(s)...",
             Threads.nthreads()))
+
+    # Initialise placeholder variable
+    J_λ = Array{Int32,3}(undef, nz, nx, ny)
 
     # Bound free wavelength
     for λi=1:2*nλ_bf

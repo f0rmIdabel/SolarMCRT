@@ -60,10 +60,11 @@ function collect_radiation_data(atmosphere::Atmosphere,
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR BACKGROUND PROCESSES
     # ==================================================================
     proton_density = hydrogen_populations[:,:,:,end]
-    hydrogen_ground_popuplation = hydrogen_populations[:,:,:,1]
+    hydrogen_ground_density = hydrogen_populations[:,:,:,1]
+    hydrogen_neutral_density = hydrogen_populations[:,:,:,1] .+ hydrogen_populations[:,:,:,2]
 
-    α_continuum_abs = α_cont_abs.(λ, temperature, electron_density, hydrogen_ground_popuplation, proton_density)
-    α_continuum_scat = α_cont_scatt.(λ, electron_density, hydrogen_ground_popuplation)
+    α_continuum_abs = α_cont_abs.(λ, temperature, electron_density, hydrogen_neutral_density, proton_density)
+    α_continuum_scat = α_cont_scatt.(λ, electron_density, hydrogen_ground_density)
 
     α[1,:,:,:] = α_continuum_abs .+ α_continuum_scat
     ε[1,:,:,:] = α_continuum_abs ./ α[1,:,:,:]
