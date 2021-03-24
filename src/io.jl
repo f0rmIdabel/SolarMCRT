@@ -177,8 +177,6 @@ function get_Jλ(output_path::String, iteration::Int64, intensity_per_packet::Ar
         J = read(file, "J")[iteration,:,:,:,:]
     end
 
-    @test all( Inf .> J .>= 0)
-
     nλ, nz, nx, ny = size(J)
     Jλ = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
 

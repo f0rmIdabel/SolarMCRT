@@ -107,7 +107,7 @@ function check_radiationBackground(radiationBackground::RadiationBackground,
     @test all(  Inf .> ustrip.(λ) .>= 0.0 )
     @test all(  Inf .> ustrip.(α_continuum) .>= 0.0 )
     @test all(  Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
-    @test all(  Inf .> ε_continuum .>= 0.0 )
+    @test all(  1.0 .>= ε_continuum .>= 0.0 )
     @test all(  Inf .> boundary .>= 0 )
     @test all(  Inf .> packets .>= 0 )
 end
@@ -339,8 +339,8 @@ function check_radiation(radiation::Radiation,
     # NO NEGAITVE VALUES
     # ===========================================================
     @test all( Inf .> ustrip.(α_continuum) .>= 0.0 )
-    @test all( Inf .> ε_continuum .>= 0.0 )
-    @test all( Inf .> ε_line .>= 0.0 )
+    @test all( 1.0 .>= ε_continuum .>= 0.0 )
+    @test all( 1.0 .>= ε_line .>= 0.0 )
     @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
     @test all( Inf .> ustrip.(α_line) .>= 0.0 )

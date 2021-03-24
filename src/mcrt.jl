@@ -75,8 +75,7 @@ function mcrt(atmosphere::Atmosphere,
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
-        p = Progress(ny)
-        update!(p,0)
+        p = Progress(ny); update!(p,0)
         jj = Threads.Atomic{Int}(0)
         l = Threads.SpinLock()
 
@@ -84,8 +83,7 @@ function mcrt(atmosphere::Atmosphere,
         et = @elapsed Threads.@threads for j=1:ny
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
-            Threads.lock(l)
-            update!(p, jj[])
+            Threads.lock(l); update!(p, jj[])
             Threads.unlock(l)
 
             for i=1:nx
@@ -392,7 +390,7 @@ function scatter_packet(x::Array{<:Unitful.Length, 1},
     # CORRECT FOR OVERSHOOT IN FINAL BOX
     # ===================================================================
     if !lost
-        r -= unit_vector*(τ_cum - τ)/α #[box_id...]
+        r -= unit_vector*(τ_cum - τ)/α
     end
 
     return box_id, r, lost, α
@@ -481,8 +479,7 @@ function mcrt(atmosphere::Atmosphere,
         println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
-        p = Progress(ny)
-        update!(p,0)
+        p = Progress(ny); update!(p,0)
         jj = Threads.Atomic{Int}(0)
         l = Threads.SpinLock()
 
@@ -491,8 +488,7 @@ function mcrt(atmosphere::Atmosphere,
 
             # Advance ProgressMeter
             Threads.atomic_add!(jj, 1)
-            Threads.lock(l)
-            update!(p, jj[])
+            Threads.lock(l); update!(p, jj[])
             Threads.unlock(l)
 
             for i=1:nx

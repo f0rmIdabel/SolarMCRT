@@ -86,7 +86,7 @@ function collect_radiation_data(atmosphere::Atmosphere,
     @test all(  Inf .> ustrip.(λ) .>= 0.0 )
     @test all(  Inf .> ustrip.(α) .>= 0.0 )
     @test all(  Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
-    @test all(  Inf .> ε .>= 0.0 )
+    @test all(  1.0 .>= ε .>= 0.0 )
     @test all(  Inf .> boundary .>= 0 )
     @test all(  Inf .> packets .>= 0 )
 
@@ -176,8 +176,8 @@ function collect_radiation_data(atmosphere::Atmosphere,
     # CHECK FOR UNVALID VALUES
     # ==================================================================
     @test all( Inf .> ustrip.(α_continuum) .>= 0.0 )
-    @test all( Inf .> ε_continuum .>= 0.0 )
-    @test all( Inf .> ε_line .>= 0.0 )
+    @test all( 1.0 .>= ε_continuum .>= 0.0 )
+    @test all( 1.0 .>= ε_line .>= 0.0 )
     @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
     @test all( Inf .> packets .>= 0 )
@@ -237,7 +237,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     hydrogen_neutral_density = hydrogen_populations[:,:,:,1] .+ hydrogen_populations[:,:,:,2]
 
     # Background at bound-free wavelengths
-    @Threads.threads for l=1:2*nλ_bf
+    @Threads.threads for l=1:2nλ_bf
         α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_neutral_density, proton_density)
         α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
 
@@ -255,7 +255,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     α_background_line = α_abs .+ α_scatt
     ε_background_line = α_abs ./ α_background_line
 
-    @Threads.threads for l=2*nλ_bf+1:nλ
+    @Threads.threads for l=2nλ_bf+1:nλ
         α_continuum[l,:,:,:] = α_background_line
         ε_continuum[l,:,:,:] = ε_background_line
     end
@@ -284,10 +284,10 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
                                1.0, n_eff)
 
         α_continuum[l,:,:,:] = α_background[l,:,:,:] .+ α_bf_l
-        ε_continuum[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_bf_l .* α_bf_l ) ./  (α_background[l,:,:,:] .+ α_bf_l)
+        ε_continuum[l,:,:,:] = ( ε_background[l,:,:,:] .* α_background[l,:,:,:] .+ ε_bf_l .* α_bf_l ) ./  α_continuum[l,:,:,:]
 
         α_continuum[l+nλ_bf,:,:,:] = α_background[l+nλ_bf,:,:,:] .+ α_bf_u
-        ε_continuum[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ (α_background[l+nλ_bf,:,:,:] .+ α_bf_u)
+        ε_continuum[l+nλ_bf,:,:,:] = ( ε_background[l+nλ_bf,:,:,:] .* α_background[l+nλ_bf,:,:,:] .+ ε_bf_u .* α_bf_u ) ./ α_continuum[l+nλ_bf,:,:,:]
     end
 
     return α_continuum, ε_continuum

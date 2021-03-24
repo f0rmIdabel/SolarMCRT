@@ -1,6 +1,6 @@
 include("../src/mcrt.jl")
 include("../src/populations.jl")
-
+include("../test/check_parameters.jl")
 
 function run()
     println("\n", "="^91, "\n", " "^34,
@@ -146,6 +146,13 @@ function run()
             new_populations = get_revised_populations(rates, atom.density)
             write_to_file(new_populations, n, output_path)
             println("Populations updated.")
+
+            # =============================================================================
+            # CHECK FOR UNVALID VARIABLES
+            # =============================================================================
+            @test all( Inf .> J .>= 0)
+            check_rates(rates, atmosphere_size)
+            check_populations(new_populations, atmosphere_size)
 
             # =============================================================================
             # CHECK POPULATION CONVERGENCE

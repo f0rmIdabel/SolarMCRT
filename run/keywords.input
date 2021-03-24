@@ -26,7 +26,7 @@ atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_2lvl.h5"
 # ======================================================================================= #
 #  Initial population distribution. Choose between "LTE" and "zero_radiation".            #
 # ======================================================================================= #
-population_distribution = "LTE"
+population_distribution = "zero_radiation"
 
 # ======================================================================================= #
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.  #
@@ -40,7 +40,7 @@ nλ_bf = 25
 #  The intended number of packets to be created for each wavelength.                      #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets = 1e5
+target_packets = 5e5
 
 # ======================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                         #

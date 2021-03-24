@@ -72,4 +72,4 @@ function run_tests(check=true, plot=false)
     end
 end
 
-run_tests(true, true)
+run_tests(true, false)
