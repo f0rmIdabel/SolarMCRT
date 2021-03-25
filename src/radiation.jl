@@ -237,7 +237,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     hydrogen_neutral_density = hydrogen_populations[:,:,:,1] .+ hydrogen_populations[:,:,:,2]
 
     # Background at bound-free wavelengths
-    @Threads.threads for l=1:2nλ_bf
+    for l=1:2nλ_bf
         α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_neutral_density, proton_density)
         α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
 
@@ -274,7 +274,7 @@ function continuum_extinction_destruction(atmosphere::Atmosphere,
     ε_bf_l = C31 ./ (R31 .+ C31)
     ε_bf_u = C32 ./ (R32 .+ C32)
 
-    @Threads.threads for l=1:nλ_bf
+    for l=1:nλ_bf
         α_bf_l = hydrogenic_bf.(ν[l], ν[nλ_bf],
                                temperature,  atom_populations[:,:,:,1],
                                1.0, n_eff)
@@ -394,7 +394,7 @@ function optical_depth(α::Array{<:PerLength, 3},
     τ = Array{Float64,3}(undef, nz-1, nx, ny)
 
     # Calculate vertical optical depth for each column
-    Threads.@threads for col=1:nx*ny
+    for col=1:nx*ny
         j = 1 + (col-1)÷nx
         i = col - (j-1)*nx
         τ[1,i,j] = 0.5(z[1] - z[2]) * (α[1,i,j] + α[2,i,j])
@@ -423,7 +423,7 @@ function optical_depth_boundary(α::Array{<:PerLength, 3},
     boundary = Array{Int32, 2}(undef, nx, ny)
 
     # Calculate vertical optical depth for each column
-    Threads.@threads for col=1:columns
+    for col=1:columns
         j = 1 + (col-1)÷nx
         i = col - (j-1)*nx
 
@@ -474,7 +474,7 @@ function distribute_packets(λ::Unitful.Length,
     Δx = (x[2:end] .- x[1:end-1])
     Δy = (y[2:end] .- y[1:end-1])
 
-    @Threads.threads for j=1:ny
+    for j=1:ny
         for i=1:nx
             for k=1:boundary[i,j]
                 box_emission[k,i,j] = emissivity[k,i,j]*Δz[k]*Δx[i]*Δy[j]

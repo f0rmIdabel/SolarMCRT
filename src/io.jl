@@ -102,12 +102,25 @@ Get the number of packets to be created for each wavelength.
 """
 function get_target_packets()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("target_packets", input_file)[end] + 1
+    i = findfirst("target_packets_bb", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
-    target_packets = parse(Float64, file[i:j])
-    return target_packets # move
+    target_packets_bb = parse(Float64, file[i:j])
+
+    i = findfirst("target_packets_bf_g", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    target_packets_bf_g = parse(Float64, file[i:j])
+
+    i = findfirst("target_packets_bf_e", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    target_packets_bf_e = parse(Float64, file[i:j])
+
+    return target_packets_bb, target_packets_bf_g, target_packets_bf_e
 end
 
 """

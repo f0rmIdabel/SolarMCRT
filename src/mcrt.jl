@@ -112,8 +112,6 @@ function mcrt(atmosphere::Atmosphere,
                         # escape or reach max_scatterings
                         for s=1:Int(max_scatterings)
 
-                            Threads.atomic_add!(total_scatterings, 1)
-
                             # Scatter packet once
                             box_id, r, lost = scatter_packet(x, y, z,
                                                              α_λ,
@@ -129,6 +127,9 @@ function mcrt(atmosphere::Atmosphere,
                                 Threads.atomic_add!(total_destroyed, 1)
                                 break
                             end
+
+                            Threads.atomic_add!(total_scatterings, 1)
+
                         end
                     end
                 end
@@ -204,8 +205,6 @@ function mcrt(atmosphere::Atmosphere,
                         # escape or reach max_scatterings
                         for s=1:Int(max_scatterings)
 
-                            Threads.atomic_add!(total_scatterings, 1)
-
                             # Scatter packet once
                             box_id, r, lost, α = scatter_packet(x, y, z,
                                                                 velocity,
@@ -231,6 +230,9 @@ function mcrt(atmosphere::Atmosphere,
                                 Threads.atomic_add!(total_destroyed, 1)
                                 break
                             end
+
+                            Threads.atomic_add!(total_scatterings, 1)
+
                         end
                     end
                 end

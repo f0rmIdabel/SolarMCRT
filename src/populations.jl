@@ -57,8 +57,21 @@ the convergence criterion. Return convergence status and error.
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
                                       criterion::Real = 1e-3)
-    N = length(populations)
-    error = sum( abs.(populations .- new_populations) ./populations ) ./N
+    nz, nx, ny, nl = size(populations)
+    error = 0.0
+    N = 0
+
+    for j=1:ny
+        for i=1:nx
+            nz = boundary[i,j]
+            N += ny*nx*nz
+            for k = 1:nz
+                error = sum( abs.(populations[k,i,j,:] .- new_populations[k,i,j,:]) ./populations[k,i,j,:] )
+            end
+        end
+    end
+
+    error /= N
 
     converged = false
     if error < criterion
@@ -93,9 +106,6 @@ function get_revised_populations(rates::TransitionRates,
     revised_populations[:,:,:,3] = n3(atom_density, P12, P13, P21, P23, P31, P32)
     revised_populations[:,:,:,2] = n2(atom_density, revised_populations[:,:,:,3], P12, P21, P23, P32)
     revised_populations[:,:,:,1] = n1(atom_density, revised_populations[:,:,:,3], revised_populations[:,:,:,2])
-
-    @test all( sum(revised_populations, dims=4) .≈ atom_density )
-    @test all( Inf .> ustrip.(revised_populations) .>= 0.0 )
 
     return revised_populations
 end

@@ -150,7 +150,7 @@ function run()
             # =============================================================================
             # CHECK FOR UNVALID VARIABLES
             # =============================================================================
-            @test all( Inf .> J .>= 0)
+            @test all( Inf .> ustrip.(Jλ) .>= 0)
             check_rates(rates, atmosphere_size)
             check_populations(new_populations, atmosphere_size)
 

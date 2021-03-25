@@ -29,24 +29,26 @@ atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_2lvl.h5"
 population_distribution = "zero_radiation"
 
 # ======================================================================================= #
-#  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.  #
-#  If an even # is given for the bound-bound, an additional wavelength will be added      #
-#  by default.                                                                            #
+#  Choose how many wavelengths to sample for the bound-bound, bound-free ground and       #
+#  bound-free excited transitions. If an even # is given for the bound-bound, an          #
+#  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
-nλ_bb = 51
-nλ_bf = 25
+nλ_bb = 25
+nλ_bf = 20
 
 # ======================================================================================= #
-#  The intended number of packets to be created for each wavelength.                      #
+#  The intended number of packets to be created for each group of wavelengths.            #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets = 5e5
+target_packets_bb   = 5e5
+target_packets_bf_g = 1e6
+target_packets_bf_e = 1e7
 
 # ======================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                         #
 #  Set to false for no cut-off.                                                           #
 # ======================================================================================= #
-cut_off = 20.0
+cut_off = 30.0
 
 # ======================================================================================= #
 # Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #
@@ -58,7 +60,7 @@ step = [1, 1, 1]
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
 # ======================================================================================= #
-max_scatterings = 1e8
+max_scatterings = 1e7
 
 # ======================================================================================= #
 #  Maximum number of population iterations before quitting.                               #
