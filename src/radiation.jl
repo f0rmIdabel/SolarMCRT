@@ -148,18 +148,28 @@ function collect_radiation_data(atmosphere::Atmosphere,
     ε_line = line_destruction(rates)
     α_line_constant = line_extinction_constant.(Ref(line), populations[:,:,:,1], populations[:,:,:,2])
 
+
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
 
     # BF wavelengths
-    for l=1:2nλ_bf
+    for l=1:nλ_bf
         boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
 
         α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
-        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                      temperature, α_continuum_abs, boundary[l,:,:])
+        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], 100*target_packets, x, y, z,
+                                                                      temperature, α_continuum_abs, boundary[l,:,:])  # OPS
     end
+
+    for l=nλ_bf+1:2nλ_bf
+        boundary[l,:,:] = optical_depth_boundary(α_continuum[l,:,:,:], z, τ_max)
+
+        α_continuum_abs = α_continuum[l,:,:,:] .* ε_continuum[l,:,:,:]
+        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], 10000*target_packets, x, y, z,
+                                                                      temperature, α_continuum_abs, boundary[l,:,:]) # OPS
+    end
+
 
     # BB wavelengths
     for l=2nλ_bf+1:nλ

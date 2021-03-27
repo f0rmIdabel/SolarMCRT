@@ -50,28 +50,14 @@ end
     check_population_convergence(populations::Array{<:NumberDensity, 4},
                                  new_populations::Array{<:NumberDensity, 4},
                                  criterion::Real = 1e-3)
-
 Check if the relative difference between two populations satisfy
 the convergence criterion. Return convergence status and error.
 """
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
                                       criterion::Real = 1e-3)
-    nz, nx, ny, nl = size(populations)
-    error = 0.0
-    N = 0
-
-    for j=1:ny
-        for i=1:nx
-            nz = boundary[i,j]
-            N += ny*nx*nz
-            for k = 1:nz
-                error = sum( abs.(populations[k,i,j,:] .- new_populations[k,i,j,:]) ./populations[k,i,j,:] )
-            end
-        end
-    end
-
-    error /= N
+    N = length(populations)
+    error = sum( abs.(populations .- new_populations) ./populations ) ./N
 
     converged = false
     if error < criterion

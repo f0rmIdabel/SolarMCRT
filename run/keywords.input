@@ -40,9 +40,7 @@ nλ_bf = 20
 #  The intended number of packets to be created for each group of wavelengths.            #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets_bb   = 5e5
-target_packets_bf_g = 1e6
-target_packets_bf_e = 1e7
+target_packets = 5e4
 
 # ======================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                         #
