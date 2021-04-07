@@ -19,7 +19,7 @@ Reads and slices atmosphere parameters according to
 keyword.input file. Returns atmosphere dimensions, velocity,
 temperature, electron_density and hydrogen populations.
 """
-function collect_atmosphere_data()
+function collect_atmosphere()
 
     # ===========================================================
     # READ ATMOSPHERE FILE

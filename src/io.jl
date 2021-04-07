@@ -46,16 +46,16 @@ function get_output_path()
     if background_mode()
         path = "../out/output_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
     else
-        nλ_bb, nλ_bf = get_nλ()
-        nλ_bb += 1-nλ_bb%2
-        nλ = 2nλ_bf + nλ_bb
+        nλ_bb = sum(get_nλ_bb())
+	nλ_bf = sum(get_nλ_bf())
+        nλ = nλ_bf + nλ_bb
         pop_distrib = get_population_distribution()
         if pop_distrib == "LTE"
             d = "_LTE"
         elseif pop_distrib == "zero_radiation"
             d = "_ZR"
         end
-        path = "../out/output_nw" * string(nλ) * "_" * string(get_target_packets()) * "pcs" * d * ".h5"
+        path = "../out/output_nw" * string(nλ) * "_" * d * ".h5"
     end
 
     return path
@@ -102,13 +102,67 @@ Get the number of packets to be created for each wavelength.
 """
 function get_target_packets()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("target_packets", input_file)[end] + 1
+    i = findfirst("background_target_packets", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
     target_packets = parse(Float64, file[i:j])
     return target_packets
 end
+
+function get_target_packets_bf()
+
+    packets_bf = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("target_packets_bf", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        packets = parse(Float64, file[i:j])
+        append!(packets_bf, packets)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    packets = parse(Float64, file[i:n])
+    append!(packets_bf, packets)
+
+    return packets_bf
+end
+
+
+function get_target_packets_bb()
+
+    packets_bb = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("target_packets_bb", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        packets = parse(Float64, file[i:j])
+        append!(packets_bb, packets)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    packets = parse(Float64, file[i:n])
+    append!(packets_bb, packets)
+
+    return packets_bb
+end
+
 
 """
     get_max_scatterings()
@@ -171,42 +225,148 @@ end
 
 Get the radiation field from the output file.
 """
-function get_Jλ(output_path::String, iteration::Int64, intensity_per_packet::Array{<:UnitsIntensity_λ,1})
+function get_Jλ(output_path::String, iteration::Int64, λ)
     J = nothing
+	intensity_per_packet = nothing
+
     h5open(output_path, "r") do file
         J = read(file, "J")[iteration,:,:,:,:]
+		intensity_per_packet = read(file, "intensity_per_packet")[iteration,:] .*u"kW / m^2 / sr / nm"
     end
 
-    nλ, nz, nx, ny = size(J)
-    Jλ = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
+	nλ_tot, nz,nx,ny=size(J)
 
-    for l=1:nλ
-        Jλ[l,:,:,:] = intensity_per_packet[l] .* J[l,:,:,:]
+    Jλ = []
+	n_transitions = length(λ)
+    nλ0 = 0
+
+
+    for t=1:n_transitions
+
+		nλ = length(λ[t])
+		j = Array{UnitsIntensity_λ, 4}(undef, nλ, nz,nx,ny)
+
+		for l=1:nλ
+			j[l,:,:,:] = J[nλ0+l,:,:,:] .* intensity_per_packet[nλ0+l]
+		end
+
+		append!(Jλ, [j])
+
+		nλ0 += nλ
     end
 
     return Jλ
 end
 
-"""
-    get_nλ()
 
-Get the number of bound-bound and bound-free wavelengths to sample.
-"""
-function get_nλ()
+function get_nλ_bf()
+
+    nλ_bf = []
+
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("nλ_bb", input_file)[end] + 1
+    i = findfirst("λ_bf", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-    nλ_bb = parse(Int64, file[i:j])
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
 
-    i = findfirst("nλ_bf", input_file)[end] + 1
+    while j < n
+        nλ = parse(Int64, file[i:j])
+        append!(nλ_bf, nλ)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    nλ = parse(Int64, file[i:n])
+    append!(nλ_bf, nλ)
+
+    return nλ_bf
+end
+
+
+function get_nλ_bb()
+
+    nλ_bb = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("λ_bb", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
-    j = findfirst("\n", file)[end] - 1
-    nλ_bf = parse(Int64, file[i:j])
-    return nλ_bb, nλ_bf
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        nλ = parse(Int64, file[i:j])
+        append!(nλ_bb, nλ)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    nλ = parse(Int64, file[i:n])
+    append!(nλ_bb, nλ)
+
+    return nλ_bb
 end
+
+
+function get_qcore()
+
+    qcore = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("q_core", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        q = parse(Float64, file[i:j])
+        append!(qcore, q)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    q = parse(Float64, file[i:n])
+    append!(qcore, q)
+
+    return qcore
+end
+
+function get_qwing()
+
+    qwing = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("q_wing", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        q = parse(Float64, file[i:j])
+        append!(qwing, q)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    q = parse(Float64, file[i:n])
+    append!(qwing, q)
+
+    return qwing
+end
+
+
+
 
 # =============================================================================
 # ATOM
@@ -241,6 +401,35 @@ function get_population_distribution()
     distribution = string(file[i+1:j-1])
     return distribution
 end
+
+
+
+function get_λ_min()
+
+    λ_min = []
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("λ_min", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst(",", file)[end] - 1
+    n = findfirst("\n", file)[end] - 1
+
+    while j < n
+        λ = parse(Float64, file[i:j])
+        append!(λ_min, λ)
+
+        i = j + 2
+        j = i + findfirst(",", file[i+1:end])[end] - 1
+        n = i + findfirst("\n", file[i+1:end])[end] - 1
+    end
+
+    λ = parse(Float64, file[i:n])
+    append!(λ_min, λ)
+
+    return λ_min
+end
+
 
 
 """
@@ -388,7 +577,7 @@ end
     create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
 Initialise all output variables for the full atom mode.
 """
-function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
+function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, n_transitions, atmosphere_size::Tuple, write_rates::Bool)
 
     nz, nx, ny = atmosphere_size
 
@@ -405,18 +594,10 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
         write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
 
         if write_rates
-            write(file, "R12", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "R13", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "R23", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "R21", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "R31", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "R32", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C12", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C13", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C23", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C21", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C31", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
-            write(file, "C32", Array{Float64}(undef, max_iterations+1, nz,nx,ny))
+            write(file, "Rlu", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
+            write(file, "Rul", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
+            write(file, "Clu", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
+            write(file, "Cul", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
         end
     end
 end
@@ -431,14 +612,14 @@ function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tu
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        write(file, "J", Array{Int32,4}(undef, nλ, nz, nx,ny))
-        write(file, "total_destroyed", Array{Int64,1}(undef, nλ))
-        write(file, "total_scatterings", Array{Int64,1}(undef, nλ))
-        write(file, "time", Array{Float64,1}(undef, nλ))
+        write(file, "J", Array{Int32,5}(undef, 1, nλ, nz, nx,ny))
+        write(file, "total_destroyed", Array{Int64,2}(undef,1, nλ))
+        write(file, "total_scatterings", Array{Int64,2}(undef,1, nλ))
+        write(file, "time", Array{Float64,2}(undef,1, nλ))
 
-        write(file, "packets", Array{Int32,4}(undef, nλ, nz, nx, ny))
-        write(file, "boundary", Array{Int32,3}(undef, nλ, nx, ny))
-        write(file, "intensity_per_packet", Array{Float64,1}(undef, nλ))
+        write(file, "packets", Array{Int32,5}(undef,1, nλ, nz, nx, ny))
+        write(file, "boundary", Array{Int32,4}(undef, 1,nλ, nx, ny))
+        write(file, "intensity_per_packet", Array{Float64,2}(undef,1, nλ))
     end
 end
 

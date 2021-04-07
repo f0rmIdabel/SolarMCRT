@@ -104,7 +104,7 @@ end
 Plots column averaged extincion, destruction probability,
 package creation and depth boundary for a background wavelength.
 """
-function plot_radiationBackground(radiationBackground::RadiationBackground,
+function plot_radiationBackground(radiationBackground::RadiationContinuum,
                                   z::Array{<:Unitful.Length, 1})
     #λ = radiationBackground.λ
     α_continuum = radiationBackground.α_continuum[1,:,:,:]
@@ -208,7 +208,7 @@ For bb-center and bf-edge wavelengths, plot average column extinction,
 average column destruction probability, mean boundary depth and average
 number of packets created at each height.
 """
-function plot_radiation(radiation::Radiation,
+function plot_radiation(radiation::RadiationLine,
                         atom::Atom,
                         z::Array{<:Unitful.Length, 1})
 

@@ -2,18 +2,10 @@ include("atmosphere.jl")
 include("atom.jl")
 
 struct TransitionRates
-    R12::Array{<:Unitful.Frequency,3}
-    R13::Array{<:Unitful.Frequency,3}
-    R23::Array{<:Unitful.Frequency,3}
-    R21::Array{<:Unitful.Frequency,3}
-    R31::Array{<:Unitful.Frequency,3}
-    R32::Array{<:Unitful.Frequency,3}
-    C12::Array{<:Unitful.Frequency,3}
-    C13::Array{<:Unitful.Frequency,3}
-    C23::Array{<:Unitful.Frequency,3}
-    C21::Array{<:Unitful.Frequency,3}
-    C31::Array{<:Unitful.Frequency,3}
-    C32::Array{<:Unitful.Frequency,3}
+    Rlu::Array{<:Unitful.Frequency, 4}
+    Rul::Array{<:Unitful.Frequency, 4}
+    Clu::Array{<:Unitful.Frequency, 4}
+    Cul::Array{<:Unitful.Frequency, 4}
 end
 
 """
@@ -27,61 +19,75 @@ the excitation, de-excitation, ionisations and re-combiantions
 of a two level atom. Level 1,2 and 3 represent the ground level,
 excited level and ionised level respectively.
 """
-function calculate_transition_rates(atom::Atom,
-                                    temperature::Array{<:Unitful.Temperature, 3},
-                                    electron_density::Array{<:NumberDensity,3},
-                                    J::Array{<:UnitsIntensity_λ, 4})
+function calculate_transition_rates(atmosphere::Atmosphere,
+                                    atom::Atom,
+                                    J::Array{Any,1})
 
     # ==================================================================
     # LOAD ATMOSPHERE PARAMETERS
     # ==================================================================
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    hydrogen_populations = atmosphere.hydrogen_populations
+
     LTE_pops = LTE_populations(atom, temperature, electron_density)
 
+    nz,nx,ny,nl = size(LTE_pops)
+    n_levels = nl - 1
     # ==================================================================
-    # LOAD WAVELENGTHS AND SEPERATE BB AND BF
+    # LOAD WAVELENGTHS
     # ==================================================================
     λ = atom.λ
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
 
-    λ_bf_l = λ[1:nλ_bf]
-    λ_bf_u = λ[nλ_bf+1:2nλ_bf]
-    λ_bb = λ[2nλ_bf+1:end]
+    n_levels = atom.n_levels
+    n_lines = atom.n_lines
 
-    J_bf_l = J[1:nλ_bf,:,:,:]
-    J_bf_u = J[nλ_bf+1:2nλ_bf,:,:,:]
-    J_bb = J[2nλ_bf+1:end,:,:,:]
-
+    n_transitions = n_levels + n_lines
     # ==================================================================
-    # CALCULATE RADIATIVE RATES (nz, nx, ny)
+    # CALCULATE RADIATIVE RATES
     # ==================================================================
-    σ12 = σij(1, 2, atom, λ_bb)
-    σ13 = σic(1, atom, λ_bf_l)
-    σ23 = σic(2, atom, λ_bf_u)
 
-    G12 = Gij(1, 2, λ_bb, temperature, LTE_pops)
-    G13 = Gij(1, 3, λ_bf_l, temperature, LTE_pops)
-    G23 = Gij(2, 3, λ_bf_u, temperature, LTE_pops)
+    Rlu = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
+    Rul = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
+    Clu = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
+    Cul = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
 
-    R12 = Rij(J_bb, σ12, λ_bb)
-    R13 = Rij(J_bf_l, σ13, λ_bf_l)
-    R23 = Rij(J_bf_u, σ23, λ_bf_u)
-    R21 = Rji(J_bb, σ12, G12, λ_bb)
-    R31 = Rji(J_bf_l, σ13, G13, λ_bf_l)
-    R32 = Rji(J_bf_u, σ23, G23, λ_bf_u)
+    # BF
 
-    # ==================================================================
-    # CALCULATE COLLISIONAL RATES (nz, nx, ny)
-    # ==================================================================
-    C12 = Cij(1, 2, electron_density, temperature, LTE_pops)
-    C13 = Cij(1, 3, electron_density, temperature, LTE_pops)
-    C23 = Cij(2, 3, electron_density, temperature, LTE_pops)
-    C21 = Cij(2, 1, electron_density, temperature, LTE_pops)
-    C31 = Cij(3, 1, electron_density, temperature, LTE_pops)
-    C32 = Cij(3, 2, electron_density, temperature, LTE_pops)
+    for level = 1:n_levels
+        σ = σic(level, atom, λ[level])
+        G = Gij(level, n_levels+1, λ[level], temperature, LTE_pops)
 
-    return R12, R13, R23, R21, R31, R32,
-           C12, C13, C23, C21, C31, C32
+        Rlu[level,:,:,:] = Rij(J[level], σ, λ[level])
+        Rul[level,:,:,:] = Rji(J[level], σ, G, λ[level])
+
+        Clu[level,:,:,:] = Cij(level, n_levels+1, electron_density, temperature, LTE_pops)
+        Cul[level,:,:,:] = Cij(n_levels+1, level, electron_density, temperature, LTE_pops)
+    end
+
+
+    line_number = 0
+    for l=1:n_levels-1
+        for u=(l+1):n_levels
+
+            line_parameters = collect_line_data(atmosphere, atom, u, l)
+            line = Line(line_parameters...)
+
+            line_number += 1
+
+            σ = σij(l, u, line, λ[n_levels + line_number])
+            G = Gij(l, u, λ[n_levels+line_number], temperature, LTE_pops)
+
+            Rlu[n_levels + line_number,:,:,:] = Rij(J[n_levels+line_number], σ, λ[n_levels+line_number])
+            Rul[n_levels + line_number,:,:,:] = Rji(J[n_levels+line_number], σ, G, λ[n_levels+line_number])
+
+            Clu[n_levels + line_number,:,:,:] = Cij(l, u, electron_density, temperature, LTE_pops)
+            Cul[n_levels + line_number,:,:,:] = Cij(u, l, electron_density, temperature, LTE_pops)
+        end
+    end
+
+
+    return Rlu, Rul, Clu, Cul
 end
 
 """
@@ -192,13 +198,13 @@ Calculates the bound-bound cross section.
 """
 function σij(i::Integer,
              j::Integer,
-             atom::Atom,
+             line::Line,
              λ::Array{<:Unitful.Length, 1})
 
-    damping_constant = atom.damping_constant
-    ΔλD = atom.doppler_width
-    λ0 = atom.line.λ0
-    Bij = atom.line.Bij
+    damping_constant = line.damping_constant
+    ΔλD = line.doppler_width
+    λ0 = line.lineData.λ0
+    Bij = line.lineData.Bij
     σ_constant = h*c_0/(4π*λ0) * Bij
     nλ = length(λ)
     nz, nx, ny = size(ΔλD)
@@ -227,7 +233,7 @@ function σic(i::Integer,
 
     λ_edge = λ[end]
     λ3_ratio = (λ ./ λ_edge).^3
-    n_eff = sqrt(E_∞ / (atom.χu - atom.χl)) |>u"J/J" # should be χu - χl
+    n_eff = sqrt(E_∞ / (atom.χ[end] - atom.χ[i])) |>u"J/J" # should be χu - χl
     charge = atom.Z
     σ_constant = (4 * e^2 / (3 * π * sqrt(3) * ε_0 * m_e * c_0^2 * R_∞)) |> u"m^2"
 
@@ -329,30 +335,30 @@ end
                     electron_density::Array{<:NumberDensity, 3})
 Given the atom density, calculate the atom populations according to LTE.
 """
-function LTE_populations(atom::Atom,
-                         temperature::Array{<:Unitful.Temperature, 3},
-                         electron_density::Array{<:NumberDensity, 3})
-
-    χl = atom.χl
-    χu = atom.χu
-    χ∞ = atom.χ∞
-    gl = atom.gl
-    gu = atom.gu
-    g∞ = atom.g∞
-    U0 = atom.U0
-    U1 = atom.U1
+function LTE_populations2(atom::Atom,
+                          temperature::Array{<:Unitful.Temperature, 3},
+                          electron_density::Array{<:NumberDensity, 3})
 
     atom_density = atom.density
+    χ = atom.χ
+    g = atom.g
+    U = atom.U
+    n_levels = length(g)
+
     nz, nx, ny = size(temperature)
-    populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
+    nl = length(χ)
+    populations = Array{Float64, 4}(undef, nz, nx, ny, nl)u"m^-3"
 
-    z1 = gl * exp.( -χl/k_B./temperature)
-    z2 = gu * exp.(- χu/k_B./temperature)
+    z = Array{Float64, 4}(undef, nl, nz, nx, ny)
 
-    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U1 ./ U0 .* exp.(-χ∞/k_B./temperature)
+    for l=1:n_levels
+        z[l,:,:,:] = g[l] * exp.(-χ[l]/k_B./temperature)
+    end
+
+    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U[2] ./ U[1] .* exp.(-χ[end]/k_B./temperature)
 
     n3  = (c .* atom_density ./ (1.0 .+ c)) .|> u"m^-3"
-    n2 = ((atom_density .- n3) ./ (z1 ./ z2 .+ 1.0) ) .|> u"m^-3"
+    n2 = ((atom_density .- n3) ./ (z[1] ./ z[2] .+ 1.0) ) .|> u"m^-3"
     n1 = (atom_density .- n2 .- n3) .|> u"m^-3"
 
     populations[:,:,:,1] = n1
@@ -363,6 +369,36 @@ function LTE_populations(atom::Atom,
 
     return populations
 end
+
+function LTE_populations(atom::Atom,
+                         temperature::Array{<:Unitful.Temperature, 3},
+                         electron_density::Array{<:NumberDensity, 3})
+    χ = atom.χ
+    g = atom.g
+    atom_density = atom.density
+    nz,nx,ny = size(atom_density)
+
+    n_levels = length(χ)
+    n_relative = ones(Float64, nz,nx,ny, n_levels)
+
+    saha_const = (k_B / h) * (2π * m_e) / h
+    saha_factor = 2 * ((saha_const * temperature).^(3/2) ./ electron_density) .|> u"m/m"
+
+    for i=2:n_levels
+        ΔE = χ[i] - χ[1]
+        n_relative[:,:,:,i] = g[i] / g[1] * exp.(-ΔE ./ (k_B * temperature))
+    end
+
+    # Last level is ionised stage (H II)
+    n_relative[:,:,:,n_levels] .*= saha_factor
+    n_relative[:,:,:,1] = 1 ./ sum(n_relative, dims=4)[:,:,:,1]
+    n_relative[:,:,:,2:end] .*= n_relative[:,:,:,1]
+
+    return n_relative .* atom_density
+end
+
+
+
 
 """
     write_to_file(populations::Array{<:NumberDensity,4},
@@ -375,17 +411,9 @@ function write_to_file(rates::TransitionRates,
                        iteration::Int64,
                        output_path::String)
     h5open(output_path, "r+") do file
-        file["R12"][iteration+1,:,:,:] = ustrip.(rates.R12)
-        file["R13"][iteration+1,:,:,:] = ustrip.(rates.R13)
-        file["R23"][iteration+1,:,:,:] = ustrip.(rates.R23)
-        file["R21"][iteration+1,:,:,:] = ustrip.(rates.R21)
-        file["R31"][iteration+1,:,:,:] = ustrip.(rates.R31)
-        file["R32"][iteration+1,:,:,:] = ustrip.(rates.R32)
-        file["C12"][iteration+1,:,:,:] = ustrip.(rates.C12)
-        file["C13"][iteration+1,:,:,:] = ustrip.(rates.C13)
-        file["C23"][iteration+1,:,:,:] = ustrip.(rates.C23)
-        file["C21"][iteration+1,:,:,:] = ustrip.(rates.C21)
-        file["C31"][iteration+1,:,:,:] = ustrip.(rates.C31)
-        file["C32"][iteration+1,:,:,:] = ustrip.(rates.C32)
+        file["Rlu"][iteration+1,:,:,:,:] = ustrip.(rates.Rlu)
+        file["Rul"][iteration+1,:,:,:,:] = ustrip.(rates.Rul)
+        file["Clu"][iteration+1,:,:,:,:] = ustrip.(rates.Clu)
+        file["Cul"][iteration+1,:,:,:,:] = ustrip.(rates.Cul)
     end
 end

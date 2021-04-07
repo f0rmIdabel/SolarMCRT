@@ -69,7 +69,7 @@ end
 
 Check that background radiation data has valid units, dimensions and values.
 """
-function check_radiationBackground(radiationBackground::RadiationBackground,
+function check_radiationBackground(radiationBackground::RadiationContinuum,
                                    atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
@@ -281,7 +281,7 @@ check_radiation(radiation::Radiation,
 
 Check that radiation data has valid units, dimensions and values.
 """
-function check_radiation(radiation::Radiation,
+function check_radiation(radiation::RadiationLine,
                          atom::Atom,
                          atmosphere_size::Tuple)
     # ===========================================================

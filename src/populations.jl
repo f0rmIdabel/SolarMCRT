@@ -8,17 +8,20 @@ include("rates.jl")
 
 Collect initial population distribution. Either LTE or zero-radiation.
 """
-function collect_initial_populations(atom::Atom,
-                                     temperature::Array{<:Unitful.Temperature, 3},
-                                     electron_density::Array{<:NumberDensity,3})
+function collect_initial_populations(atmosphere,
+                                     atom::Atom)
+                                     #temperature::Array{<:Unitful.Temperature, 3},
+                                     #electron_density::Array{<:NumberDensity,3})
 
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
     density = atom.density
     population_mode = get_population_distribution()
 
     if population_mode == "LTE"
         initial_populations = LTE_populations(atom, temperature, electron_density)
     elseif population_mode == "zero_radiation"
-        initial_populations = zero_radiation_populations(atom, temperature, electron_density)
+        initial_populations = zero_radiation_populations(atmosphere, atom)
     end
 
     return initial_populations
@@ -31,15 +34,23 @@ end
 
 For a given atom density, calculate the populations according to zero-radiation.
 """
-function zero_radiation_populations(atom::Atom,
-                                    temperature::Array{<:Unitful.Temperature, 3},
-                                    electron_density::Array{<:NumberDensity,3})
-    nλ = length(atom.λ)
-    nz,nx,ny = size(temperature)
+function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
+                                    #temperature::Array{<:Unitful.Temperature, 3},
+                                    #electron_density::Array{<:NumberDensity,3})
+    nλ = atom.nλ
+    nz,nx,ny = size(atmosphere.temperature)
 
-    J0 = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
-    rates0 = TransitionRates(calculate_transition_rates(atom, temperature, electron_density, J0)...)
-    populations = get_revised_populations(rates0, atom.density)
+    λ = atom.λ
+    J = []
+    for t=1:length(λ)
+        nλ = length(λ[t])
+        j = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
+        #j = zeros(UnitsIntensity_λ, nλ,nz,nx,ny)#u"J/s/nm/m^2/sr"
+        append!(J, [j])
+    end
+
+    zero_rates = TransitionRates(calculate_transition_rates(atmosphere, atom, J)...)
+    populations = get_revised_populations(zero_rates, atom.density)
 
     @test all( Inf .> ustrip.(populations) .>= 0.0 )
 
@@ -78,13 +89,16 @@ Calculate the population distribution using statistical equlibrium.
 function get_revised_populations(rates::TransitionRates,
                                  atom_density::Array{<:NumberDensity, 3})
 
+
     # Transition probabilities
-    P12 = rates.R12 .+ rates.C12
-    P13 = rates.R13 .+ rates.C13
-    P23 = rates.R23 .+ rates.C23
-    P21 = rates.R21 .+ rates.C21
-    P31 = rates.R31 .+ rates.C31
-    P32 = rates.R32 .+ rates.C32
+    P12 = rates.Rlu[3,:,:,:] + rates.Clu[3,:,:,:]
+    P13 = rates.Rlu[1,:,:,:] + rates.Clu[1,:,:,:]
+    P23 = rates.Rlu[2,:,:,:] + rates.Clu[2,:,:,:]
+
+    P21 = rates.Rul[3,:,:,:] + rates.Cul[3,:,:,:]
+    P31 = rates.Rul[1,:,:,:] + rates.Cul[1,:,:,:]
+    P32 = rates.Rul[2,:,:,:] + rates.Cul[2,:,:,:]
+
 
     nz, nx, ny = size(P12)
     revised_populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
@@ -105,7 +119,8 @@ end
        P31::Array{<:Unitful.Frequency,3},
        P32::Array{<:Unitful.Frequency,3})
 
-Given the atom density and selected transition rates,
+Given the atom density and se    qcore, qwing = get_qvalues()
+lected transition rates,
 calculate the ionised population density.
 """
 function n3(N::Array{<:NumberDensity,3},

@@ -6,14 +6,6 @@
 
 
 # ======================================================================================= #
-#  When the background mode is set to "true", the MC simulation is run with the           #
-#  background opacity at the given λ (nm). A convenient quick test, without going into    #
-#   the involved population-iteration routine.                                            #
-# ======================================================================================= #
-background_mode = false
-background_wavelength = 500.0
-
-# ======================================================================================= #
 #  Path to atmosphere data (bifrost_cb24bih_s385_fullv.ncdf)                              #
 # ======================================================================================= #
 atmosphere_path = "/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
@@ -29,31 +21,29 @@ atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_2lvl.h5"
 population_distribution = "zero_radiation"
 
 # ======================================================================================= #
-#  Choose how many wavelengths to sample for the bound-bound, bound-free ground and       #
-#  bound-free excited transitions. If an even # is given for the bound-bound, an          #
-#  additional wavelength will be added by default.                                        #
-# ======================================================================================= #
-nλ_bb = 25
-nλ_bf = 20
-
-# ======================================================================================= #
-#  The intended number of packets to be created for each group of wavelengths.            #
-#  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
-# ======================================================================================= #
-target_packets = 5e4
-
-# ======================================================================================= #
 #  Optical depth where atmosphere is cut off for each wavelength.                         #
 #  Set to false for no cut-off.                                                           #
 # ======================================================================================= #
 cut_off = 30.0
 
 # ======================================================================================= #
-# Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #
+#  Choose how many wavelengths to sample for the bound-bound, bound-free ground and       #
+#  bound-free excited transitions. If an even # is given for the bound-bound, an          #
+#  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
-start = [1, 1, 1]
-stop = [end, end, end]
-step = [1, 1, 1]
+nλ_bf = 10, 10
+λ_min = 22.794, 91.176
+
+nλ_bb = 20
+q_core = 15.0
+q_wing = 600.0
+
+# ======================================================================================= #
+#  The intended number of packets to be created for each group of wavelengths.            #
+#  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
+# ======================================================================================= #
+target_packets_bf = 1e6, 1e8
+target_packets_bb = 1e4
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
@@ -66,6 +56,22 @@ max_scatterings = 1e7
 max_iterations = 10
 
 # ======================================================================================= #
+# Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #
+# ======================================================================================= #
+start = [1, 1, 1]
+stop = [end, end, end]
+step = [1, 1, 1]
+
+# ======================================================================================= #
 #  Option to write all transition rates to output file for each iteration.                #
 # ======================================================================================= #
 write_rates = true
+
+# ======================================================================================= #
+#  When the background mode is set to "true", the MC simulation is run with the           #
+#  background opacity at the given λ (nm). A convenient quick test, without going into    #
+#  the involved population-iteration routine.                                             #
+# ======================================================================================= #
+background_mode = false
+background_wavelength = 500.0
+background_target_packets = 1e7
