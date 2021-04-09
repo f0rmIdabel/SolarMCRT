@@ -110,7 +110,7 @@ function run()
         # CREATE OUTPUT FILE
         # =============================================================================
         print("--Initialise output file...................")
-        create_output_file(output_path, max_iterations, atom.nλ, n_transitions, atmosphere_size, write_rates)
+        create_output_file(output_path, max_iterations, atom.nλ, n_levels, atmosphere_size, write_rates)
         write_to_file(atom.λ, output_path)
         write_to_file(populations, 0, output_path)
         if write_rates; write_to_file(rates, 0, output_path); end
@@ -167,7 +167,6 @@ function run()
                     radiation = RadiationLine(radiation_parameters...)
                     write_to_file(radiation, n, nλ0, output_path)
                     println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
-
 
                     # =============================================================================
                     # SIMULATION

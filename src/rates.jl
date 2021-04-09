@@ -2,22 +2,18 @@ include("atmosphere.jl")
 include("atom.jl")
 
 struct TransitionRates
-    Rlu::Array{<:Unitful.Frequency, 4}
-    Rul::Array{<:Unitful.Frequency, 4}
-    Clu::Array{<:Unitful.Frequency, 4}
-    Cul::Array{<:Unitful.Frequency, 4}
+    R::Array{<:Unitful.Frequency, 5}
+    C::Array{<:Unitful.Frequency, 5}
 end
 
 """
-    calculate_transition_rates(atom::Atom,
-                               temperature::Array{<:Unitful.Temperature, 3},
-                               electron_density::Array{<:NumberDensity,3},
-                               J::Array{<:UnitsIntensity_λ, 4})
+    calculate_transition_rates(atmosphere::Atmosphere,
+                               atom::Atom,
+                               J::Array{Any,1})
 
 Given the radiation field, calculate all transition rates for
 the excitation, de-excitation, ionisations and re-combiantions
-of a two level atom. Level 1,2 and 3 represent the ground level,
-excited level and ionised level respectively.
+of a single atom.
 """
 function calculate_transition_rates(atmosphere::Atmosphere,
                                     atom::Atom,
@@ -39,55 +35,49 @@ function calculate_transition_rates(atmosphere::Atmosphere,
     # ==================================================================
     λ = atom.λ
 
-    n_levels = atom.n_levels
-    n_lines = atom.n_lines
-
-    n_transitions = n_levels + n_lines
     # ==================================================================
     # CALCULATE RADIATIVE RATES
     # ==================================================================
-
-    Rlu = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
-    Rul = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
-    Clu = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
-    Cul = Array{Unitful.Frequency,4}(undef,n_transitions,nz,nx,ny)
-
-    # BF
+    R = Array{Float64,5}(undef,n_levels+1,n_levels+1, nz,nx,ny)u"s^-1"
+    C = Array{Float64,5}(undef,n_levels+1,n_levels+1, nz,nx,ny)u"s^-1"
 
     for level = 1:n_levels
         σ = σic(level, atom, λ[level])
         G = Gij(level, n_levels+1, λ[level], temperature, LTE_pops)
 
-        Rlu[level,:,:,:] = Rij(J[level], σ, λ[level])
-        Rul[level,:,:,:] = Rji(J[level], σ, G, λ[level])
+        R[level,n_levels+1,:,:,:] = Rij(J[level], σ, λ[level])
+        R[n_levels+1,level,:,:,:] = Rji(J[level], σ, G, λ[level])
 
-        Clu[level,:,:,:] = Cij(level, n_levels+1, electron_density, temperature, LTE_pops)
-        Cul[level,:,:,:] = Cij(n_levels+1, level, electron_density, temperature, LTE_pops)
+        C[level,n_levels+1,:,:,:] = Cij(level, n_levels+1, electron_density, temperature, LTE_pops)
+        C[n_levels+1,level,:,:,:] = Cij(n_levels+1, level, electron_density, temperature, LTE_pops)
     end
 
-
-    line_number = 0
     for l=1:n_levels-1
         for u=(l+1):n_levels
 
+            line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
             line_parameters = collect_line_data(atmosphere, atom, u, l)
             line = Line(line_parameters...)
-
-            line_number += 1
 
             σ = σij(l, u, line, λ[n_levels + line_number])
             G = Gij(l, u, λ[n_levels+line_number], temperature, LTE_pops)
 
-            Rlu[n_levels + line_number,:,:,:] = Rij(J[n_levels+line_number], σ, λ[n_levels+line_number])
-            Rul[n_levels + line_number,:,:,:] = Rji(J[n_levels+line_number], σ, G, λ[n_levels+line_number])
+            R[l,u,:,:,:] = Rij(J[n_levels+line_number], σ, λ[n_levels+line_number])
+            R[u,l,:,:,:] = Rji(J[n_levels+line_number], σ, G, λ[n_levels+line_number])
 
-            Clu[n_levels + line_number,:,:,:] = Cij(l, u, electron_density, temperature, LTE_pops)
-            Cul[n_levels + line_number,:,:,:] = Cij(u, l, electron_density, temperature, LTE_pops)
+            C[l,u,:,:,:] = Cij(l, u, electron_density, temperature, LTE_pops)
+            C[u,l,:,:,:] = Cij(u, l, electron_density, temperature, LTE_pops)
+
         end
     end
 
+    # Fill diagonal with zeros, because #undef does not like arithmetics
+    for l=1:n_levels+1
+        R[l,l,:,:,:] .= 0u"s^-1"
+        C[l,l,:,:,:] .= 0u"s^-1"
+    end
 
-    return Rlu, Rul, Clu, Cul
+    return R, C
 end
 
 """
@@ -309,6 +299,7 @@ function Cij(i::Integer,
     return C
 end
 
+
 """
     gaunt_bf(charge::Int, n_eff::Number, λ::Unitful.Length)::Float64
 
@@ -370,6 +361,7 @@ function LTE_populations2(atom::Atom,
     return populations
 end
 
+
 function LTE_populations(atom::Atom,
                          temperature::Array{<:Unitful.Temperature, 3},
                          electron_density::Array{<:NumberDensity, 3})
@@ -411,9 +403,7 @@ function write_to_file(rates::TransitionRates,
                        iteration::Int64,
                        output_path::String)
     h5open(output_path, "r+") do file
-        file["Rlu"][iteration+1,:,:,:,:] = ustrip.(rates.Rlu)
-        file["Rul"][iteration+1,:,:,:,:] = ustrip.(rates.Rul)
-        file["Clu"][iteration+1,:,:,:,:] = ustrip.(rates.Clu)
-        file["Cul"][iteration+1,:,:,:,:] = ustrip.(rates.Cul)
+        file["R"][iteration+1,:,:,:,:,:] = ustrip.(rates.R)
+        file["C"][iteration+1,:,:,:,:,:] = ustrip.(rates.C)
     end
 end

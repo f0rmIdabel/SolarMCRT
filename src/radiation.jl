@@ -139,9 +139,8 @@ function collect_bf_radiation(atmosphere::Atmosphere,
     ν = c_0 ./ λ
     n_eff = sqrt(E_∞ / (atom.χ[end] - atom.χ[level])) |> u"J/J"
 
-    Cul = rates.Cul[level,:,:,:]
-    Rul = rates.Rul[level,:,:,:]
-
+    Cul = rates.C[end,level,:,:,:]
+    Rul = rates.R[end,level,:,:,:]
     ε_bf = Cul ./ (Rul .+ Cul)
 
     for l=1:nλ
@@ -261,8 +260,8 @@ function collect_bb_radiation(atmosphere::Atmosphere,
     #ε_line = line_destruction(rates)
     line_number = sum((n_levels-line.l+1):(n_levels-1)) + (line.u - line.l)
 
-    Cul = rates.Cul[n_levels + line_number,:,:,:]
-    Rul = rates.Rul[n_levels + line_number,:,:,:]
+    Cul = rates.C[line.u,line.l,:,:,:]
+    Rul = rates.R[line.u,line.l,:,:,:]
     ε_line = Cul ./ (Rul .+ Cul)
 
     α_line_constant = line_extinction_constant.(Ref(lineData), populations[:,:,:,line.l], populations[:,:,:,line.u])

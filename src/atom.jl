@@ -7,12 +7,8 @@ struct Atom
     χ::Array{<:Unitful.Energy,1}
     g::Array{Int64,1}
     Z::Int64
-    #U::Array{Any,1}
     λ::Array{Any, 1}
     nλ::Int64
-    #lines::Array{Any,1}
-    #doppler_width::Array{<:Unitful.Length, 4}        # (n_lines, nz, nx, ny)
-    #damping_constant::Array{<:PerArea,4}             # (n_lines, nx, ny)
 end
 
 struct Line
@@ -67,43 +63,7 @@ function collect_atom_data(atmosphere::Atmosphere)
     g = atomic_stage.g[1:n_levels]
     append!(g, 1.0)
 
-    # ==================================================================
-    # COLLECT LINE DATA
-    # ==================================================================
     n_lines = Int(n_levels*(n_levels-1)/2)
-
-    """lines = []
-    ΔλD = Array{Unitful.Length, 4}(n_lines, nz,nx,ny)
-    damping_const = Array{Unitful.PerArea, 4}(n_lines, nz,nx,ny)
-
-    # Sample bound-bound transitions
-    for l=1:n_levels-1
-        for u=(l+1):n_levels
-            line = AtomicLine(χ[u], χ[l], χ[end], g[u], g[l], f_value, atom_weight, Z)
-            append!(lines, [line])
-
-            unsold_const = const_unsold(line)
-            quad_stark_const = const_quadratic_stark(line)
-
-            γ = γ_unsold.(unsold_const, temperature, neutral_hydrogen_density)
-            γ .+= line.Aji
-            γ .+= γ_linear_stark.(electron_density, u, l)
-            γ .+= γ_quadratic_stark.(electron_density, temperature, stark_constant=quad_stark_const)
-
-            ΔλD[l,:,:,:] = doppler_width.(line.λ0, atom_weight, temperature)
-            damping_const[l,:,:,:] = damping_constant.(γ, ΔλD[l,:,:,:])
-        end
-    end"""
-
-    # ==================================================================
-    # GET PARTITION FUNCTION
-    # ==================================================================
-    """max_temperature = floor(maximum(ustrip(atmosphere.temperature))) + 1
-    U = []
-
-    partition_f = partition_function_interpolator.(atomic_stage, [0;1:max_temperature]u"K")
-    append!(U, [partition_f.(atmosphere.temperature)])
-    append!(U, 1)                                       # ionised"""
 
     # ==================================================================
     # SAMPLE ATOM TRANSITION WAVELENGTHS
@@ -142,16 +102,12 @@ function collect_atom_data(atmosphere::Atmosphere)
     @test all( Inf .> ustrip(density) .>= 0.0 )
     @test all( Inf .> ustrip.(χ) .>= 0.0 )
     @test all( Inf .> g .> 0)
-    #@test all( Inf .> ustrip.(damping_const) .>= 0.0 )
-    #@test all( Inf .> ustrip.(ΔλD) .>= 0.0 )
-    #@test all(Inf .> U[1] .>= 0.0 )
 
     for l=1:(n_levels+n_lines)
         @test all(Inf .> ustrip.(λ[l]) .>= 0.0 )
     end
 
-    return density, n_levels, n_lines, χ, g, Z,#U,
-            λ, nλ#, lines, ΔλD, damping_const
+    return density, n_levels, n_lines, χ, g, Z, λ, nλ
 end
 
 """

@@ -35,8 +35,6 @@ end
 For a given atom density, calculate the populations according to zero-radiation.
 """
 function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
-                                    #temperature::Array{<:Unitful.Temperature, 3},
-                                    #electron_density::Array{<:NumberDensity,3})
     nλ = atom.nλ
     nz,nx,ny = size(atmosphere.temperature)
 
@@ -45,7 +43,6 @@ function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
     for t=1:length(λ)
         nλ = length(λ[t])
         j = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
-        #j = zeros(UnitsIntensity_λ, nλ,nz,nx,ny)#u"J/s/nm/m^2/sr"
         append!(J, [j])
     end
 
@@ -78,6 +75,75 @@ function check_population_convergence(populations::Array{<:NumberDensity, 4},
     return converged, error
 end
 
+
+function get_revised_populations(rates::TransitionRates, atom_density::Array{<:NumberDensity,3})
+
+    P = rates.R .+ rates.C
+    n_levels = size(P)[1] - 1
+    nz,nx,ny = size(atom_density)
+
+    A = Array{Float64, 5}(undef, n_levels, n_levels, nz, nx, ny)u"s^-1"
+    b = Array{Float64, 4}(undef, n_levels, nz, nx, ny)u"s^-1 * m^-3"
+    populations = Array{Float64, 4}(undef, nz, nx, ny, n_levels+1)u"m^-3"
+
+    for r=1:n_levels
+        A[r,r,:,:,:] = P[1,r+1,:,:,:]
+        for c=setdiff(1:n_levels, r)
+            A[c,r,:,:,:] = P[1,r+1,:,:,:] .- P[c+1,r+1,:,:,:]
+            A[r,r,:,:,:] .+= P[r+1,c+1,:,:,:]
+        end
+
+        b[r,:,:,:] = atom_density .* P[1,r+1,:,:,:]
+    end
+
+    for k=1:nz
+        for i=1:nx
+            for j=1:ny
+                populations[k,i,j,2:end] .= inv(A[:,:,k,i,j]) * b[:,k,i,j]
+            end
+        end
+    end
+
+    populations[:,:,:,1] = atom_density .- sum(populations[:,:,:,2:end],dims=4)[:,:,:,1]
+
+    return populations
+
+end
+
+
+"""
+    write_to_file(populations::Array{<:NumberDensity,4},
+                  iteration::Int64,
+                  output_path::String)
+
+Write the populations for a given iteration to the output file.
+"""
+function write_to_file(populations::Array{<:NumberDensity,4},
+                       iteration::Int64,
+                       output_path::String)
+    h5open(output_path, "r+") do file
+        file["populations"][iteration+1,:,:,:,:] = ustrip.(populations)
+    end
+end
+
+
+"""
+    write_to_file(populations::Array{<:NumberDensity,4},
+                  iteration::Int64,
+                  output_path::String)
+
+Write the populations for a given iteration to the output file.
+"""
+function write_to_file(error::Float64,
+                       iteration::Int64,
+                       output_path::String)
+    h5open(output_path, "r+") do file
+        file["populations"][iteration+1] = ustrip.(populations)
+    end
+end
+
+
+
 """
     get_revised_populations(rates::TransitionRates,
                             atom_density::Array{<:NumberDensity, 3},
@@ -86,21 +152,14 @@ end
 
 Calculate the population distribution using statistical equlibrium.
 """
-function get_revised_populations(rates::TransitionRates,
+function get_revised_populations2(rates::TransitionRates,
                                  atom_density::Array{<:NumberDensity, 3})
 
 
     # Transition probabilities
-    P12 = rates.Rlu[3,:,:,:] + rates.Clu[3,:,:,:]
-    P13 = rates.Rlu[1,:,:,:] + rates.Clu[1,:,:,:]
-    P23 = rates.Rlu[2,:,:,:] + rates.Clu[2,:,:,:]
+    P = rates.R+ rates.C
 
-    P21 = rates.Rul[3,:,:,:] + rates.Cul[3,:,:,:]
-    P31 = rates.Rul[1,:,:,:] + rates.Cul[1,:,:,:]
-    P32 = rates.Rul[2,:,:,:] + rates.Cul[2,:,:,:]
-
-
-    nz, nx, ny = size(P12)
+    nz, nx, ny = size(atom_density)
     revised_populations = Array{Float64, 4}(undef, nz, nx, ny, 3)u"m^-3"
 
     revised_populations[:,:,:,3] = n3(atom_density, P12, P13, P21, P23, P31, P32)
@@ -170,19 +229,4 @@ function n1(N::Array{<:NumberDensity,3},
             n3::Array{<:NumberDensity,3},
             n2::Array{<:NumberDensity,3})
     return N .- n3 .- n2
-end
-
-"""
-    write_to_file(populations::Array{<:NumberDensity,4},
-                  iteration::Int64,
-                  output_path::String)
-
-Write the populations for a given iteration to the output file.
-"""
-function write_to_file(populations::Array{<:NumberDensity,4},
-                       iteration::Int64,
-                       output_path::String)
-    h5open(output_path, "r+") do file
-        file["populations"][iteration+1,:,:,:,:] = ustrip.(populations)
-    end
 end

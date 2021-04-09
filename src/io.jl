@@ -55,7 +55,7 @@ function get_output_path()
         elseif pop_distrib == "zero_radiation"
             d = "_ZR"
         end
-        path = "../out/output_nw" * string(nλ) * "_" * d * ".h5"
+        path = "../out/output_nw" * string(nλ) * d * ".h5"
     end
 
     return path
@@ -577,7 +577,7 @@ end
     create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, atmosphere_size::Tuple, write_rates::Bool)
 Initialise all output variables for the full atom mode.
 """
-function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, n_transitions, atmosphere_size::Tuple, write_rates::Bool)
+function create_output_file(output_path::String, max_iterations::Int64, nλ::Int64, n_levels, atmosphere_size::Tuple, write_rates::Bool)
 
     nz, nx, ny = atmosphere_size
 
@@ -592,12 +592,11 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
         write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
 
         write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
+		write(file, "error", Array{Float64,1}(undef, max_iterations))
 
         if write_rates
-            write(file, "Rlu", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
-            write(file, "Rul", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
-            write(file, "Clu", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
-            write(file, "Cul", Array{Float64,5}(undef, max_iterations+1, n_transitions, nz,nx,ny))
+            write(file, "R", Array{Float64,6}(undef, max_iterations+1, n_levels+1, n_levels+1, nz,nx,ny))
+            write(file, "C", Array{Float64,6}(undef, max_iterations+1, n_levels+1, n_levels+1, nz,nx,ny))
         end
     end
 end
@@ -661,44 +660,14 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
         write(file, "populations", populations_new)
 
         if write_rates
-            R12_new = read(file, "R12")[1:final_iteration,:,:,:]
-            R13_new = read(file, "R13")[1:final_iteration,:,:,:]
-            R23_new = read(file, "R23")[1:final_iteration,:,:,:]
-            R21_new = read(file, "R21")[1:final_iteration,:,:,:]
-            R31_new = read(file, "R31")[1:final_iteration,:,:,:]
-            R32_new = read(file, "R32")[1:final_iteration,:,:,:]
-            C12_new = read(file, "C12")[1:final_iteration,:,:,:]
-            C13_new = read(file, "C13")[1:final_iteration,:,:,:]
-            C23_new = read(file, "C23")[1:final_iteration,:,:,:]
-            C21_new = read(file, "C21")[1:final_iteration,:,:,:]
-            C31_new = read(file, "C31")[1:final_iteration,:,:,:]
-            C32_new = read(file, "C32")[1:final_iteration,:,:,:]
+            R_new = read(file, "R")[1:final_iteration,:,:,:,:,:]
+			C_new = read(file, "C")[1:final_iteration,:,:,:,:,:]
 
-            delete_object(file, "R12")
-            delete_object(file, "R13")
-            delete_object(file, "R23")
-            delete_object(file, "R21")
-            delete_object(file, "R31")
-            delete_object(file, "R32")
-            delete_object(file, "C12")
-            delete_object(file, "C13")
-            delete_object(file, "C23")
-            delete_object(file, "C21")
-            delete_object(file, "C31")
-            delete_object(file, "C32")
+            delete_object(file, "R")
+            delete_object(file, "C")
 
-            write(file, "R12", R12_new)
-            write(file, "R13", R13_new)
-            write(file, "R23", R23_new)
-            write(file, "R21", R21_new)
-            write(file, "R31", R31_new)
-            write(file, "R32", R32_new)
-            write(file, "C12", C12_new)
-            write(file, "C13", C13_new)
-            write(file, "C23", C23_new)
-            write(file, "C21", C21_new)
-            write(file, "C31", C31_new)
-            write(file, "C32", C32_new)
+            write(file, "R", R_new)
+            write(file, "C", C_new)
         end
     end
 end
@@ -724,7 +693,7 @@ function how_much_data(nλ::Int64, atmosphere_size::Tuple, max_iterations::Int64
     pop_data = 8boxes*3
 
     # Rates
-    rate_data = 8*12boxes
+    rate_data = 8*12boxes #fix
 
     max_data = ( λ_data +
                ( J_data + sim_data + rad_data) * max_iterations +

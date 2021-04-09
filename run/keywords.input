@@ -24,17 +24,17 @@ population_distribution = "zero_radiation"
 #  Optical depth where atmosphere is cut off for each wavelength.                         #
 #  Set to false for no cut-off.                                                           #
 # ======================================================================================= #
-cut_off = 30.0
+cut_off = 20.0
 
 # ======================================================================================= #
 #  Choose how many wavelengths to sample for the bound-bound, bound-free ground and       #
 #  bound-free excited transitions. If an even # is given for the bound-bound, an          #
 #  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
-nλ_bf = 10, 10
+nλ_bf = 2, 2
 λ_min = 22.794, 91.176
 
-nλ_bb = 20
+nλ_bb = 5
 q_core = 15.0
 q_wing = 600.0
 
@@ -42,8 +42,8 @@ q_wing = 600.0
 #  The intended number of packets to be created for each group of wavelengths.            #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets_bf = 1e6, 1e8
-target_packets_bb = 1e4
+target_packets_bf = 1e4, 1e4
+target_packets_bb = 1e2
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
@@ -53,7 +53,7 @@ max_scatterings = 1e7
 # ======================================================================================= #
 #  Maximum number of population iterations before quitting.                               #
 # ======================================================================================= #
-max_iterations = 10
+max_iterations = 3
 
 # ======================================================================================= #
 # Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #
