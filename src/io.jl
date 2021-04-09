@@ -591,7 +591,7 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
         write(file, "boundary", Array{Int32,4}(undef,max_iterations, nλ, nx, ny))
         write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
 
-        write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, 3))
+        write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, n_levels+1))
 		write(file, "error", Array{Float64,1}(undef, max_iterations))
 
         if write_rates

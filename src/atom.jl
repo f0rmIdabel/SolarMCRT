@@ -38,7 +38,7 @@ function collect_atom_data(atmosphere::Atmosphere)
     #atom_weight = read(atom, "atom_weight")u"kg"
     #f_value = read(atom, "f_value")
     #Z = read(atom, "Z")
-    n_levels = read(atom, "n_levels")
+    n_levels = 3#read(atom, "n_levels")
 
     density = read(atom, "density")u"m^-3"
     close(atom)

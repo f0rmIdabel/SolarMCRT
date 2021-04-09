@@ -54,27 +54,6 @@ function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
     return populations
 end
 
-"""
-    check_population_convergence(populations::Array{<:NumberDensity, 4},
-                                 new_populations::Array{<:NumberDensity, 4},
-                                 criterion::Real = 1e-3)
-Check if the relative difference between two populations satisfy
-the convergence criterion. Return convergence status and error.
-"""
-function check_population_convergence(populations::Array{<:NumberDensity, 4},
-                                      new_populations::Array{<:NumberDensity, 4},
-                                      criterion::Real = 1e-3)
-    N = length(populations)
-    error = sum( abs.(populations .- new_populations) ./populations ) ./N
-
-    converged = false
-    if error < criterion
-        converged = true
-    end
-
-    return converged, error
-end
-
 
 function get_revised_populations(rates::TransitionRates, atom_density::Array{<:NumberDensity,3})
 
@@ -87,7 +66,7 @@ function get_revised_populations(rates::TransitionRates, atom_density::Array{<:N
     populations = Array{Float64, 4}(undef, nz, nx, ny, n_levels+1)u"m^-3"
 
     for r=1:n_levels
-        A[r,r,:,:,:] = P[1,r+1,:,:,:]
+        A[r,r,:,:,:] = P[1,r+1,:,:,:] .+ P[r+1,1,:,:,:]
         for c=setdiff(1:n_levels, r)
             A[c,r,:,:,:] = P[1,r+1,:,:,:] .- P[c+1,r+1,:,:,:]
             A[r,r,:,:,:] .+= P[r+1,c+1,:,:,:]
@@ -109,6 +88,29 @@ function get_revised_populations(rates::TransitionRates, atom_density::Array{<:N
     return populations
 
 end
+
+
+"""
+    check_population_convergence(populations::Array{<:NumberDensity, 4},
+                                 new_populations::Array{<:NumberDensity, 4},
+                                 criterion::Real = 1e-3)
+Check if the relative difference between two populations satisfy
+the convergence criterion. Return convergence status and error.
+"""
+function check_population_convergence(populations::Array{<:NumberDensity, 4},
+                                      new_populations::Array{<:NumberDensity, 4},
+                                      criterion::Real = 1e-3)
+    N = length(populations)
+    error = sum( abs.(populations .- new_populations) ./populations ) ./N
+
+    converged = false
+    if error < criterion
+        converged = true
+    end
+
+    return converged, error
+end
+
 
 
 """

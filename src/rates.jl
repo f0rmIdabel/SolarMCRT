@@ -77,6 +77,9 @@ function calculate_transition_rates(atmosphere::Atmosphere,
         C[l,l,:,:,:] .= 0u"s^-1"
     end
 
+    @test all(Inf .> ustrip.(R) .>= 0.0)
+    @test all(Inf .> ustrip.(C) .>= 0.0)
+
     return R, C
 end
 
