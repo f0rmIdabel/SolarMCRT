@@ -35,14 +35,11 @@ function collect_atom_data(atmosphere::Atmosphere)
     stage = read(atom, "stage")
     element = read(atom, "element")
     Z = read(atom, "Z")
-    #atom_weight = read(atom, "atom_weight")u"kg"
-    #f_value = read(atom, "f_value")
-    #Z = read(atom, "Z")
-    n_levels = 3#read(atom, "n_levels")
-
     density = read(atom, "density")u"m^-3"
+    χ = read(atom, "chi")u"J"
+    χ_ion = read(atom, "chi_ion")u"J"
+    g = read(atom, "g")
     close(atom)
-
 
     # ==================================================================
     # RELEVANT ATMOSPHERE DATA
@@ -56,14 +53,14 @@ function collect_atom_data(atmosphere::Atmosphere)
     # ==================================================================
     # ATOMIC STAGE
     # ==================================================================
-    atomic_stage = get_atomic_stage(element, stage)
-    χ = atomic_stage.χ[1:n_levels]
-    append!(χ, atomic_stage.χ_ion)
-
-    g = atomic_stage.g[1:n_levels]
-    append!(g, 1.0)
-
+    n_levels = get_nlevels()
     n_lines = Int(n_levels*(n_levels-1)/2)
+
+    χ = χ[1:n_levels]
+    append!(χ, χ_ion)
+
+    g = g[1:n_levels]
+    append!(g, 1)
 
     # ==================================================================
     # SAMPLE ATOM TRANSITION WAVELENGTHS

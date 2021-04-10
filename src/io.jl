@@ -3,7 +3,6 @@ using BenchmarkTools
 using ProgressMeter
 using Transparency
 using StaticArrays
-using AtomicData
 using Unitful
 using Random
 using Printf
@@ -385,6 +384,21 @@ function get_atom_path()
     j = findfirst("\"", file[i+1:end])[end] + i
     atmosphere_path = string(file[i+1:j-1])
     return atmosphere_path
+end
+
+"""
+    get_nlevels()
+
+Get how many levels to use from atom file.
+"""
+function get_nlevels()
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("n_levels", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+    n_levels = parse(Int64, file[i:j])
+    return n_levels
 end
 
 """

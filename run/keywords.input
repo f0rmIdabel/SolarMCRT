@@ -12,7 +12,8 @@ atmosphere_path = "/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_qs00
 # ======================================================================================= #
 #  Path to atom data.                                                                     #
 # ======================================================================================= #
-atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_2lvl.h5"
+atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_6lvl.h5"
+n_levels = 2
 
 # ======================================================================================= #
 #  Initial population distribution. Choose between "LTE" and "zero_radiation".            #
@@ -30,19 +31,19 @@ cut_off = 20.0
 #  bound-free excited transitions. If an even # is given for the bound-bound, an          #
 #  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
-nλ_bf = 10, 10, 10
-λ_min = 22.794, 91.176, 200.0
+nλ_bf = 10, 10
+λ_min = 22.794, 91.176
 
-nλ_bb = 20, 20,20
-q_core = 15.0, 15.0, 15.0
-q_wing = 600.0, 600.0, 600.0
+nλ_bb = 20
+q_core = 15.0
+q_wing = 600.0
 
 # ======================================================================================= #
 #  The intended number of packets to be created for each group of wavelengths.            #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets_bf = 1e6, 1e8, 1e8
-target_packets_bb = 1e4, 1e4, 1e4
+target_packets_bf = 1e6, 1e8
+target_packets_bb = 1e4
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #

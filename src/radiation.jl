@@ -185,7 +185,7 @@ function collect_bf_radiation(atmosphere::Atmosphere,
     @test all( 1.0 .>= ε .>= 0.0 )
     @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> packets .>= 0 )
-    @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
+    @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0)
 
     return α, ε, boundary, packets, intensity_per_packet
 end
@@ -326,17 +326,6 @@ function line_extinction(λ::Unitful.Length,
     return α
 end
 
-"""
-    line_destruction(rates::TransitionRates)
-    @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
-
-Returns line destruction probability for the two level atom.
-"""
-function line_destruction(rates::TransitionRates)
-    C21 = rates.C21
-    R21 = rates.R21
-    return C21 ./ (R21 .+ C21)
-end
 
 """
     line_extinction_constant(line::AtomicLine, n_l::NumberDensity, n_u::NumberDensity)

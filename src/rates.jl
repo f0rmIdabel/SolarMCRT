@@ -328,43 +328,8 @@ end
                     temperature::Array{<:Unitful.Temperature, 3},
                     electron_density::Array{<:NumberDensity, 3})
 Given the atom density, calculate the atom populations according to LTE.
+Tiago
 """
-function LTE_populations2(atom::Atom,
-                          temperature::Array{<:Unitful.Temperature, 3},
-                          electron_density::Array{<:NumberDensity, 3})
-
-    atom_density = atom.density
-    χ = atom.χ
-    g = atom.g
-    U = atom.U
-    n_levels = length(g)
-
-    nz, nx, ny = size(temperature)
-    nl = length(χ)
-    populations = Array{Float64, 4}(undef, nz, nx, ny, nl)u"m^-3"
-
-    z = Array{Float64, 4}(undef, nl, nz, nx, ny)
-
-    for l=1:n_levels
-        z[l,:,:,:] = g[l] * exp.(-χ[l]/k_B./temperature)
-    end
-
-    c = ( 2π*m_e*k_B/h^2 .* temperature ).^(1.5) .* 2.0 ./ electron_density * U[2] ./ U[1] .* exp.(-χ[end]/k_B./temperature)
-
-    n3  = (c .* atom_density ./ (1.0 .+ c)) .|> u"m^-3"
-    n2 = ((atom_density .- n3) ./ (z[1] ./ z[2] .+ 1.0) ) .|> u"m^-3"
-    n1 = (atom_density .- n2 .- n3) .|> u"m^-3"
-
-    populations[:,:,:,1] = n1
-    populations[:,:,:,2] = n2
-    populations[:,:,:,3] = n3
-
-    @test all( Inf .> ustrip.(populations) .>= 0.0 )
-
-    return populations
-end
-
-
 function LTE_populations(atom::Atom,
                          temperature::Array{<:Unitful.Temperature, 3},
                          electron_density::Array{<:NumberDensity, 3})
