@@ -32,11 +32,7 @@ cut_off = 20.0
 #  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
 nλ_bf = 10, 10
-λ_min = 22.794, 91.176
-
 nλ_bb = 20
-q_core = 15.0
-q_wing = 600.0
 
 # ======================================================================================= #
 #  The intended number of packets to be created for each group of wavelengths.            #
@@ -72,6 +68,6 @@ write_rates = true
 #  background opacity at the given λ (nm). A convenient quick test, without going into    #
 #  the involved population-iteration routine.                                             #
 # ======================================================================================= #
-background_mode = false
+background_mode = true
 background_wavelength = 500.0
-background_target_packets = 1e7
+background_target_packets = 1e6

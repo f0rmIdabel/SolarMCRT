@@ -7,6 +7,7 @@ struct Atom
     χ::Array{<:Unitful.Energy,1}
     g::Array{Int64,1}
     Z::Int64
+    f_value::Array{Float64,1}
     λ::Array{Any, 1}
     nλ::Int64
 end
@@ -32,29 +33,45 @@ function collect_atom_data(atmosphere::Atmosphere)
     # READ ATOM FILE
     # ==================================================================
     atom = h5open(get_atom_path(), "r")
-    stage = read(atom, "stage")
-    element = read(atom, "element")
     Z = read(atom, "Z")
     density = read(atom, "density")u"m^-3"
     χ = read(atom, "chi")u"J"
     χ_ion = read(atom, "chi_ion")u"J"
     g = read(atom, "g")
+    f_value = read(atom, "f_value")
+    qwing = read(atom, "qwing")
+    qcore = read(atom, "qcore")
     close(atom)
 
     # ==================================================================
-    # RELEVANT ATMOSPHERE DATA
-    # ==================================================================
-    temperature = atmosphere.temperature
-    electron_density = atmosphere.electron_density
-    neutral_hydrogen_density = sum(atmosphere.hydrogen_populations[:,:,:,1:end-1], dims=4)[:,:,:,1]
-
-    nz, nx, ny = size(temperature)
-
-    # ==================================================================
-    # ATOMIC STAGE
+    # CUT ACCORDING TO LEVEL NUMBER
     # ==================================================================
     n_levels = get_nlevels()
+    n_levels_file = length(g)
+
     n_lines = Int(n_levels*(n_levels-1)/2)
+
+    if n_levels > n_levels_file
+        println("You entered more levels: ", n_levels,
+                " than exist in the file: ", n_levels_file)
+        quit()
+    elseif n_levels < n_levels_file
+        qwing_new = []
+        qcore_new = []
+        f_value_new = []
+
+        s = 1
+        for l=1:n_levels-1
+            append!(f_value_new, f_value[s:n_levels-l])
+            append!(qcore_new, qcore[s:n_levels-l])
+            append!(qwing_new, qwing[s:n_levels-l])
+            s += n_levels_file-l
+        end
+
+        f_value = f_value_new
+        qcore = qcore_new
+        qwing= qwing_new
+    end
 
     χ = χ[1:n_levels]
     append!(χ, χ_ion)
@@ -65,19 +82,19 @@ function collect_atom_data(atmosphere::Atmosphere)
     # ==================================================================
     # SAMPLE ATOM TRANSITION WAVELENGTHS
     # ==================================================================
-    nλ_bf = get_nλ_bf()
-    λ_min = get_λ_min() .* u"nm"
 
+    nλ_bf = get_nλ_bf()
     nλ_bb = get_nλ_bb()
-    qcore = get_qcore()
-    qwing = get_qwing()
 
     λ = []
     nλ = 0
 
     # Sample bound free transitions
+    λ1c = transition_λ(χ[1], χ[end])
+
     for level=1:n_levels
-        λ_bf = sample_λ_boundfree(nλ_bf[level], λ_min[level], χ[level], χ[end])
+        λ_min = λ1c * (level/2.0)^2
+        λ_bf = sample_λ_boundfree(nλ_bf[level], λ_min, χ[level], χ[end])
         append!(λ, [λ_bf])
         nλ += length(λ_bf)
     end
@@ -99,12 +116,13 @@ function collect_atom_data(atmosphere::Atmosphere)
     @test all( Inf .> ustrip(density) .>= 0.0 )
     @test all( Inf .> ustrip.(χ) .>= 0.0 )
     @test all( Inf .> g .> 0)
+    @test all( Inf .> f_value .> 0)
 
     for l=1:(n_levels+n_lines)
         @test all(Inf .> ustrip.(λ[l]) .>= 0.0 )
     end
 
-    return density, n_levels, n_lines, χ, g, Z, λ, nλ
+    return density, n_levels, n_lines, χ, g, Z, f_value, λ, nλ
 end
 
 """
@@ -121,7 +139,6 @@ function collect_line_data(atmosphere::Atmosphere, atom::Atom, u::Int, l::Int)
     # ==================================================================
     atom_file = h5open(get_atom_path(), "r")
     atom_weight = read(atom_file, "atom_weight")u"kg"
-    f_value = read(atom_file, "f_value")
     Z = read(atom_file, "Z")
     close(atom_file)
 
@@ -139,12 +156,16 @@ function collect_line_data(atmosphere::Atmosphere, atom::Atom, u::Int, l::Int)
     # ==================================================================
     χ = atom.χ
     g = atom.g
+    f_value = atom.f_value
+    n_levels = length(g)-1
 
     # ==================================================================
     # COLLECT LINE DATA
     # ==================================================================
 
-    lineData = AtomicLine(χ[u], χ[l], χ[end], g[u], g[l], f_value, atom_weight, Z)
+    line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
+
+    lineData = AtomicLine(χ[u], χ[l], χ[end], g[u], g[l], f_value[line_number], atom_weight, Z)
     unsold_const = const_unsold(lineData)
     quad_stark_const = const_quadratic_stark(lineData)
 
@@ -179,10 +200,6 @@ function sample_λ_line(nλ::Int64,
                        χu::Unitful.Energy,
                        qwing::Float64,
                        qcore::Float64)
-
-    atom_file = h5open(get_atom_path(), "r")
-
-    close(atom_file)
 
     λ_center = transition_λ(χl, χu)
 
@@ -244,7 +261,6 @@ function sample_λ_boundfree(nλ::Int64,
 
 
     λ_max  = transition_λ(χl, χ∞)
-
 
     # Initialise wavelength array
     λ = Array{Float64,1}(undef, nλ)u"nm"

@@ -71,13 +71,16 @@ function collect_background_radiation(atmosphere::Atmosphere,
     # FIND OPTICAL DEPTH BOUNDARY
     # ==================================================================
     boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, τ_max)
+    #boundary[1,:,:] = ε_boundary(ε[1,:,:,:], 0.95)
+
+    println(boundary)
 
     # ==================================================================
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
                                                                    temperature, α_continuum_abs, boundary[1,:,:])
-
+ optical_depth
     # ==================================================================
     # CHECK FOR UNVALID VALUES
     # ==================================================================
@@ -172,7 +175,6 @@ function collect_bf_radiation(atmosphere::Atmosphere,
     # BF wavelengths
     for l=1:nλ
         boundary[l,:,:] = optical_depth_boundary(α[l,:,:,:], z, τ_max)
-
         α_abs = α[l,:,:,:] .* ε[l,:,:,:]
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α_abs, boundary[l,:,:])
@@ -432,6 +434,27 @@ function optical_depth_boundary(α::Array{<:PerLength, 3},
             τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
             k += 1
         end
+        boundary[i,j] = k
+    end
+
+    return boundary
+end
+
+function ε_boundary(ε::Array{Float64, 3}, ε_max::Real)
+
+    nz, nx, ny = size(ε)
+    columns = nx*ny
+    boundary = Array{Int32, 2}(undef, nx, ny)
+
+    for col=1:columns
+        j = 1 + (col-1)÷nx
+        i = col - (j-1)*nx
+
+        k = nz
+        while ε[k,i,j] > ε_max
+            k -= 1
+        end
+
         boundary[i,j] = k
     end
 

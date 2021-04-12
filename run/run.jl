@@ -47,7 +47,7 @@ function run()
         print("--Initialise output file...................")
         create_output_file(output_path, nλ, atmosphere_size)
         write_to_file(λ, output_path)
-        write_to_file(radiation, 1, output_path)
+        write_to_file(radiation, output_path)
         println(@sprintf("%.1f GBs of data initialised.", how_much_data(nλ, atmosphere_size)))
 
         # =============================================================================
