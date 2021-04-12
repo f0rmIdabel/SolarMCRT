@@ -416,8 +416,8 @@ function mcrt_continuum(atmosphere::Atmosphere,
                     end
 
                     # Dimensions of box
-                    corner = SA[z[k], x[i], y[j]]
-                    box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
+                    corner = [z[k], x[i], y[j]]
+                    box_dim = [z[k+1], x[i+1], y[j+1]] .- corner
 
                     for pct=1:pcts
                         # Initial box
@@ -429,8 +429,6 @@ function mcrt_continuum(atmosphere::Atmosphere,
                         # Scatter each packet until destroyed,
                         # escape or reach max_scatterings
                         for s=1:Int(max_scatterings)
-
-                            Threads.atomic_add!(total_scatterings, 1)
 
                             # Scatter packet once
                             box_id, r, lost = scatter_packet_continuum(x, y, z,
@@ -447,6 +445,9 @@ function mcrt_continuum(atmosphere::Atmosphere,
                                 Threads.atomic_add!(total_destroyed, 1)
                                 break
                             end
+
+                            Threads.atomic_add!(total_scatterings, 1)
+
                         end
                     end
                 end

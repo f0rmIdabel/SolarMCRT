@@ -8,19 +8,17 @@ include("rates.jl")
 
 Collect initial population distribution. Either LTE or zero-radiation.
 """
-function collect_initial_populations(atmosphere,
-                                     atom::Atom)
-                                     #temperature::Array{<:Unitful.Temperature, 3},
-                                     #electron_density::Array{<:NumberDensity,3})
+function collect_initial_populations(atmosphere::Atmosphere,
+                                     atom::Atom,
+                                     distribution::String)
 
     temperature = atmosphere.temperature
     electron_density = atmosphere.electron_density
     density = atom.density
-    population_mode = get_population_distribution()
 
-    if population_mode == "LTE"
+    if distribution == "LTE"
         initial_populations = LTE_populations(atom, temperature, electron_density)
-    elseif population_mode == "zero_radiation"
+    elseif distribution == "zero_radiation"
         initial_populations = zero_radiation_populations(atmosphere, atom)
     end
 

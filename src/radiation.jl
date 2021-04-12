@@ -31,7 +31,7 @@ Returns data to go into structure.
 """
 function collect_background_radiation(atmosphere::Atmosphere,
                                       λ::Array{<:Unitful.Length,1},
-                                      τ_max::Float64,
+                                      boundary_criterion,
                                       target_packets::Float64)
 
     # ==================================================================
@@ -70,17 +70,24 @@ function collect_background_radiation(atmosphere::Atmosphere,
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY
     # ==================================================================
-    boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, τ_max)
-    #boundary[1,:,:] = ε_boundary(ε[1,:,:,:], 0.95)
+    criterion, cut_off = boundary_criterion
 
-    println(boundary)
+    if cut_off == false
+        fill!(boundary, nz)
+    else
+        if criterion == "depth"
+            boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, cut_off)
+        elseif criterion == "destruction"
+            boundary[1,:,:] = ε_boundary(ε[1,:,:,:], cut_off)
+        end
+    end
 
     # ==================================================================
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
                                                                    temperature, α_continuum_abs, boundary[1,:,:])
- optical_depth
+
     # ==================================================================
     # CHECK FOR UNVALID VALUES
     # ==================================================================
@@ -107,11 +114,10 @@ bound-free processes. Returns data to go into structure.
 """
 function collect_bf_radiation(atmosphere::Atmosphere,
                               atom::Atom,
-                              #λ::Array{<:Unitful.Length,1},
                               level::Int64,
                               rates::TransitionRates,
                               populations::Array{<:NumberDensity,4},
-                              τ_max::Float64,
+                              boundary_criterion,
                               target_packets::Float64)
     # ==================================================================
     # GET ATMOSPHERE DATA
@@ -171,10 +177,24 @@ function collect_bf_radiation(atmosphere::Atmosphere,
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
+    criterion, cut_off = boundary_criterion
+
+    if cut_off == false
+        fill!(boundary, nz)
+    else
+        if criterion == "depth"
+            for l=1:nλ
+                boundary[l,:,:] = optical_depth_boundary(α[l,:,:,:], z, cut_off)
+            end
+        elseif criterion == "destruction"
+            for l=1:nλ
+                boundary[l,:,:] = ε_boundary(ε[l,:,:,:], cut_off)
+            end
+        end
+    end
 
     # BF wavelengths
     for l=1:nλ
-        boundary[l,:,:] = optical_depth_boundary(α[l,:,:,:], z, τ_max)
         α_abs = α[l,:,:,:] .* ε[l,:,:,:]
         packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α_abs, boundary[l,:,:])
@@ -207,10 +227,9 @@ bound-free processes. Returns data to go into structure.
 function collect_bb_radiation(atmosphere::Atmosphere,
                               λ::Array{<:Unitful.Length,1},
                               line::Line,
-                              #line_number::Int64,
                               rates::TransitionRates,
                               populations::Array{<:NumberDensity,4},
-                              τ_max::Float64,
+                              boundary_criterion,
                               target_packets::Float64)
 
     # ==================================================================
@@ -272,14 +291,42 @@ function collect_bb_radiation(atmosphere::Atmosphere,
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
 
-    for l=1:nλ
-        α = α_continuum .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
-        boundary[l,:,:] = optical_depth_boundary(α, z, τ_max)
+    criterion, cut_off = boundary_criterion
 
-        α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
-        α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
-        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
+    if cut_off == false
+        fill!(boundary, nz)
+
+        for l=1:nλ
+            α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
+            α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+            packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
                                                                        temperature, α_abs, boundary[l,:,:])
+        end
+
+    else
+        if criterion == "depth"
+            for l=1:nλ
+                α = α_continuum .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
+                boundary[l,:,:] = optical_depth_boundary(α, z, cut_off)
+
+                α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
+                α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+                packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
+                                                                               temperature, α_abs, boundary[l,:,:])
+
+            end
+        elseif criterion == "destruction"
+            for l=1:nλ
+
+                α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
+                α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+                ε = α_abs ./ (α_continuum .+ α_line)
+
+                boundary[l,:,:] = ε_boundary(ε, cut_off)
+                packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
+                                                                               temperature, α_abs, boundary[l,:,:])
+            end
+        end
     end
 
     # ==================================================================

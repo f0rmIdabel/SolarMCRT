@@ -185,6 +185,14 @@ end
 Get optical depth where the atmosphere will be cut.
 """
 function get_cut_off()
+
+	input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("criterion", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("\"", file)[end]
+    j = findfirst("\"", file[i+1:end])[end] + i
+    distribution = string(file[i+1:j-1])
+
     input_file = open(f->read(f, String), "../run/keywords.input")
     i = findfirst("cut_off", input_file)[end] + 1
     file = input_file[i:end]
@@ -199,8 +207,9 @@ function get_cut_off()
         cut_off = parse(Bool, file[i:j])
     end
 
-    return cut_off # move
+    return distribution, cut_off
 end
+
 
 """
     get_background_λ()

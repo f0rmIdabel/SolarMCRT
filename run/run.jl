@@ -68,7 +68,7 @@ function run()
         target_packets_bf = get_target_packets_bf()
         target_packets_bb = get_target_packets_bb()
         cut_off = get_cut_off()
-        population_distribution = get_population_distribution()
+        initial_population_distribution = get_population_distribution()
         write_rates = get_write_rates()
 
         # =============================================================================
@@ -87,7 +87,7 @@ function run()
         # LOAD INITIAL POPULATIONS
         # =============================================================================
         print("--Loading initial populations..............")
-        populations = collect_initial_populations(atmosphere, atom)
+        populations = collect_initial_populations(atmosphere, atom, initial_population_distribution)
         println("Initial ", population_distribution, "-populations loaded.")
 
         # =============================================================================
