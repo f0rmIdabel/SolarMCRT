@@ -88,7 +88,7 @@ function run()
         # =============================================================================
         print("--Loading initial populations..............")
         populations = collect_initial_populations(atmosphere, atom, initial_population_distribution)
-        println("Initial ", population_distribution, "-populations loaded.")
+        println("Initial ", initial_population_distribution, "-populations loaded.")
 
         # =============================================================================
         # CALCULATE INITIAL TRANSITION RATES

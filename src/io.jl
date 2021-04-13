@@ -606,6 +606,7 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
 
     h5open(output_path, "w") do file
         write(file, "J", Array{Int32,5}(undef, max_iterations, nλ, nz, nx,ny))
+	write(file, "I0", Array{Int32,5}(undef, max_iterations, nλ, 3, nx,ny))
         write(file, "total_destroyed", Array{Int64,2}(undef, max_iterations, nλ))
         write(file, "total_scatterings", Array{Int64,2}(undef,max_iterations, nλ))
         write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
@@ -635,7 +636,8 @@ function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tu
 
     h5open(output_path, "w") do file
         write(file, "J", Array{Int32,5}(undef, 1, nλ, nz, nx,ny))
-        write(file, "total_destroyed", Array{Int64,2}(undef,1, nλ))
+        write(file, "I0", Array{Int32,5}(undef, 1, nλ, 3, nx,ny))
+	write(file, "total_destroyed", Array{Int64,2}(undef,1, nλ))
         write(file, "total_scatterings", Array{Int64,2}(undef,1, nλ))
         write(file, "time", Array{Float64,2}(undef,1, nλ))
 
@@ -654,6 +656,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
     h5open(output_path, "r+") do file
         # Slice
         J_new = read(file, "J")[1:final_iteration,:,:,:,:]
+	I0_new = read(file, "I0")[1:final_iteration,:,:,:,:]
         total_destroyed_new = read(file, "total_destroyed")[1:final_iteration,:]
         total_scatterings_new = read(file, "total_scatterings")[1:final_iteration,:]
         time_new = read(file, "time")[1:final_iteration,:]
@@ -664,6 +667,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
 
         # Delete
         delete_object(file, "J")
+	delete_object(file, "I0")
         delete_object(file, "total_destroyed")
         delete_object(file, "total_scatterings")
         delete_object(file, "time")
@@ -674,6 +678,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
 
         # Write
         write(file, "J", J_new)
+	write(file, "I0", I0_new)
         write(file, "total_destroyed", total_destroyed_new)
         write(file, "total_scatterings", total_scatterings_new)
         write(file, "time", time_new)

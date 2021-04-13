@@ -1,5 +1,5 @@
 include("radiation.jl")
-
+using Plots
 
 """
     mcrt(atmosphere::Atmosphere,
@@ -44,8 +44,6 @@ function mcrt_line(atmosphere::Atmosphere,
     # ===================================================================
     # ATOM DATA
     # ===================================================================
-    #λ = atom.λ
-    #nλ_bf = atom.nλ_bf
     lineData = line.lineData
     dc = line.damping_constant
     ΔλD = line.doppler_width
@@ -59,12 +57,14 @@ function mcrt_line(atmosphere::Atmosphere,
 
     # Initialise placeholder variable
     J_λ = Array{Int32,3}(undef, nz, nx, ny)
+    I0_λ = Array{Int32,3}(undef, 3, nx, ny)
 
     # Line wavelengths
     for λi=1:nλ
 
         # Reset counters
         fill!(J_λ, 0.0)
+        fill!(I0_λ, 0.0)
         total_destroyed = Threads.Atomic{Int64}(0)
         total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -122,7 +122,7 @@ function mcrt_line(atmosphere::Atmosphere,
                                                                 α_line_constant,
                                                                 boundary_λ,
                                                                 box_id, r,
-                                                                J_λ,
+                                                                J_λ, I0_λ,
                                                                 dc, ΔλD,
                                                                 λ0, λ[λi])
 
@@ -134,7 +134,7 @@ function mcrt_line(atmosphere::Atmosphere,
                             # Check if destroyed in next particle interaction
                             α_line = α -  α_continuum[box_id...]
                             ε = ( ε_continuum[box_id...] * α_continuum[box_id...] +
-                                  ε_line[box_id...]        * α_line ) / α
+                                  ε_line[box_id...]      * α_line ) / α
 
                             if rand() < ε
                                 Threads.atomic_add!(total_destroyed, 1)
@@ -154,6 +154,7 @@ function mcrt_line(atmosphere::Atmosphere,
         # ===================================================================
         h5open(output_path, "r+") do file
             file["J"][iteration,nλ0 + λi,:,:,:] = J_λ
+            file["I0"][iteration,nλ0 + λi,:,:,:] = I0_λ
             file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
             file["total_scatterings"][iteration,nλ0 + λi] = total_scatterings.value
             file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
@@ -197,6 +198,7 @@ function scatter_packet_line(x::Array{<:Unitful.Length, 1},
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
                         J::Array{Int32, 3},
+                        I0::Array{Int32, 3},
 
                         damping_constant::Array{<:PerArea, 3},
                         ΔλD::Array{<:Unitful.Length, 3},
@@ -370,6 +372,7 @@ function mcrt_continuum(atmosphere::Atmosphere,
 
     # Initialise placeholder variable
     J_λ = zeros(Int32, nz, nx, ny)
+    I0_λ = zeros(Int32, 3, nx, ny)
 
     # ===================================================================
     # SIMULATION
@@ -381,6 +384,7 @@ function mcrt_continuum(atmosphere::Atmosphere,
 
         # Reset counters
         fill!(J_λ, 0.0)
+        fill!(I0_λ, 0.0)
         total_destroyed = Threads.Atomic{Int64}(0)
         total_scatterings = Threads.Atomic{Int64}(0)
 
@@ -435,7 +439,7 @@ function mcrt_continuum(atmosphere::Atmosphere,
                                                                        α_λ,
                                                                        boundary_λ,
                                                                        box_id, r,
-                                                                       J_λ)
+                                                                       J_λ, I0_λ)
 
                             # Check if escaped or lost in bottom
                             if lost
@@ -459,6 +463,7 @@ function mcrt_continuum(atmosphere::Atmosphere,
         # ===================================================================
         h5open(output_path, "r+") do file
             file["J"][iteration,nλ0 + λi,:,:,:] = J_λ
+            file["I0"][iteration,nλ0 + λi,:,:,:] = I0_λ
             file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
             file["total_scatterings"][iteration,nλ0 + λi] = total_scatterings.value
             file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
@@ -487,7 +492,8 @@ function scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
                                   boundary::Array{Int32, 2},
                                   box_id::Array{Int64,1},
                                   r::Array{<:Unitful.Length, 1},
-                                  J::Array{Int32, 3})
+                                  J::Array{Int32, 3},
+                                  I0::Array{Int32, 3})
 
     # Keep track of status
     lost = false
@@ -529,6 +535,7 @@ function scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
     # TRAVERSE BOXES UNTIL DEPTH TARGET REACHED
     # ===================================================================
     while τ > τ_cum
+
         # Switch to new box
         box_id[face] += direction[face]
         next_edge[face] += direction[face]
@@ -537,8 +544,18 @@ function scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
         if face == 1
             if box_id[1] == 0
                 lost = true
+
+                if θ < π/32
+                    I0[1,box_id[2], box_id[3]] += 1
+                elseif π/32 < θ < π/4
+                    I0[2,box_id[2], box_id[3]] += 1
+                else
+                    I0[3,box_id[2], box_id[3]] += 1
+                end
+
                 break
             end
+
         # Handle side escapes with periodic boundary
         else
             # Left-going packets

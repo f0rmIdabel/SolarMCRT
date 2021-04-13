@@ -24,33 +24,33 @@ population_distribution = "zero_radiation"
 #  Optical depth where atmosphere is cut off for each wavelength.                         #
 #  Set to false for no cut-off.                                                           #
 # ======================================================================================= #
-criterion = "destruction"
-cut_off = 0.999
+criterion = "depth"
+cut_off = 20
 
 # ======================================================================================= #
 #  Choose how many wavelengths to sample for the bound-bound, bound-free ground and       #
 #  bound-free excited transitions. If an even # is given for the bound-bound, an          #
 #  additional wavelength will be added by default.                                        #
 # ======================================================================================= #
-nλ_bf = 5, 5
-nλ_bb = 5
+nλ_bf = 25, 25
+nλ_bb = 51
 
 # ======================================================================================= #
 #  The intended number of packets to be created for each group of wavelengths.            #
 #  Deviates from the actual number, as packets are not perfectly divided between boxes.   #
 # ======================================================================================= #
-target_packets_bf = 1e6, 1e8
+target_packets_bf = 1e6, 1e7
 target_packets_bb = 1e4
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
 # ======================================================================================= #
-max_scatterings = 1e4
+max_scatterings = 1e5
 
 # ======================================================================================= #
 #  Maximum number of population iterations before quitting.                               #
 # ======================================================================================= #
-max_iterations = 3
+max_iterations = 5
 
 # ======================================================================================= #
 # Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #
@@ -69,6 +69,6 @@ write_rates = true
 #  background opacity at the given λ (nm). A convenient quick test, without going into    #
 #  the involved population-iteration routine.                                             #
 # ======================================================================================= #
-background_mode = true
+background_mode = false
 background_wavelength = 500.0
-background_target_packets = 1e8
+background_target_packets = 1e7

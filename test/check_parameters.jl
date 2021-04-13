@@ -69,32 +69,29 @@ end
 
 Check that background radiation data has valid units, dimensions and values.
 """
-function check_radiationBackground(radiationBackground::RadiationContinuum,
-                                   atmosphere_size::Tuple)
+function check_radiationContinuum(radiation::RadiationContinuum,
+                                   atmosphere_size::Tuple, nλ::Int64)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
-    λ = radiationBackground.λ
-    α_continuum = radiationBackground.α_continuum
-    ε_continuum = radiationBackground.ε_continuum
-    boundary = radiationBackground.boundary
-    packets = radiationBackground.packets
-    intensity_per_packet = radiationBackground.intensity_per_packet
+    α_continuum = radiation.α_continuum
+    ε_continuum = radiation.ε_continuum
+    boundary = radiation.boundary
+    packets = radiation.packets
+    intensity_per_packet = radiation.intensity_per_packet
 
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    nλ = length(λ)
     nz, nx, ny = atmosphere_size
 
-    @assert size(α_continuum) == size(α_continuum) == size(packets)
+    @assert size(α_continuum) == size(ε_continuum) == size(packets) == (nλ, nz, nx, ny)
     @assert size(boundary) == (nλ, nx, ny)
-    @assert length(λ) == length(intensity_per_packet) == nλ
+    @assert length(intensity_per_packet) == nλ
 
     # ===========================================================
     # CHECK UNITS
     # ===========================================================
-    @test dimension(λ[1]) ==  Unitful.𝐋
     @test dimension(α_continuum[1]) == Unitful.𝐋^-1
     @test dimension(ε_continuum[1]) == NoDims
     @test dimension(boundary[1]) == NoDims
@@ -104,7 +101,6 @@ function check_radiationBackground(radiationBackground::RadiationContinuum,
     # ===========================================================
     # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all(  Inf .> ustrip.(λ) .>= 0.0 )
     @test all(  Inf .> ustrip.(α_continuum) .>= 0.0 )
     @test all(  Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
     @test all(  1.0 .>= ε_continuum .>= 0.0 )
@@ -123,26 +119,71 @@ function check_atom(atom::Atom,
     # ===========================================================
     # LOAD DATA
     # ===========================================================
-    line = atom.line
-    Aul = line.Aji
-    Bul = line.Bji
-    Blu = line.Bij
-    λ0 = line.λ0
-    χl = atom.χl
-    χu = atom.χu
-    χ∞ = atom.χ∞
-    doppler_width = atom.doppler_width
-    damping_constant = atom.damping_constant
+
+    density = atom.density
+    n_levels = atom.n_levels
+    n_lines = atom.n_lines
+    χ = atom.χ
+    g = atom.g
+    Z = atom.Z
+    f_value = atom.f_value
     λ = atom.λ
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
+    nλ = atom.nλ
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
+    @assert size(density) == atmosphere_size
+    @assert length(χ) == n_levels + 1
+    @assert length(g) == n_levels + 1
+    @assert length(f_value) == n_lines
+
+    # ===========================================================
+    # CHECK UNITS
+    # ===========================================================
+    @test dimension(λ[1][1])    ==  Unitful.𝐋
+    @test dimension(χ[1])       ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
+    @test dimension(density[1]) ==  Unitful.𝐋^-3
+    # ===========================================================
+    # NO NEGAITVE OR INFINITE VALUES
+    # ===========================================================
+    @test all( Inf .> ustrip.(density) .>= 0.0)
+    @test all( Inf .> f_value .>= 0.0)
+    @test all( Inf .> g .>= 0.0)
+
+    @test ustrip(χ[1]) == 0.0
+    @test all( ustrip.(χ[2:end] .- χ[1:end-1]) .> 0 )
+
+    for l=1:(n_levels+n_lines)
+        @test all(Inf .> ustrip.(λ[l]) .>= 0.0 )
+    end
+
+end
+
+"""
+    check_line(line::Line,
+               atmosphere_size::Tuple)
+
+Check that atom data has valid units, dimensions and values.
+"""
+function check_line(line::Line,
+                    atmosphere_size::Tuple)
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
+    lineData = line.lineData
+    Aul = lineData.Aji
+    Bul = lineData.Bji
+    Blu = lineData.Bij
+    λ0 = lineData.λ0
+    doppler_width = line.doppler_width
+    damping_constant = line.damping_constant
 
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
     @assert size(doppler_width) == atmosphere_size
     @assert size(damping_constant) == atmosphere_size
-    @assert length(λ) == 2nλ_bf + nλ_bb
 
     # ===========================================================
     # CHECK UNITS
@@ -150,13 +191,9 @@ function check_atom(atom::Atom,
     @test dimension(Aul) ==  Unitful.𝐓^-1
     @test dimension(Bul) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
     @test dimension(Blu) ==  Unitful.𝐓^2 * Unitful.𝐌^-1 * Unitful.𝐋
-    @test dimension(λ[1])   ==  Unitful.𝐋
+    @test dimension(λ0)   ==  Unitful.𝐋
     @test dimension(damping_constant[1])  ==  Unitful.𝐋^-2
     @test dimension(doppler_width[1])  ==  Unitful.𝐋
-    @test dimension(λ0)  ==  Unitful.𝐋
-    @test dimension(χl) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
-    @test dimension(χu) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
-    @test dimension(χ∞) ==  Unitful.𝐌 * Unitful.𝐋^2 * Unitful.𝐓^-2
 
     # ===========================================================
     # NO NEGAITVE OR INFINITE VALUES
@@ -166,14 +203,7 @@ function check_atom(atom::Atom,
     @test all( Inf > ustrip(Blu) >= 0.0 )
     @test all( Inf .> ustrip.(damping_constant) .>= 0.0 )
     @test all( Inf .> ustrip.(doppler_width) .>= 0.0 )
-    @test all( Inf .> ustrip.(λ) .>= 0.0 )
     @test Inf > ustrip(λ0) >= 0.0
-    @test Inf > nλ_bb >= 0
-    @test Inf > nλ_bf >= 0
-
-    @test ustrip(χl) == 0.0
-    @test ustrip(χu) > 0.0
-    @test χ∞ > χu
 end
 
 """
@@ -188,7 +218,7 @@ function check_populations(populations::Array{<:NumberDensity,4},
     # CHECK DIMENSIONS
     # ===========================================================
     nz, nx, ny = atmosphere_size
-    @assert size(populations) == (nz, nx, ny, 3)
+    @assert size(populations[:,:,:,1]) == (nz, nx, ny)
 
     # ===========================================================
     # CHECK UNITS
@@ -208,70 +238,49 @@ end
 Check that transition rates have valid units, dimensions and values.
 """
 function check_rates(rates::TransitionRates,
-                     atmosphere_size::Tuple)
+                     atmosphere_size::Tuple,
+                     n_levels::Int64)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
-    R12 = rates.R12
-    R13 = rates.R13
-    R23 = rates.R23
-    R21 = rates.R21
-    R31 = rates.R31
-    R32 = rates.R32
-    C12 = rates.C12
-    C13 = rates.C13
-    C23 = rates.C23
-    C21 = rates.C21
-    C31 = rates.C31
-    C32 = rates.C32
+    R = rates.R
+    C = rates.C
 
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    @assert size(R12) == atmosphere_size
-    @assert size(R13) == atmosphere_size
-    @assert size(R23) == atmosphere_size
-    @assert size(R21) == atmosphere_size
-    @assert size(R31) == atmosphere_size
-    @assert size(R32) == atmosphere_size
-    @assert size(C12) == atmosphere_size
-    @assert size(C13) == atmosphere_size
-    @assert size(C23) == atmosphere_size
-    @assert size(C21) == atmosphere_size
-    @assert size(C31) == atmosphere_size
-    @assert size(C32) == atmosphere_size
+    for l=1:n_levels
+        for u=l+1:n_levels+1
+            @assert size(R[l,u,:,:,:]) == atmosphere_size
+            @assert size(R[u,l,:,:,:]) == atmosphere_size
+            @assert size(C[l,u,:,:,:]) == atmosphere_size
+            @assert size(C[u,l,:,:,:]) == atmosphere_size
+        end
+    end
 
     # ===========================================================
     # CHECK UNITS
     # ===========================================================
-    @test dimension(R12[1]) ==  Unitful.𝐓^-1
-    @test dimension(R13[1]) ==  Unitful.𝐓^-1
-    @test dimension(R23[1]) ==  Unitful.𝐓^-1
-    @test dimension(R21[1]) ==  Unitful.𝐓^-1
-    @test dimension(R31[1]) ==  Unitful.𝐓^-1
-    @test dimension(R32[1]) ==  Unitful.𝐓^-1
-    @test dimension(C12[1]) ==  Unitful.𝐓^-1
-    @test dimension(C13[1]) ==  Unitful.𝐓^-1
-    @test dimension(C23[1]) ==  Unitful.𝐓^-1
-    @test dimension(C21[1]) ==  Unitful.𝐓^-1
-    @test dimension(C31[1]) ==  Unitful.𝐓^-1
-    @test dimension(C32[1]) ==  Unitful.𝐓^-1
+    for l=1:n_levels
+        for u=l+1:n_levels+1
+            @test dimension(R[l,u,1,1,1]) == Unitful.𝐓^-1
+            @test dimension(R[u,l,1,1,1]) == Unitful.𝐓^-1
+            @test dimension(C[l,u,1,1,1]) == Unitful.𝐓^-1
+            @test dimension(C[u,l,1,1,1]) == Unitful.𝐓^-1
+        end
+    end
 
     # ===========================================================
     # NO NEGAITVE OR INFINITE VALUES
     # ===========================================================
-    @test all( Inf .> ustrip.(R12) .>= 0.0 )
-    @test all( Inf .> ustrip.(R13) .>= 0.0 )
-    @test all( Inf .> ustrip.(R23) .>= 0.0 )
-    @test all( Inf .> ustrip.(R21) .>= 0.0 )
-    @test all( Inf .> ustrip.(R31) .>= 0.0 )
-    @test all( Inf .> ustrip.(R32) .>= 0.0 )
-    @test all( Inf .> ustrip.(C12) .>= 0.0 )
-    @test all( Inf .> ustrip.(C13) .>= 0.0 )
-    @test all( Inf .> ustrip.(C23) .>= 0.0 )
-    @test all( Inf .> ustrip.(C21) .>= 0.0 )
-    @test all( Inf .> ustrip.(C31) .>= 0.0 )
-    @test all( Inf .> ustrip.(C32) .>= 0.0 )
+    for l=1:n_levels
+        for u=l+1:n_levels+1
+            @test all( Inf .> ustrip.(R[l,u,:,:,:]) .>= 0.0 )
+            @test all( Inf .> ustrip.(R[u,l,:,:,:]) .>= 0.0 )
+            @test all( Inf .> ustrip.(C[l,u,:,:,:]) .>= 0.0 )
+            @test all( Inf .> ustrip.(C[u,l,:,:,:]) .>= 0.0 )
+        end
+    end
 end
 
 """
@@ -281,9 +290,10 @@ check_radiation(radiation::Radiation,
 
 Check that radiation data has valid units, dimensions and values.
 """
-function check_radiation(radiation::RadiationLine,
-                         atom::Atom,
-                         atmosphere_size::Tuple)
+function check_radiationLine(radiation::RadiationLine,
+                             λ::Array{<:Unitful.Length, 1},
+                             line::Line,
+                             atmosphere_size::Tuple)
     # ===========================================================
     # LOAD DATA
     # ===========================================================
@@ -291,7 +301,6 @@ function check_radiation(radiation::RadiationLine,
     ε_continuum = radiation.ε_continuum
     α_line_constant = radiation.α_line_constant
     ε_line = radiation.ε_line
-
     boundary = radiation.boundary
     packets = radiation.packets
     intensity_per_packet = radiation.intensity_per_packet
@@ -300,26 +309,29 @@ function check_radiation(radiation::RadiationLine,
     # ===========================================================
     # LOAD DATA
     # ===========================================================
-    λ = atom.λ
     nλ = length(λ)
+    lineData = line.lineData
 
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
-    α_line = Array{PerLength, 4}(undef,nλ_bb,nz,nx,ny)
+    α = Array{PerLength, 4}(undef,nλ,nz,nx,ny)
+    ε = Array{Float64, 4}(undef,nλ,nz,nx,ny)
 
-    for l=1:nλ_bb
-        α_line[l,:,:,:] = line_extinction.(λ[2nλ_bf + l], atom.line.λ0, atom.doppler_width, atom.damping_constant, α_line_constant)
+    for l=1:nλ
+        α_line = line_extinction.(λ[l], lineData.λ0, line.doppler_width,
+                                      line.damping_constant, α_line_constant)
+
+        α[l,:,:,:] = α_line .+ α_continuum
+        ε[l,:,:,:] = (ε_line .* α_line .+ ε_continuum .* α_continuum) ./ α[l,:,:,:]
     end
 
     # ===========================================================
     # CHECK DIMENSIONS
     # ===========================================================
-    @assert size(α_continuum) == (nλ, nz, nx, ny)
-    @assert size(α_continuum) ==  (nλ, nz, nx, ny)
-    @assert size(ε_continuum) == (nλ, nz, nx, ny)
-    @assert size(packets) == (nλ, nz, nx, ny)
+    @assert size(α_continuum) == (nz, nx, ny)
+    @assert size(ε_continuum) == (nz, nx, ny)
     @assert size(α_line_constant) == (nz, nx, ny)
     @assert size(ε_line) == (nz, nx, ny)
+
+    @assert size(packets) == (nλ, nz, nx, ny)
     @assert size(boundary) == (nλ, nx, ny)
     @assert length(intensity_per_packet) == nλ
 
@@ -328,7 +340,7 @@ function check_radiation(radiation::RadiationLine,
     # ===========================================================
     @test dimension(α_continuum[1]) == Unitful.𝐋^-1
     @test dimension(ε_continuum[1]) == NoDims
-    @test dimension(α_line[1]) == Unitful.𝐋^-1
+    @test dimension(α[1]) == Unitful.𝐋^-1
     @test dimension(α_line_constant[1]) == NoDims
     @test dimension(ε_line[1]) == NoDims
     @test dimension(boundary[1]) == NoDims
@@ -341,9 +353,10 @@ function check_radiation(radiation::RadiationLine,
     @test all( Inf .> ustrip.(α_continuum) .>= 0.0 )
     @test all( 1.0 .>= ε_continuum .>= 0.0 )
     @test all( 1.0 .>= ε_line .>= 0.0 )
-    @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> ustrip.(α_line_constant) .>= 0.0 )
-    @test all( Inf .> ustrip.(α_line) .>= 0.0 )
+    @test all( Inf .> ustrip.(α) .>= 0.0 )
+    @test all( 1.0 .>= ε .>= 0.0 )
+    @test all( Inf .> boundary .>= 0 )
     @test all( Inf .> packets .>= 0 )
     @test all( Inf .> ustrip.(intensity_per_packet) .>= 0.0 )
 end

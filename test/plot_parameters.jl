@@ -50,7 +50,7 @@ function plot_atmosphere(atmosphere::Atmosphere)
                     xlabel = "z (Mm)", ylabel = "electron density (m^-3)",
                     yscale=:log10, legend = false)
     p4 = Plots.plot(z, [mean_h1./total, mean_h2./total, mean_h3./total],
-                    xlabel = "z (Mm)", ylabel = "hydrogen density (m^-3)",
+                    xlabel = "z (Mm)", ylabel = "relativ HI populations",
                     yscale=:log10,
                     label=permutedims(["ground","excited","ionised"]),
                     legendfontsize=6)
@@ -66,20 +66,21 @@ end
 Plot the population distribution for a 2-level atom with continuum.
 """
 function plot_populations(populations_LTE::Array{<:NumberDensity, 4},
-                          populations_zero_radiation::Array{<:NumberDensity, 4},
+                          populations_ZR::Array{<:NumberDensity, 4},
                           z::Array{<:Unitful.Length,1})
     # ===========================================================
     # GET AVERAGE COLUMN
     # ===========================================================
-    mean_p1 = average_column(populations_LTE[:,:,:,1])
-    mean_p2 = average_column(populations_LTE[:,:,:,2])
-    mean_p3 = average_column(populations_LTE[:,:,:,3])
-    total =  mean_p1 .+ mean_p2 .+ mean_p3
+    np = size(populations_LTE)[end]
+    mean_LTE = []
+    mean_ZR = []
 
-    mean_p1_z = average_column(populations_zero_radiation[:,:,:,1])
-    mean_p2_z = average_column(populations_zero_radiation[:,:,:,2])
-    mean_p3_z = average_column(populations_zero_radiation[:,:,:,3])
-    total_z =  mean_p1_z .+ mean_p2_z .+ mean_p3_z
+    Np = average_column(sum(populations_LTE, dims=4)[:,:,:,1])
+
+    for i=1:np
+        append!(mean_LTE, [average_column(populations_LTE[:,:,:,i]) ./ Np])
+        append!(mean_ZR, [average_column(populations_ZR[:,:,:,i]) ./ Np])
+    end
 
     # ===========================================================
     # PLOT
@@ -87,13 +88,13 @@ function plot_populations(populations_LTE::Array{<:NumberDensity, 4},
     ENV["GKSwstype"]="nul"
     z = ustrip.(z .|>u"Mm")
 
-    p1 = Plots.plot(z, [mean_p1./total, mean_p2./total, mean_p3./total],
-                    xlabel = "z (Mm)", ylabel = "population density (m^-3)",
+    p1 = Plots.plot(z, mean_LTE,
+                    xlabel = "z (Mm)", ylabel = "Relative populations",
                     yscale=:log10, label=permutedims(["ground","excited","ionised"]))
-    p2 = Plots.plot(z, [mean_p1_z./total_z, mean_p2_z./total_z, mean_p3_z./total_z],
-                    xlabel = "z (Mm)", ylabel = "population density (m^-3)",
+    p2 = Plots.plot(z, mean_ZR,
+                    xlabel = "z (Mm)", ylabel = "Relative populations",
                     yscale=:log10, label=permutedims(["ground","excited","ionised"]))
-    Plots.plot(p1, p2, title=permutedims(["LTE", "Zero radiation"]), layout=(2,1))
+    Plots.plot(p1, p2, title=permutedims(["LTE", "Zero-radiation"]), layout=(2,1))
     Plots.png("plots/initial_populations")
 end
 
@@ -104,13 +105,13 @@ end
 Plots column averaged extincion, destruction probability,
 package creation and depth boundary for a background wavelength.
 """
-function plot_radiationBackground(radiationBackground::RadiationContinuum,
+function plot_radiationBackground(radiation::RadiationContinuum,
                                   z::Array{<:Unitful.Length, 1})
-    #λ = radiationBackground.λ
-    α_continuum = radiationBackground.α_continuum[1,:,:,:]
-    ε_continuum = radiationBackground.ε_continuum[1,:,:,:]
-    boundary = radiationBackground.boundary[1,:,:]
-    packets = radiationBackground.packets[1,:,:,:]
+
+    α_continuum = radiation.α_continuum[1,:,:,:]
+    ε_continuum = radiation.ε_continuum[1,:,:,:]
+    boundary = radiation.boundary[1,:,:]
+    packets = radiation.packets[1,:,:,:]
     #intensity_per_packet = radiationBackground.intensity_per_packet
 
     mean_α = average_column(ustrip.(α_continuum))u"m^-1"
@@ -149,53 +150,119 @@ Plot the column averaged transition rates.
 function plot_rates(rates::TransitionRates,
                     z::Array{<:Unitful.Length, 1})
 
-    R12 = average_column(ustrip.(rates.R12))
-    R13 = average_column(ustrip.(rates.R13))
-    R23 = average_column(ustrip.(rates.R23))
-    R21 = average_column(ustrip.(rates.R21))
-    R31 = average_column(ustrip.(rates.R31))
-    R32 = average_column(ustrip.(rates.R32))
-    C12 = average_column(ustrip.(rates.C12))
-    C13 = average_column(ustrip.(rates.C13))
-    C23 = average_column(ustrip.(rates.C23))
-    C21 = average_column(ustrip.(rates.C21))
-    C31 = average_column(ustrip.(rates.C31))
-    C32 = average_column(ustrip.(rates.C32))
+    # ===========================================================
+    # LOAD DATA
+    # ===========================================================
+    R = rates.R
+    C = rates.C
+    n_levels = size(R)[1] - 1
+
+    # ===========================================================
+    # CHECK DIMENSIONS
+    # ===========================================================
 
     ENV["GKSwstype"]="nul"
     z = ustrip.(z .|>u"Mm")
-    p1 = Plots.plot(z, [R12, C12],
-                    ylabel = "rates (s^-1)", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R12","C12"]),
-                    legendfontsize=6)
+    plots = []
 
-    p2 = Plots.plot(z, [R13, C13],
-                    ylabel = "rates (s^-1)", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R13","C13"]),
-                    legendfontsize=6)
+    for l=1:n_levels
+        for u=l+1:n_levels+1
+            Rlu = average_column(ustrip.(R[l,u,:,:,:]))
+            Rul = average_column(ustrip.(R[u,l,:,:,:]))
+            Clu = average_column(ustrip.(C[l,u,:,:,:]))
+            Cul = average_column(ustrip.(C[u,l,:,:,:]))
 
-    p3 = Plots.plot(z, [R23, C23],
-                    ylabel = "rates [s^-1]", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R23","C23"]),
-                    legendfontsize=6)
+            up = Plots.plot(z, [Rlu, Clu],
+                            ylabel = "rates (n s^-1)", xlabel = "z (Mm)", yscale=:log10,
+                            label=permutedims(["R"*string(l)*string(u), "C"*string(l)*string(u)]),
+                            legendfontsize=6)
 
-    p4 = Plots.plot(z, [ R21, C21],
-                    ylabel = "rates (s^-1)", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R21","C21"]),
-                    legendfontsize=6)
+            down = Plots.plot(z, [Rul, Cul],
+                            ylabel = "rates (n s^-1)", xlabel = "z (Mm)", yscale=:log10,
+                            label=permutedims(["R"*string(u)*string(l), "C"*string(u)*string(l)]),
+                            legendfontsize=6)
 
-    p5 = Plots.plot(z, [R31, C31],
-                    ylabel = "rates (s^-1)", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R31","C31"]),
-                    legendfontsize=6)
+            append!(plots, [up])
+            append!(plots, [down])
+        end
+    end
 
-    p6 = Plots.plot(z, [R32, C32],
-                    ylabel = "rates (s^-1)", xlabel = "z (Mm)",
-                    yscale=:log10, label=permutedims(["R32","C32"]),
-                    legendfontsize=6)
-
-    Plots.plot(p1, p2, p3, p4, p5, p6, tickfontsize=6)
+    Plots.plot(plots..., tickfontsize=6)
     Plots.png("plots/transition_rates")
+
+end
+
+
+"""
+    plot_radiation(radiation::Radiation,
+                   atom::Atom,
+                   z::Array{<:Unitful.Length, 1})
+
+For bb-center and bf-edge wavelengths, plot average column extinction,
+average column destruction probability, mean boundary depth and average
+number of packets created at each height.
+"""
+function plot_radiation(radiation::RadiationContinuum,
+                        λ::Array{<:Unitful.Length, 1},
+                        level::Int64,
+                        z::Array{<:Unitful.Length, 1})
+
+    # ===========================================================
+    # LOAD RADIATION DATA
+    # ===========================================================
+    α = radiation.α_continuum
+    ε = radiation.ε_continuum
+    boundary = radiation.boundary
+    packets = radiation.packets
+
+    nλ, nz, nx, ny = size(packets)
+
+    # ===========================================================
+    # LOAD ATOM DATA AND GET LINE OPACITY/DESTRUCTION
+    # ===========================================================
+
+    mean_boundary = Array{Float64, 1}(undef,nλ)
+    max_boundary = Array{Float64, 1}(undef,nλ)
+    min_boundary = Array{Float64, 1}(undef,nλ)
+
+    for l=1:nλ
+        mean_boundary[l] = mean(boundary[l,:,:])
+        max_boundary[l] = maximum(boundary[l,:,:])
+        min_boundary[l] = minimum(boundary[l,:,:])
+    end
+
+    α = ustrip.(α)
+    mean_α = mean(α, dims=(3,4))[:,:,1,1]
+    mean_ε = mean(ε, dims=(3,4))[:,:,1,1]
+    mean_packets = mean(packets, dims=(3,4))[:,:,1,1]
+
+    z = ustrip.(z .|>u"Mm")
+    λ = ustrip.(λ .|>u"nm")
+
+
+    c = nλ ÷ 2 + 1
+
+    ENV["GKSwstype"]="nul"
+    p1 = Plots.plot(z, [mean_α[1,:], mean_α[c,:], mean_α[end,:]],
+                    ylabel = "Extinction (m^-1)", xlabel = "z (Mm)",
+                    yscale=:log10,
+                    label=permutedims(["low", "mid", "edge"]))
+
+    p2 = Plots.plot(z, [mean_ε[1,:], mean_ε[c,:], mean_ε[end,:] ],
+                    ylabel = "Destruction", xlabel = "z (Mm)",
+                    yscale=:log10,
+                    label=permutedims(["low", "mid", "edge"]))
+
+    p3 = Plots.plot(z, [mean_packets[1,:], mean_packets[c,:], mean_packets[end,:]],
+                    ylabel = "Mean packets", xlabel = "z (Mm)",
+                    label=permutedims(["low", "mid", "edge"]))
+
+    p4 = Plots.plot(λ, [mean_boundary, max_boundary, min_boundary],
+                    xlabel = "wavelength (nm)", yflip = true,
+                    label=permutedims(["mean", "minimum", "maximum"]))
+
+    Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
+    Plots.png("plots/radiation_"*string(level)*"c")
 end
 
 
@@ -209,7 +276,8 @@ average column destruction probability, mean boundary depth and average
 number of packets created at each height.
 """
 function plot_radiation(radiation::RadiationLine,
-                        atom::Atom,
+                        λ::Array{<:Unitful.Length, 1},
+                        line::Line,
                         z::Array{<:Unitful.Length, 1})
 
     # ===========================================================
@@ -224,41 +292,23 @@ function plot_radiation(radiation::RadiationLine,
     packets = radiation.packets
     nλ, nz, nx, ny = size(packets)
 
+    λ0 = line.lineData.λ0
+
     # ===========================================================
     # LOAD ATOM DATA AND GET LINE OPACITY/DESTRUCTION
     # ===========================================================
-    λ = atom.λ
-    nλ_bb = atom.nλ_bb
-    nλ_bf = atom.nλ_bf
+    α = Array{PerLength,4}(undef, nλ, nz, nx, ny)
+    ε = Array{Float64,4}(undef, nλ, nz, nx, ny)
 
-    α_total = copy(α_continuum)
-    ε_total = copy(ε_continuum)
-
-    for l=1:nλ_bb
-        α_line = line_extinction.(λ[2nλ_bf + l], atom.line.λ0, atom.doppler_width, atom.damping_constant, α_line_constant)
-
-        α_total[(2nλ_bf + l),:,:,:] += α_line
-        ε_total[(2nλ_bf + l),:,:,:] = (ε_continuum[(2nλ_bf + l),:,:,:].*α_continuum[(2nλ_bf + l),:,:,:]  .+  ε_line.*α_line) ./ α_total[(2nλ_bf + l),:,:,:]
+    for l=1:nλ
+        α_line = line_extinction.(λ[l], line.lineData.λ0, line.doppler_width, line.damping_constant, α_line_constant)
+        α[l,:,:,:] = α_continuum .+ α_line
+        ε[l,:,:,:] = (ε_continuum.*α_continuum  .+  ε_line.*α_line) ./ α[l,:,:,:]
     end
-
-    α_total = ustrip.(α_total)
-
-    mean_packets_bf_l = zeros(nz)
-    mean_packets_bf_u = zeros(nz)
-    mean_packets_bb = zeros(nz)
 
     mean_boundary = Array{Float64, 1}(undef,nλ)
     max_boundary = Array{Float64, 1}(undef,nλ)
     min_boundary = Array{Float64, 1}(undef,nλ)
-
-    for l=1:nλ_bf
-        mean_packets_bf_l += average_column(packets[l,:,:,:]) ./nλ_bf
-        mean_packets_bf_u += average_column(packets[nλ_bf+l,:,:,:]) ./nλ_bf
-    end
-
-    for l=(2nλ_bf+1):nλ
-        mean_packets_bb += average_column(packets[l,:,:,:]) ./nλ_bb
-    end
 
     for l=1:nλ
         mean_boundary[l] = mean(boundary[l,:,:])
@@ -266,45 +316,37 @@ function plot_radiation(radiation::RadiationLine,
         min_boundary[l] = minimum(boundary[l,:,:])
     end
 
-    c = 2nλ_bf + nλ_bb ÷ 2 + 1
-    mean_α_bb = average_column(α_total[c,:,:,:])
-    mean_α_bf_l = average_column(α_total[nλ_bf,:,:,:])
-    mean_α_bf_u = average_column(α_total[2nλ_bf,:,:,:])
-
-    mean_ε_bb = average_column(ε_total[c,:,:,:])
-    mean_ε_bf_l = average_column(ε_total[nλ_bb,:,:,:])
-    mean_ε_bf_u = average_column(ε_total[2nλ_bf,:,:,:])
+    α = ustrip.(α)
+    mean_α = mean(α, dims=(3,4))[:,:,1,1]
+    mean_ε = mean(ε, dims=(3,4))[:,:,1,1]
+    mean_packets = mean(packets, dims=(3,4))[:,:,1,1]
 
     z = ustrip.(z .|>u"Mm")
     λ = ustrip.(λ .|>u"nm")
 
+    c = nλ ÷ 2 + 1
+
     ENV["GKSwstype"]="nul"
-    p1 = Plots.plot(z, [mean_α_bb, mean_α_bf_l, mean_α_bf_u ],
+    p1 = Plots.plot(z, [mean_α[1,:], mean_α[c÷2+1,:], mean_α[c,:]],
                     ylabel = "Extinction (m^-1)", xlabel = "z (Mm)",
                     yscale=:log10,
-                    label=permutedims(["1 -> 2", "1 -> c", "2 -> c"]))
-    p2 = Plots.plot(z, [mean_ε_bb, mean_ε_bf_l, mean_ε_bf_u ],
+                    label=permutedims(["wing", "mid", "center"]))
+
+    p2 = Plots.plot(z, [mean_ε[1,:], mean_ε[c÷2+1,:], mean_ε[c,:] ],
                     ylabel = "Destruction", xlabel = "z (Mm)",
                     yscale=:log10,
-                    label=permutedims(["1 -> 2", "1 -> c", "2 -> c"]))
-    p3 = Plots.plot(z, [mean_packets_bb, mean_packets_bf_l, mean_packets_bf_u],
+                    label=permutedims(["wing", "mid", "center"]))
+
+    p3 = Plots.plot(z, [mean_packets[1,:], mean_packets[c÷2+1,:], mean_packets[c,:]],
                     ylabel = "Mean packets", xlabel = "z (Mm)",
-                    label=permutedims(["1 -> 2", "1 -> c", "2 -> c"]))
+                    label=permutedims(["wing", "mid", "center"]))
 
-    p4 = Plots.plot(λ[1:nλ_bf], [mean_boundary[1:nλ_bf], max_boundary[1:nλ_bf], min_boundary[1:nλ_bf]],
-                    xlabel = "wavelength (nm)", yflip = true,
-                    label=permutedims(["mean", "minimum", "maximum"]))
-    p5 = Plots.plot(λ[(nλ_bf+1):2nλ_bf], [mean_boundary[(nλ_bf+1):2nλ_bf], max_boundary[(nλ_bf+1):2nλ_bf], min_boundary[(nλ_bf+1):2nλ_bf]],
-                    ylabel = "Depth boundary", xlabel = "wavelength (nm)", yflip = true,
-                    label=permutedims(["mean", "maximum", "minimum"]))
-    p6 = Plots.plot(λ[(2nλ_bf+1):nλ], [mean_boundary[(2nλ_bf+1):nλ], max_boundary[(2nλ_bf+1):nλ], min_boundary[(2nλ_bf+1):nλ]],
+    p4 = Plots.plot(λ, [mean_boundary, max_boundary, min_boundary],
                     xlabel = "wavelength (nm)", yflip = true,
                     label=permutedims(["mean", "minimum", "maximum"]))
 
-    Plots.plot(p1, p2, p3, tickfontsize=6, legendfontsize=6, layout=(3,1))
-    Plots.png("plots/radiation_atmosphere")
-    Plots.plot(p4, p5, p6, tickfontsize=6, legendfontsize=6, layout=(3,1))
-    Plots.png("plots/radiation_boundary")
+    Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
+    Plots.png("plots/radiation_"*string(line.u)*string(line.l))
 end
 
 """

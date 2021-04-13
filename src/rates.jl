@@ -148,7 +148,7 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
 
     # Trapezoid rule
     for l=1:(nλ-1)
-        R += 4π/hc * (σij[l,:,:,:]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*h*c_0^2 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
+        R += 2π/hc * (σij[l,:,:,:]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*h*c_0^2 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
                       σij[l+1,:,:,:] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*h*c_0^2 ./ λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
     end
 
@@ -174,7 +174,7 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
 
     # Trapezoid rule
     for l=1:(nλ-1)
-        R += 4π/hc * (σij[l]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*hc*c_0 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
+        R += 2π/hc * (σij[l]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*hc*c_0 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
                       σij[l+1] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*hc*c_0 ./ λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
     end
 
