@@ -69,7 +69,7 @@ end
 
 Check that background radiation data has valid units, dimensions and values.
 """
-function check_radiationContinuum(radiation::RadiationContinuum,
+function check_radiationContinuum(radiation::Radiation,
                                    atmosphere_size::Tuple, nλ::Int64)
     # ===========================================================
     # LOAD DATA
@@ -290,7 +290,8 @@ check_radiation(radiation::Radiation,
 
 Check that radiation data has valid units, dimensions and values.
 """
-function check_radiationLine(radiation::RadiationLine,
+function check_radiationLine(radiation::Radiation,
+                             lineRadiation::LineRadiation,
                              λ::Array{<:Unitful.Length, 1},
                              line::Line,
                              atmosphere_size::Tuple)
@@ -299,11 +300,12 @@ function check_radiationLine(radiation::RadiationLine,
     # ===========================================================
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
-    α_line_constant = radiation.α_line_constant
-    ε_line = radiation.ε_line
     boundary = radiation.boundary
     packets = radiation.packets
     intensity_per_packet = radiation.intensity_per_packet
+
+    α_line_constant = lineRadiation.α_line_constant
+    ε_line = lineRadiation.ε_line
 
     nz, nx, ny = atmosphere_size
     # ===========================================================

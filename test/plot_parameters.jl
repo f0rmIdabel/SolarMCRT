@@ -74,12 +74,14 @@ function plot_populations(populations_LTE::Array{<:NumberDensity, 4},
     np = size(populations_LTE)[end]
     mean_LTE = []
     mean_ZR = []
+    lbl = []
 
     Np = average_column(sum(populations_LTE, dims=4)[:,:,:,1])
 
     for i=1:np
         append!(mean_LTE, [average_column(populations_LTE[:,:,:,i]) ./ Np])
         append!(mean_ZR, [average_column(populations_ZR[:,:,:,i]) ./ Np])
+        append!(lbl, string(i))
     end
 
     # ===========================================================
@@ -90,10 +92,10 @@ function plot_populations(populations_LTE::Array{<:NumberDensity, 4},
 
     p1 = Plots.plot(z, mean_LTE,
                     xlabel = "z (Mm)", ylabel = "Relative populations",
-                    yscale=:log10, label=permutedims(["ground","excited","ionised"]))
+                    yscale=:log10, label=permutedims(lbl))
     p2 = Plots.plot(z, mean_ZR,
                     xlabel = "z (Mm)", ylabel = "Relative populations",
-                    yscale=:log10, label=permutedims(["ground","excited","ionised"]))
+                    yscale=:log10, label=permutedims(lbl))
     Plots.plot(p1, p2, title=permutedims(["LTE", "Zero-radiation"]), layout=(2,1))
     Plots.png("plots/initial_populations")
 end
@@ -105,7 +107,7 @@ end
 Plots column averaged extincion, destruction probability,
 package creation and depth boundary for a background wavelength.
 """
-function plot_radiationBackground(radiation::RadiationContinuum,
+function plot_radiationBackground(radiation::Radiation,
                                   z::Array{<:Unitful.Length, 1})
 
     α_continuum = radiation.α_continuum[1,:,:,:]
@@ -173,12 +175,12 @@ function plot_rates(rates::TransitionRates,
             Cul = average_column(ustrip.(C[u,l,:,:,:]))
 
             up = Plots.plot(z, [Rlu, Clu],
-                            ylabel = "rates (n s^-1)", xlabel = "z (Mm)", yscale=:log10,
+                            ylabel = "rates (s^-1)", xlabel = "z (Mm)", yscale=:log10,
                             label=permutedims(["R"*string(l)*string(u), "C"*string(l)*string(u)]),
                             legendfontsize=6)
 
             down = Plots.plot(z, [Rul, Cul],
-                            ylabel = "rates (n s^-1)", xlabel = "z (Mm)", yscale=:log10,
+                            ylabel = "rates (s^-1)", xlabel = "z (Mm)", yscale=:log10,
                             label=permutedims(["R"*string(u)*string(l), "C"*string(u)*string(l)]),
                             legendfontsize=6)
 
@@ -202,7 +204,7 @@ For bb-center and bf-edge wavelengths, plot average column extinction,
 average column destruction probability, mean boundary depth and average
 number of packets created at each height.
 """
-function plot_radiation(radiation::RadiationContinuum,
+function plot_radiation(radiation::Radiation,
                         λ::Array{<:Unitful.Length, 1},
                         level::Int64,
                         z::Array{<:Unitful.Length, 1})
@@ -275,7 +277,8 @@ For bb-center and bf-edge wavelengths, plot average column extinction,
 average column destruction probability, mean boundary depth and average
 number of packets created at each height.
 """
-function plot_radiation(radiation::RadiationLine,
+function plot_radiation(radiation::Radiation,
+                        lineRadiation::LineRadiation,
                         λ::Array{<:Unitful.Length, 1},
                         line::Line,
                         z::Array{<:Unitful.Length, 1})
@@ -285,8 +288,8 @@ function plot_radiation(radiation::RadiationLine,
     # ===========================================================
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
-    α_line_constant = radiation.α_line_constant
-    ε_line = radiation.ε_line
+    α_line_constant = lineRadiation.α_line_constant
+    ε_line = lineRadiation.ε_line
 
     boundary = radiation.boundary
     packets = radiation.packets

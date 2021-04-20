@@ -17,7 +17,8 @@ of a single atom.
 """
 function calculate_transition_rates(atmosphere::Atmosphere,
                                     atom::Atom,
-                                    J::Array{Any,1})
+                                    lines,
+                                    J::Array{<:UnitsIntensity_λ,4})
 
     # ==================================================================
     # LOAD ATMOSPHERE PARAMETERS
@@ -34,6 +35,8 @@ function calculate_transition_rates(atmosphere::Atmosphere,
     # LOAD WAVELENGTHS
     # ==================================================================
     λ = atom.λ
+    iλbf = atom.iλbf
+    iλbb = atom.iλbb
 
     # ==================================================================
     # CALCULATE RADIATIVE RATES
@@ -42,11 +45,12 @@ function calculate_transition_rates(atmosphere::Atmosphere,
     C = Array{Float64,5}(undef,n_levels+1,n_levels+1, nz,nx,ny)u"s^-1"
 
     for level = 1:n_levels
-        σ = σic(level, atom, λ[level])
-        G = Gij(level, n_levels+1, λ[level], temperature, LTE_pops)
+        start, stop = iλbf[level]
+        σ = σic(level, atom, λ[start:stop])
+        G = Gij(level, n_levels+1, λ[start:stop], temperature, LTE_pops)
 
-        R[level,n_levels+1,:,:,:] = Rij(J[level], σ, λ[level])
-        R[n_levels+1,level,:,:,:] = Rji(J[level], σ, G, λ[level])
+        R[level,n_levels+1,:,:,:] = Rij(J[start:stop,:,:,:], σ, λ[start:stop])
+        R[n_levels+1,level,:,:,:] = Rji(J[start:stop,:,:,:], σ, G, λ[start:stop])
 
         C[level,n_levels+1,:,:,:] = Cij(level, n_levels+1, electron_density, temperature, LTE_pops)
         C[n_levels+1,level,:,:,:] = Cij(n_levels+1, level, electron_density, temperature, LTE_pops)
@@ -56,14 +60,15 @@ function calculate_transition_rates(atmosphere::Atmosphere,
         for u=(l+1):n_levels
 
             line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
-            line_parameters = collect_line_data(atmosphere, atom, u, l)
-            line = Line(line_parameters...)
+            start, stop = iλbb[line_number]
 
-            σ = σij(l, u, line, λ[n_levels + line_number])
-            G = Gij(l, u, λ[n_levels+line_number], temperature, LTE_pops)
+            line = lines[line_number]
 
-            R[l,u,:,:,:] = Rij(J[n_levels+line_number], σ, λ[n_levels+line_number])
-            R[u,l,:,:,:] = Rji(J[n_levels+line_number], σ, G, λ[n_levels+line_number])
+            σ = σij(l, u, line, λ[start:stop])
+            G = Gij(l, u, λ[start:stop], temperature, LTE_pops)
+
+            R[l,u,:,:,:] = Rij(J[start:stop,:,:,:], σ, λ[start:stop])
+            R[u,l,:,:,:] = Rji(J[start:stop,:,:,:], σ, G, λ[start:stop])
 
             C[l,u,:,:,:] = Cij(l, u, electron_density, temperature, LTE_pops)
             C[u,l,:,:,:] = Cij(u, l, electron_density, temperature, LTE_pops)
@@ -148,8 +153,8 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
 
     # Trapezoid rule
     for l=1:(nλ-1)
-        R += 2π/hc * (σij[l,:,:,:]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*h*c_0^2 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
-                      σij[l+1,:,:,:] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*h*c_0^2 ./ λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
+        R += 2π/hc * (σij[l,:,:,:]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*h*c_0^2 / λ[l]^5   .+ J[l,:,:,:] ) .+
+                      σij[l+1,:,:,:] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*h*c_0^2 / λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
     end
 
     return R
@@ -174,8 +179,8 @@ function Rji(J::Array{<:UnitsIntensity_λ, 4},
 
     # Trapezoid rule
     for l=1:(nλ-1)
-        R += 2π/hc * (σij[l]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*hc*c_0 ./ λ[l]^5   .+ J[l,:,:,:] ) .+
-                      σij[l+1] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*hc*c_0 ./ λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
+        R += 2π/hc * (σij[l]   .* Gij[l,:,:,:]   .* λ[l]   .* (2*hc*c_0 / λ[l]^5   .+ J[l,:,:,:] ) .+
+                      σij[l+1] .* Gij[l+1,:,:,:] .* λ[l+1] .* (2*hc*c_0 / λ[l+1]^5 .+ J[l+1,:,:,:] )) .* (λ[l+1] - λ[l])
     end
 
     return R
@@ -222,9 +227,12 @@ Calculates the bound-free cross-section.
 """
 function σic(i::Integer,
              atom::Atom,
-             λ::Array{<:Unitful.Length, 1})
+             λ::Array{<:Unitful.Length, 1},
+             λ_edge=nothing)
 
-    λ_edge = λ[end]
+    if λ_edge == nothing
+        λ_edge = λ[end]
+    end
     λ3_ratio = (λ ./ λ_edge).^3
     n_eff = sqrt(E_∞ / (atom.χ[end] - atom.χ[i])) |>u"J/J" # should be χu - χl
     charge = atom.Z

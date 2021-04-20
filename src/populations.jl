@@ -33,21 +33,14 @@ end
 For a given atom density, calculate the populations according to zero-radiation.
 """
 function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
-    nλ = atom.nλ
-    nz,nx,ny = size(atmosphere.temperature)
 
-    λ = atom.λ
-    J = []
-    for t=1:length(λ)
-        nλ = length(λ[t])
-        j = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
-        append!(J, [j])
-    end
+    nz,nx,ny = size(atmosphere.temperature)
+    nλ = atom.nλ
+
+    J = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
 
     zero_rates = TransitionRates(calculate_transition_rates(atmosphere, atom, J)...)
     populations = get_revised_populations(zero_rates, atom.density)
-
-    @test all( Inf .> ustrip.(populations) .>= 0.0 )
 
     return populations
 end
@@ -82,6 +75,8 @@ function get_revised_populations(rates::TransitionRates, atom_density::Array{<:N
     end
 
     populations[:,:,:,1] = atom_density .- sum(populations[:,:,:,2:end],dims=4)[:,:,:,1]
+
+    @test all( Inf .> ustrip.(populations) .>= 0.0 )
 
     return populations
 

@@ -39,6 +39,8 @@ function run_tests(check=true, plot=false)
                                             atmosphere.electron_density)
     populations_ZR = zero_radiation_populations(atmosphere, atom)
 
+    plot_populations(populations_LTE, populations_ZR, z)
+
     # =============================================================================
     # INITIAL TRANSITION RATES
     # =============================================================================
@@ -54,6 +56,7 @@ function run_tests(check=true, plot=false)
     # =============================================================================
 
     for level=1:n_levels
+        println(level)
         λ = atom.λ[level]
         radiation_parameters = collect_bf_radiation(atmosphere, atom, level, rates, populations_ZR, cut_off, target_packets_bf[level])
         radiation = RadiationContinuum(radiation_parameters...)
@@ -74,7 +77,7 @@ function run_tests(check=true, plot=false)
             λ = atom.λ[n_levels + line_number]
             line_parameters = collect_line_data(atmosphere, atom, u, l)
             line = Line(line_parameters...)
-            radiation_parameters = collect_bb_radiation(atmosphere, λ, line, rates, populations_ZR, cut_off, target_packets_bb[line_number])
+            radiation_parameters = collect_bb_radiation(atmosphere, λ, line, rates, populations_LTE, cut_off, target_packets_bb[line_number])
             radiation = RadiationLine(radiation_parameters...)
 
             if check == true

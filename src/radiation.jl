@@ -2,22 +2,196 @@ include("atmosphere.jl")
 include("rates.jl")
 include("atom.jl")
 
-struct RadiationLine
-    α_continuum::Array{<:PerLength, 3}                   # (nλ, nz, nx, ny)
-    ε_continuum::Array{Float64,3}                        # (nλ, nz, nx, ny)
-    α_line_constant::Array{Float64, 3}
-    ε_line::Array{Float64,3}
-    boundary::Array{Int32,3}                             # (nλ, nx, ny)
-    packets::Array{Int32,4}                              # (nλ, nz, nx, ny)
-    intensity_per_packet::Array{<:UnitsIntensity_λ, 1}     # (nλ)
-end
-
-struct RadiationContinuum
+struct Radiation
     α_continuum::Array{<:PerLength, 4}                     # (nλ, nz, nx, ny)
     ε_continuum::Array{Float64,4}                          # (nλ, nz, nx, ny)
     boundary::Array{Int32,3}                               # (nλ, nx, ny)
     packets::Array{Int32,4}                                # (nλ, nz, nx, ny)
     intensity_per_packet::Array{<:UnitsIntensity_λ, 1}     # (nλ)
+end
+
+struct LineRadiation
+    α_line_constant::Array{Float64, 3}
+    ε_line::Array{Float64,3}
+end
+
+
+function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates,
+                           lines, lineRadiations,
+                           populations, boundary_criterion, target_packets::Float64)
+
+    α_continuum, ε_continuum = opacity_continuum(atmosphere, atom, rates, populations)
+    α_line, ε_line = opacity_line(atom,  lines, lineRadiations)
+
+    α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+
+    α = α_continuum .+ α_line
+    ε = α_abs ./ α
+
+    # ==================================================================
+    # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
+    # ==================================================================
+
+    criterion, cut_off = boundary_criterion
+
+    if cut_off == false
+        fill!(boundary, nz)
+    elseif criterion == "depth"
+        for l=1:nλ
+            boundary[l,:,:] = optical_depth_boundary(α, z, cut_off)
+        end
+    elseif criterion == "destruction"
+        for l=1:nλ
+            boundary[l,:,:] = ε_boundary(ε, cut_off)
+        end
+    end
+
+    for l=1:nλ
+        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
+                                                                       temperature, α_abs, boundary[l,:,:])
+    end
+
+    return α_continuum, ε_continuum, boundary, packets, intensity_per_packet
+end
+
+
+function opacity_line(atom::Atom, lines, lineRadiations)
+    # ==================================================================
+    # GET ATMOSPHERE DATA AND WAVELENGTH
+    # ==================================================================
+    λ = atom.λ
+    iλbb = atom.iλbb
+    n_levels = atom.n_levels
+
+    nz, nx, ny, = size(atom.density)
+    nλ = atom.nλ
+
+    # ==================================================================
+    # INITIALISE VARIABLES
+    # ==================================================================
+    α_line = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+
+    α = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+    α_abs = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION PROBABILITY FOR BACKGROUND PROCESSES
+    # ==================================================================
+
+    for l=1:n_levels-1
+        for u=2:n_levels
+
+            line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
+            line = lines[line_number]
+            lineRadiation = lineRadiations[line_number]
+            ε_line = lineRadiation.ε_line
+            start, stop = iλbb[line_number,:]
+
+            for w=start:stop
+
+                α_line = line_extinction.(λ[w], line.lineData.λ0, line.ΔλD, line.damping_constant, lineRadiation.α_line_constant)
+                α[w,:,:,:] .+= α_line
+                α_abs[l,:,:,:] .+= α_line .* ε_line
+            end
+        end
+    end
+
+    ε = α_abs ./ α
+
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # ==================================================================
+    @test all(  Inf .> ustrip.(α_line) .>= 0.0 )
+
+    return α, ε
+end
+
+
+function opacity_continuum(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates, populations::Array{<:NumberDensity,4})
+    # ==================================================================
+    # GET ATMOSPHERE DATA AND WAVELENGTH
+    # ==================================================================
+    temperature = atmosphere.temperature
+    electron_density = atmosphere.electron_density
+    hydrogen_populations = atmosphere.hydrogen_populations
+    proton_density = hydrogen_populations[:,:,:,end]
+    hydrogen_ground_density = hydrogen_populations[:,:,:,1]
+    hydrogen_neutral_density = sum(hydrogen_populations, dims=4)[:,:,:,1] .- proton_density
+
+    λ = atom.λ
+
+    iλbf = atom.iλbf
+
+    n_levels = atom.n_levels
+    χ = atom.χ
+    Z = atom.Z
+
+    nz, nx, ny = size(temperature)
+    nλ = length(λ)
+
+    R = rates.R
+    C = rates.C
+
+    # ==================================================================
+    # INITIALISE VARIABLES
+    # ==================================================================
+    α = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+    α_abs = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+
+    # ==================================================================
+    # EXTINCTION AND DESTRUCTION PROBABILITY FOR BACKGROUND PROCESSES
+    # ==================================================================
+
+    for l=1:nλ
+        α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_neutral_density, proton_density)
+        α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
+        α[l,:,:,:] = α_scatt .+ α_abs
+        α_abs[l,:,:,:] = α_abs
+    end
+
+
+    for level=1:n_levels
+
+        ε_bf = C[end,level,:,:,:] ./ (C[end,level,:,:,:] .+ R[end,level,:,:,:])
+
+        start,stop = iλbf[level,:]
+        for l=start:stop
+            α_bf = hydrogenic_bf.(c_0/λ[l], c_0/λ[nλ],
+                                  temperature, populations[:,:,:,level],
+                                  1.0, n_eff(χ[end], χ[level], Z))
+
+            α[l,:,:,:] .+= α_bf
+            α_abs[l,:,:,:] .+= α_bf .* ε_bf
+        end
+
+    end
+
+    ε = α_abs ./ α
+
+    # ==================================================================
+    # CHECK FOR UNVALID VALUES
+    # ==================================================================
+    @test all(  Inf .> ustrip.(α) .>= 0.0 )
+    @test all(  1.0 .>= ε .>= 0.0 )
+
+    return α, ε
+end
+
+
+
+function collect_line_radiation_data(line::Line, rates::TransitionRates, populations::Array{<:NumberDensity,4})
+
+    l = line.l
+    u = line.u
+    lineData = line.lineData
+
+    α_line_constant = line_extinction_constant.(Ref(lineData), populations[:,:,:,l], populations[:,:,:,u])
+
+    Cul = rates.C[u,l,:,:,:]
+    Rul = rates.R[u,l,:,:,:]
+    ε_line = Cul ./ (Rul .+ Cul)
+
+    return α_line_constant, ε_line
 end
 
 """
@@ -130,7 +304,6 @@ function collect_bf_radiation(atmosphere::Atmosphere,
     electron_density = atmosphere.electron_density
     nz, nx, ny = size(temperature)
 
-
     λ = atom.λ[level]
     χ = atom.χ
     nλ = length(λ)
@@ -157,15 +330,22 @@ function collect_bf_radiation(atmosphere::Atmosphere,
         α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
 
         α_background = α_scatt .+ α_abs
+
+        @test all( Inf .> ustrip.(α_abs) .>= 0.0 )
+        @test all( Inf .> ustrip.(α_scatt) .>= 0.0 )
+
         ε_background = α_abs ./ α_background
 
         α_bf = hydrogenic_bf.(ν[l], ν[nλ],
                               temperature,  populations[:,:,:,level],
                               1.0, n_eff)
 
+        @test all( Inf .> ustrip.(α_bf) .>= 0.0 )
+
         α[l,:,:,:] = α_background .+ α_bf
         ε[l,:,:,:] = (ε_background .* α_background .+ ε_bf .* α_bf) ./  α[l,:,:,:]
     end
+
 
     # ==================================================================
     # INITIALISE VARIABLES
@@ -278,7 +458,6 @@ function collect_bb_radiation(atmosphere::Atmosphere,
     # ==================================================================
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR EACH WAVELENGTH
     # ==================================================================
-    #ε_line = line_destruction(rates)
     line_number = sum((n_levels-line.l+1):(n_levels-1)) + (line.u - line.l)
 
     Cul = rates.C[line.u,line.l,:,:,:]
@@ -600,7 +779,7 @@ end
 
 Write the relevant radition data to the output file.
 """
-function write_to_file(radiation::RadiationContinuum, output_path::String)
+function write_to_file(radiation::Radiation, output_path::String)
     h5open(output_path, "r+") do file
         file["packets"][1,:,:,:,:] = ustrip(radiation.packets)
         file["boundary"][1,:,:,:] = radiation.boundary
@@ -613,11 +792,10 @@ end
 
 Write the relevant radition data to the output file.
 """
-function write_to_file(radiation, iteration::Int64, nλ0, output_path::String)
-    nλe = length(radiation.intensity_per_packet) + nλ0
+function write_to_file(radiation, iteration::Int64, output_path::String)
     h5open(output_path, "r+") do file
-        file["packets"][iteration,1+nλ0:nλe,:,:,:] = ustrip(radiation.packets)
-        file["boundary"][iteration,1+nλ0:nλe,:,:] = radiation.boundary
-        file["intensity_per_packet"][iteration,1+nλ0:nλe] = ustrip(radiation.intensity_per_packet)
+        file["packets"][iteration,:,:,:,:] = ustrip(radiation.packets)
+        file["boundary"][iteration,:,:,:] = radiation.boundary
+        file["intensity_per_packet"][iteration,:] = ustrip(radiation.intensity_per_packet)
     end
 end

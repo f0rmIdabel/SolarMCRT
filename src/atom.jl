@@ -8,8 +8,10 @@ struct Atom
     g::Array{Int64,1}
     Z::Int64
     f_value::Array{Float64,1}
-    λ::Array{Any, 1}
+    λ::Array{Unitful.Length, 1}
     nλ::Int64
+    iλbb
+    iλbf
 end
 
 struct Line
@@ -19,6 +21,9 @@ struct Line
     doppler_width::Array{<:Unitful.Length, 3}        # (n_lines, nz, nx, ny)
     damping_constant::Array{<:PerArea,3}             # (n_lines, nx, ny)
 end
+
+
+
 
 """
     collect_atom_data(atmosphere::Atmosphere)
@@ -62,9 +67,9 @@ function collect_atom_data(atmosphere::Atmosphere)
 
         s = 1
         for l=1:n_levels-1
-            append!(f_value_new, f_value[s:n_levels-l])
-            append!(qcore_new, qcore[s:n_levels-l])
-            append!(qwing_new, qwing[s:n_levels-l])
+            append!(f_value_new, f_value[s:s+n_levels-l-1])
+            append!(qcore_new, qcore[s:s+n_levels-l-1])
+            append!(qwing_new, qwing[s:s+n_levels-l-1])
             s += n_levels_file-l
         end
 
@@ -86,28 +91,45 @@ function collect_atom_data(atmosphere::Atmosphere)
     nλ_bf = get_nλ_bf()
     nλ_bb = get_nλ_bb()
 
-    λ = []
+    λ = Array{Unitful.Length,1}(undef,0)
     nλ = 0
 
     # Sample bound free transitions
     λ1c = transition_λ(χ[1], χ[end])
 
+    bf_bounds = []
     for level=1:n_levels
         λ_min = λ1c * (level/2.0)^2
         λ_bf = sample_λ_boundfree(nλ_bf[level], λ_min, χ[level], χ[end])
-        append!(λ, [λ_bf])
+        append!(λ, λ_bf)
         nλ += length(λ_bf)
+        append!(bf_bounds, [[λ_bf[1], λ_bf[end]]])
     end
 
+    bb_bounds = []
     # Sample bound-bound transitions
-    line = 0
     for l=1:n_levels-1
         for u=(l+1):n_levels
-            line += 1
-            λ_bb = sample_λ_line(nλ_bb[line], χ[l], χ[u], qwing[line], qcore[line])
-            append!(λ, [λ_bb])
+            line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
+            λ_bb = sample_λ_line(nλ_bb[line_number], χ[l], χ[u], qwing[line_number], qcore[line_number])
+            append!(λ, λ_bb)
             nλ +=length(λ_bb)
+            append!(bb_bounds, [[λ_bb[1], λ_bb[end]]])
         end
+    end
+
+    λ = sort(λ)
+
+    iλbf = []
+    for level=1:n_levels
+        append!(iλbf, [[argmin(abs.(bf_bounds[level][1] .- λ)),
+                        argmin(abs.(bf_bounds[level][2] .- λ))]])
+    end
+
+    iλbb = []
+    for line=1:n_lines
+        append!(iλbb, [[argmin(abs.(bb_bounds[line][1] .- λ)),
+                        argmin(abs.(bb_bounds[line][2] .- λ))]])
     end
 
     # ===========================================================
@@ -122,7 +144,7 @@ function collect_atom_data(atmosphere::Atmosphere)
         @test all(Inf .> ustrip.(λ[l]) .>= 0.0 )
     end
 
-    return density, n_levels, n_lines, χ, g, Z, f_value, λ, nλ
+    return density, n_levels, n_lines, χ, g, Z, f_value, λ, nλ, iλbb, iλbf
 end
 
 """
@@ -185,6 +207,7 @@ function collect_line_data(atmosphere::Atmosphere, atom::Atom, u::Int, l::Int)
 
     return u, l, lineData, ΔλD, damping_const
 end
+
 
 
 """

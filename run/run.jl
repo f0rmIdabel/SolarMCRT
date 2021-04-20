@@ -1,6 +1,5 @@
 include("../src/mcrt.jl")
 include("../src/populations.jl")
-include("../test/check_parameters.jl")
 
 function run()
     println("\n", "="^91, "\n", " "^34,
@@ -38,7 +37,7 @@ function run()
         # =============================================================================
         print("--Loading radiation data...................")
         radiation_parameters = collect_background_radiation(atmosphere, λ, cut_off, target_packets)
-        radiation = RadiationContinuum(radiation_parameters...)
+        radiation = Radiation(radiation_parameters...)
         println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
 
         # =============================================================================
@@ -84,6 +83,19 @@ function run()
         n_transitions = n_levels + n_lines
 
         # =============================================================================
+        # LOAD LINES
+        # =============================================================================
+        print("--Loading line.............................")
+        lines = []
+        for l=1:n_levels-1
+            for u=2:n_levels
+                line =  Line(collect_line_data(atmosphere, atom, u, l)...)
+                append!(lines, [line])
+            end
+        end
+        println(n_lines, " line(s) loaded.")
+
+        # =============================================================================
         # LOAD INITIAL POPULATIONS
         # =============================================================================
         print("--Loading initial populations..............")
@@ -94,15 +106,8 @@ function run()
         # CALCULATE INITIAL TRANSITION RATES
         # =============================================================================
         print("--Loading initial transition rates.........")
-
-        Bλ = []
-
-        for t=1:n_transitions
-            append!(Bλ, [blackbody_lambda(atom.λ[t], atmosphere.temperature)])
-        end
-
-        rate_parameters = calculate_transition_rates(atmosphere, atom, Bλ)
-
+        Bλ = blackbody_lambda(atom.λ, atmosphere.temperature)
+        rate_parameters = calculate_transition_rates(atmosphere, atom, lines, Bλ)
         rates = TransitionRates(rate_parameters...)
         println("Initial transition rates loaded.")
 
@@ -119,62 +124,32 @@ function run()
         # =============================================================================
         # RUN MCRT UNTIL POPULATIONS CONVERGE
         # =============================================================================
-        converged_populations = false
 
         for n=1:max_iterations
             println("\n  ITERATION ", n, "\n", "="^91, "\n", "="^91)
 
-            nλ0 = 0
-            for level=1:n_levels
+            print("--Loading radiation data...................")
+            lineRadiations = []
 
-                println("\n  TRANSITION ", level, " -> c", "\n", "="^91)
-
-                λ = atom.λ[level]
-
-                # =============================================================================
-                # LOAD RADIATION DATA WITH CURRENT POPULATIONS
-                # =============================================================================
-                print("--Loading radiation data...................")
-                radiation_parameters = collect_bf_radiation(atmosphere, atom, level, rates, populations, cut_off, target_packets_bf[level])
-                radiation = RadiationContinuum(radiation_parameters...)
-                write_to_file(radiation, n, nλ0, output_path)
-                println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
-
-                # =============================================================================
-                # SIMULATION
-                # =============================================================================
-                mcrt_continuum(atmosphere, radiation, λ, max_scatterings, n, nλ0, atom.nλ, output_path)
-                nλ0 += length(λ)
-            end
-
-            line_number = 0
             for l=1:n_levels-1
-                for u=l+1:n_levels
-
-                    println("\n  TRANSITION ", l, " -> ", u, "\n", "="^91)
-
-                    line_number += 1
-                    λ = atom.λ[n_levels + line_number]
-
-                    line_parameters = collect_line_data(atmosphere, atom, u, l)
-                    line = Line(line_parameters...)
-
-                    # =============================================================================
-                    # LOAD RADIATION DATA WITH CURRENT POPULATIONS
-                    # =============================================================================
-                    print("--Loading radiation data...................")
-                    radiation_parameters = collect_bb_radiation(atmosphere, λ, line, rates, populations, cut_off, target_packets_bb[line_number])
-                    radiation = RadiationLine(radiation_parameters...)
-                    write_to_file(radiation, n, nλ0, output_path)
-                    println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
-
-                    # =============================================================================
-                    # SIMULATION
-                    # =============================================================================
-                    mcrt_line(atmosphere, radiation, λ, line, max_scatterings, n, nλ0, atom.nλ, output_path)
-                    nλ0 += length(λ)
+                for u=2:n_levels
+                    line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
+                    lineRadiation = LineRadiation(collect_line_radiation_data(lines[line_number], rates, populations)...)
+                    append!(lineRadiations, [lineRadiation])
                 end
             end
+
+            radiation_parameters = collect_radiation(atmosphere, atom, rates,  lines, lineRadiations,
+                                                     populations, boundary_criterion, target_packets)
+
+            radiation = Radiation(radiation_parameters...)
+            write_to_file(radiation, n, output_path)
+            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
+
+
+            mcrt(atmosphere, radiation, atom,
+                 lines, lineRadiations,
+                 max_scatterings, n, output_path)
 
             # =============================================================================
             # CALCULATE NEW TRANSITION RATES
@@ -197,9 +172,9 @@ function run()
             # =============================================================================
             # CHECK FOR UNVALID VARIABLES
             # =============================================================================
-            #check_field(Jλ)
-            #check_rates(rates, atmosphere_size)
-            #check_populations(new_populations, atmosphere_size)
+            @test all( Inf .> ustrip.(new_populations) .>= 0.0 )
+            @test all( Inf .> ustrip.(rates.R) .>= 0.0 )
+            @test all( Inf .> ustrip.(rates.C) .>= 0.0 )
 
             # =============================================================================
             # CHECK POPULATION CONVERGENCE
