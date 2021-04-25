@@ -21,14 +21,14 @@ n_levels = 2
 # ======================================================================================= #
 #  Initial population distribution. Choose between "LTE" and "zero_radiation".            #
 # ======================================================================================= #
-population_distribution = "LTE"
+population_distribution = "zero_radiation"
 
 # ======================================================================================= #
 #  Choose between optical depth and destruction probability criterion for determining     #
 #  lower region to exclude. Set the cut-off to false for no boundary cut-off.             #
 # ======================================================================================= #
-criterion = "depth"
-cut_off = 25
+criterion = "destruction"
+cut_off = 0.1
 
 # ======================================================================================= #
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.  #
@@ -37,8 +37,8 @@ cut_off = 25
 #  by default. For an N-level atom, you must provide N-1 (comma-seperated) bound-free     #
 #  values and N(N-1)/2 bound-bound values.                                                #
 # ======================================================================================= #
-nλ_bf = 10, 10
-nλ_bb = 25
+nλ_bf = 25, 25
+nλ_bb = 51
 
 # ======================================================================================= #
 #  The intended number of packets to be created for each group of wavelengths.            #
@@ -46,8 +46,7 @@ nλ_bb = 25
 #  For an N-level atom, you must provide N-1 (comma-seperated) bound-free values and      #
 #  N(N-1)/2 bound-bound values.                                                           #
 # ======================================================================================= #
-target_packets_bf = 1e6, 1e4
-target_packets_bb = 1e8
+target_packets = 5e6
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
@@ -78,4 +77,3 @@ write_rates = true
 # ======================================================================================= #
 background_mode = false
 background_wavelength = 500.0
-background_target_packets = 1e7

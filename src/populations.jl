@@ -10,6 +10,7 @@ Collect initial population distribution. Either LTE or zero-radiation.
 """
 function collect_initial_populations(atmosphere::Atmosphere,
                                      atom::Atom,
+                                     lines,
                                      distribution::String)
 
     temperature = atmosphere.temperature
@@ -19,7 +20,7 @@ function collect_initial_populations(atmosphere::Atmosphere,
     if distribution == "LTE"
         initial_populations = LTE_populations(atom, temperature, electron_density)
     elseif distribution == "zero_radiation"
-        initial_populations = zero_radiation_populations(atmosphere, atom)
+        initial_populations = zero_radiation_populations(atmosphere, atom, lines)
     end
 
     return initial_populations
@@ -32,14 +33,14 @@ end
 
 For a given atom density, calculate the populations according to zero-radiation.
 """
-function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom)
+function zero_radiation_populations(atmosphere::Atmosphere, atom::Atom, lines)
 
     nz,nx,ny = size(atmosphere.temperature)
     nλ = atom.nλ
 
     J = zeros(Float64,nλ,nz,nx,ny)u"J/s/nm/m^2/sr"
 
-    zero_rates = TransitionRates(calculate_transition_rates(atmosphere, atom, J)...)
+    zero_rates = TransitionRates(calculate_transition_rates(atmosphere, atom, lines, J)...)
     populations = get_revised_populations(zero_rates, atom.density)
 
     return populations
@@ -59,7 +60,7 @@ function get_revised_populations(rates::TransitionRates, atom_density::Array{<:N
     for r=1:n_levels
         A[r,r,:,:,:] = P[1,r+1,:,:,:] .+ P[r+1,1,:,:,:]
         for c=setdiff(1:n_levels, r)
-            A[c,r,:,:,:] = P[1,r+1,:,:,:] .- P[c+1,r+1,:,:,:]
+            A[r,c,:,:,:] = P[1,r+1,:,:,:] .- P[c+1,r+1,:,:,:]
             A[r,r,:,:,:] .+= P[r+1,c+1,:,:,:]
         end
 

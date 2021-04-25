@@ -1,13 +1,26 @@
 include("radiation.jl")
 
+
+"""
+     mcrt(atmosphere::Atmosphere,
+          radiation::Radiation,
+          atom::Atom,
+          lines,
+          lineRadiations,
+          max_scatterings::Real,
+          iteration::Int64,
+          output_path::String)
+
+Monte Carlo radiative transfer simulation
+for full population-iteration mode."""
 function mcrt(atmosphere::Atmosphere,
-            radiation::Radiation,
-            atom::Atom,
-            lines,
-            lineRadiations,
-            max_scatterings::Real,
-            iteration::Int64,
-            output_path::String)
+              radiation::Radiation,
+              atom::Atom,
+              lines,
+              lineRadiations,
+              max_scatterings::Real,
+              iteration::Int64,
+              output_path::String)
 
     # ==================================================================
     # ATMOSPHERE DATA
@@ -31,7 +44,9 @@ function mcrt(atmosphere::Atmosphere,
     # ATOM DATA
     # ===================================================================
     iλbb = atom.iλbb
-    λ  =atom.λ
+    λ = atom.λ
+    n_lines = atom.n_lines
+    nλ = atom.nλ
 
     # ===================================================================
     # SIMULATION
@@ -43,9 +58,11 @@ function mcrt(atmosphere::Atmosphere,
     J_λ = Array{Int32,3}(undef, nz, nx, ny)
     I0_λ = Array{Int32,3}(undef, 3, nx, ny)
 
-    for l=1:n_lines
+    stop = nothing
 
-        start,stop = iλbb[line]
+    for ln=1:n_lines
+
+        start,stop = iλbb[ln]
 
         # Bound-free
         for λi=1:start-1
@@ -58,11 +75,11 @@ function mcrt(atmosphere::Atmosphere,
 
             # Pick out wavelength data
             packets_λ = packets[λi,:,:,:]
-            α_λ = α[λi,:,:,:]
+            α_λ = α_continuum[λi,:,:,:]
             boundary_λ = boundary[λi,:,:]
-            ε_λ = ε[λi,:,:,:]
+            ε_λ = ε_continuum[λi,:,:,:]
 
-            println("\n--[",nλ0 + λi,"/",Nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
+            println("\n--[", λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
             # Create ProgressMeter working with threads
             p = Progress(ny); update!(p,0)
@@ -139,8 +156,8 @@ function mcrt(atmosphere::Atmosphere,
             end
         end
 
-        line = lines[l]
-        lineRadiation = lineRadiations[l]
+        line = lines[ln]
+        lineRadiation = lineRadiations[ln]
         lineData = line.lineData
         dc = line.damping_constant
         ΔλD = line.doppler_width
@@ -161,8 +178,10 @@ function mcrt(atmosphere::Atmosphere,
             # Pick out wavelength data
             packets_λ = packets[λi,:,:,:]
             boundary_λ = boundary[λi,:,:]
+            α_continuum_λ = α_continuum[λi,:,:,:]
+            ε_continuum_λ = ε_continuum[λi,:,:,:]
 
-            println("\n--[",nλ0 + λi,"/",Nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
+            println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
             # Create ProgressMeter working with threads
             p = Progress(ny)
@@ -208,7 +227,7 @@ function mcrt(atmosphere::Atmosphere,
                                 # Scatter packet once
                                 box_id, r, lost, α = scatter_packet_line(x, y, z,
                                                                          velocity,
-                                                                         α_continuum,
+                                                                         α_continuum_λ,
                                                                          α_line_constant,
                                                                          boundary_λ,
                                                                          box_id, r,
@@ -222,9 +241,9 @@ function mcrt(atmosphere::Atmosphere,
                                 end
 
                                 # Check if destroyed in next particle interaction
-                                α_line = α -  α_continuum[box_id...]
-                                ε = ( ε_continuum[box_id...] * α_continuum[box_id...] +
-                                      ε_line[box_id...]      * α_line ) / α
+                                α_line = α -  α_continuum_λ[box_id...]
+                                ε = ( ε_continuum_λ[box_id...] * α_continuum_λ[box_id...] +
+                                      ε_line[box_id...]        * α_line ) / α
 
                                 if rand() < ε
                                     Threads.atomic_add!(total_destroyed, 1)
@@ -265,11 +284,11 @@ function mcrt(atmosphere::Atmosphere,
 
         # Pick out wavelength data
         packets_λ = packets[λi,:,:,:]
-        α_λ = α[λi,:,:,:]
+        α_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
-        ε_λ = ε[λi,:,:,:]
+        ε_λ = ε_continuum[λi,:,:,:]
 
-        println("\n--[",nλ0 + λi,"/",Nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
+        println("\n--[", λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
         p = Progress(ny); update!(p,0)
@@ -351,171 +370,7 @@ end
 
 
 """
-    mcrt(atmosphere::Atmosphere,
-         radiation::Radiation,
-         atom::Atom,
-         max_scatterings::Real,
-         iteration::Int64,
-         output_path::String)
-
-Monte Carlo radiative transfer simulation
-in full atom mode.
-
-function mcrt_line(atmosphere::Atmosphere,
-                   radiation::Radiation,
-                   λ::Array{<:Unitful.Length,1},
-                   line::Line,
-                   lineRadiation::LineRadiation,
-                   max_scatterings::Real,
-                   iteration::Int64,
-                   nλ0::Int64, Nλ::Int64,
-                   output_path::String)
-
-    # ==================================================================
-    # ATMOSPHERE DATA
-    # ==================================================================
-    x = atmosphere.x
-    y = atmosphere.y
-    z = atmosphere.z
-    velocity = atmosphere.velocity
-
-    # ===================================================================
-    # RADIATION DATA
-    # ===================================================================
-    α_continuum = radiation.α_continuum
-    ε_continuum = radiation.ε_continuum
-    α_line_constant = lineRadiation.α_line_constant
-    ε_line = lineRadiation.ε_line
-
-    boundary = radiation.boundary
-    packets = radiation.packets
-
-    nλ, nz, nx, ny = size(packets)
-
-    # ===================================================================
-    # ATOM DATA
-    # ===================================================================
-    lineData = line.lineData
-    dc = line.damping_constant
-    ΔλD = line.doppler_width
-    λ0 = lineData.λ0
-
-    # ===================================================================
-    # SIMULATION
-    # ===================================================================
-    println(@sprintf("--Starting simulation, using %d thread(s)...",
-            Threads.nthreads()))
-
-    # Initialise placeholder variable
-    J_λ = Array{Int32,3}(undef, nz, nx, ny)
-    I0_λ = Array{Int32,3}(undef, 3, nx, ny)
-
-    # Line wavelengths
-    for λi=1:nλ
-
-        # Reset counters
-        fill!(J_λ, 0.0)
-        fill!(I0_λ, 0.0)
-        total_destroyed = Threads.Atomic{Int64}(0)
-        total_scatterings = Threads.Atomic{Int64}(0)
-
-        # Pick out wavelength data
-        packets_λ = packets[λi,:,:,:]
-        boundary_λ = boundary[λi,:,:]
-
-        println("\n--[",nλ0 + λi,"/",Nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
-
-        # Create ProgressMeter working with threads
-        p = Progress(ny)
-        update!(p,0)
-        jj = Threads.Atomic{Int}(0)
-        l = Threads.SpinLock()
-
-        # Go through all boxes
-        et = @elapsed Threads.@threads for j=1:ny
-
-            # Advance ProgressMeter
-            Threads.atomic_add!(jj, 1)
-            Threads.lock(l)
-            update!(p, jj[])
-            Threads.unlock(l)
-
-            for i=1:nx
-                for k=1:nz
-
-                    # Packets in box
-                    pcts = packets_λ[k,i,j]
-
-                    if pcts == 0
-                        continue
-                    end
-
-                    # Dimensions of box
-                    corner = SA[z[k], x[i], y[j]]
-                    box_dim = SA[z[k+1], x[i+1], y[j+1]] .- corner
-
-                    for pct=1:pcts
-
-                        # Initial box
-                        box_id = [k,i,j]
-
-                        # Initial position uniformely drawn from box
-                        r = corner .+ (box_dim .* rand(3))
-
-                        # Scatter each packet until destroyed,
-                        # escape or reach max_scatterings
-                        for s=1:Int(max_scatterings)
-
-                            # Scatter packet once
-                            box_id, r, lost, α = scatter_packet_line(x, y, z,
-                                                                velocity,
-                                                                α_continuum,
-                                                                α_line_constant,
-                                                                boundary_λ,
-                                                                box_id, r,
-                                                                J_λ, I0_λ,
-                                                                dc, ΔλD,
-                                                                λ0, λ[λi])
-
-                            # Check if escaped or lost in bottom
-                            if lost
-                                break
-                            end
-
-                            # Check if destroyed in next particle interaction
-                            α_line = α -  α_continuum[box_id...]
-                            ε = ( ε_continuum[box_id...] * α_continuum[box_id...] +
-                                  ε_line[box_id...]      * α_line ) / α
-
-                            if rand() < ε
-                                Threads.atomic_add!(total_destroyed, 1)
-                                break
-                            end
-
-                            Threads.atomic_add!(total_scatterings, 1)
-
-                        end
-                    end
-                end
-            end
-        end
-
-        # ===================================================================
-        # WRITE TO FILE
-        # ===================================================================
-        h5open(output_path, "r+") do file
-            file["J"][iteration,nλ0 + λi,:,:,:] = J_λ
-            file["I0"][iteration,nλ0 + λi,:,:,:] = I0_λ
-            file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
-            file["total_scatterings"][iteration,nλ0 + λi] = total_scatterings.value
-            file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
-            file["time"][iteration,nλ0 + λi] = et
-        end
-    end
-end"""
-
-"""
-    scatter_packet(x::Array{<:Unitful.Length, 1},
+    scatter_packet_line(x::Array{<:Unitful.Length, 1},
                    y::Array{<:Unitful.Length, 1},
                    z::Array{<:Unitful.Length, 1},
                    velocity::Array{Array{<:Unitful.Velocity, 1}, 3},
@@ -527,6 +382,7 @@ end"""
                    box_id::Array{Int64,1},
                    r::Array{<:Unitful.Length, 1},
                    J::Array{Int32, 3},
+                   I0::Array{Int32, 3},
 
                    damping_constant::Array{<:PerArea, 3},
                    ΔλD::Array{<:Unitful.Length, 3},
@@ -671,8 +527,8 @@ end
 
 """
     closest_edge(next_edges::Array{<:Unitful.Length, 1},
-                      r::Array{<:Unitful.Length, 1},
-                      unit_vector::Array{Float64, 1})
+                 r::Array{<:Unitful.Length, 1},
+                 unit_vector::Array{Float64, 1})
 
 Returns the face (1=z,2=x or 3=y) that
 the packet will cross next and the distance to it.
@@ -693,13 +549,17 @@ end
 
 
 """
-    mcrt(atmosphere::Atmosphere,
-         radiation::RadiationBackground,
-         max_scatterings::Real,
-         output_path::String)
+     mcrt_continuum(atmosphere::Atmosphere,
+                    radiation::Radiation,
+                    λ::Array{<:Unitful.Length, 1},
+                    max_scatterings::Real,
+                    iteration::Int64,
+                    nλ0::Int64,
+                    Nλ::Int64,
+                    output_path::String)
 
 Monte Carlo radiative transfer simulation
-in background radiation test mode."""
+for continuum radiation."""
 
 function mcrt_continuum(atmosphere::Atmosphere,
                         radiation::Radiation,
@@ -833,14 +693,15 @@ function mcrt_continuum(atmosphere::Atmosphere,
 end
 
 """
-    scatter_packet(x::Array{<:Unitful.Length, 1},
-                   y::Array{<:Unitful.Length, 1},
-                   z::Array{<:Unitful.Length, 1},
-                   α::Array{<:PerLength, 3},
-                   boundary::Array{Int32, 2},
-                   box_id::Array{Int64,1},
-                   r::Array{<:Unitful.Length, 1},
-                   J::Array{Int32, 3})
+    scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
+                             y::Array{<:Unitful.Length, 1},
+                             z::Array{<:Unitful.Length, 1},
+                             α::Array{<:PerLength, 3},
+                             boundary::Array{Int32, 2},
+                             box_id::Array{Int64,1},
+                             r::Array{<:Unitful.Length, 1},
+                             J::Array{Int32, 3},
+                             I0::Array{Int32, 3})
 
 Traverse boxes until optical depth target reached
 for scattering event and return new position.

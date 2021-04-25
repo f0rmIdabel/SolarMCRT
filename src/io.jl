@@ -20,7 +20,7 @@ const hc = h * c_0
 @derived_dimension UnitsIntensity_λ Unitful.𝐋^-1 * Unitful.𝐌 * Unitful.𝐓^-3
 
 """
-    test_mode()
+    background_mode()
 
 Get the test mode status.
 """
@@ -63,8 +63,7 @@ function get_output_path()
 		pop_distrib = get_population_distribution()
         nλ_bb = get_nλ_bb()
 	    nλ_bf = get_nλ_bf()
-		pcs_bb = get_target_packets_bb()
-		pcs_bf = get_target_packets_bf()
+		pcs = get_target_packets()
 
 		for i=1:length(nλ_bf)
 			path *= "_"*string(nλ_bf[i])
@@ -74,13 +73,7 @@ function get_output_path()
 			path *= "_"*string(nλ_bb[i])
 		end
 
-		for i=1:length(nλ_bf)
-			path *= "_"*string(pcs_bf[i])
-		end
-
-		for i=1:length(nλ_bb)
-			path *= "_"*string(pcs_bb[i])
-		end
+	path *= "_"*string(pcs)
 
         if pop_distrib == "LTE"
             path *= "_LTE.h5"
@@ -92,20 +85,6 @@ function get_output_path()
     return path
 end
 
-"""
-    get_iteration_mode()
-
-Get the iteration mode (populations or lambda)
-"""
-function get_iteration_mode()
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("iteration_mode", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end]
-    j = findfirst("\n", file[i+1:end])[end] + i
-    im = strip(file[i+1:j-1])
-    return im
-end
 
 """
     get_max_iterations()
@@ -133,7 +112,7 @@ Get the number of packets to be created for each wavelength.
 """
 function get_target_packets()
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("background_target_packets", input_file)[end] + 1
+    i = findfirst("target_packets", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
@@ -141,58 +120,7 @@ function get_target_packets()
     return target_packets
 end
 
-function get_target_packets_bf()
 
-    packets_bf = []
-
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("target_packets_bf", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-    n = findfirst("\n", file)[end] - 1
-
-    while j < n
-        packets = parse(Float64, file[i:j])
-        append!(packets_bf, packets)
-
-        i = j + 2
-        j = i + findfirst(",", file[i+1:end])[end] - 1
-        n = i + findfirst("\n", file[i+1:end])[end] - 1
-    end
-
-    packets = parse(Float64, file[i:n])
-    append!(packets_bf, packets)
-
-    return packets_bf
-end
-
-
-function get_target_packets_bb()
-
-    packets_bb = []
-
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("target_packets_bb", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-    n = findfirst("\n", file)[end] - 1
-
-    while j < n
-        packets = parse(Float64, file[i:j])
-        append!(packets_bb, packets)
-
-        i = j + 2
-        j = i + findfirst(",", file[i+1:end])[end] - 1
-        n = i + findfirst("\n", file[i+1:end])[end] - 1
-    end
-
-    packets = parse(Float64, file[i:n])
-    append!(packets_bb, packets)
-
-    return packets_bb
-end
 
 
 """
@@ -330,61 +258,6 @@ function get_nλ_bb()
 end
 
 
-function get_qcore()
-
-    qcore = []
-
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("q_core", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-    n = findfirst("\n", file)[end] - 1
-
-    while j < n
-        q = parse(Float64, file[i:j])
-        append!(qcore, q)
-
-        i = j + 2
-        j = i + findfirst(",", file[i+1:end])[end] - 1
-        n = i + findfirst("\n", file[i+1:end])[end] - 1
-    end
-
-    q = parse(Float64, file[i:n])
-    append!(qcore, q)
-
-    return qcore
-end
-
-function get_qwing()
-
-    qwing = []
-
-    input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("q_wing", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("=", file)[end] + 1
-    j = findfirst(",", file)[end] - 1
-    n = findfirst("\n", file)[end] - 1
-
-    while j < n
-        q = parse(Float64, file[i:j])
-        append!(qwing, q)
-
-        i = j + 2
-        j = i + findfirst(",", file[i+1:end])[end] - 1
-        n = i + findfirst("\n", file[i+1:end])[end] - 1
-    end
-
-    q = parse(Float64, file[i:n])
-    append!(qwing, q)
-
-    return qwing
-end
-
-
-
-
 # =============================================================================
 # ATOM
 # =============================================================================
@@ -435,10 +308,8 @@ function get_population_distribution()
 end
 
 
-
-
 """
-    test_mode()
+    get_write_rates()
 
 Check whether to write rates or not.
 """

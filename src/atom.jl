@@ -23,8 +23,6 @@ struct Line
 end
 
 
-
-
 """
     collect_atom_data(atmosphere::Atmosphere)
 
@@ -353,12 +351,10 @@ end
 Writes wavelength and number of bound-bound and
 bound-free wavelengths to the output file.
 """
-function write_to_file(λ, output_path::String)
-    λ_flat = Array{Float64,1}(undef,0)
-    for t=1:length(λ)
-        append!(λ_flat, ustrip.(λ[t]))
-    end
+function write_to_file(λ, iλbf, iλbb, output_path::String)
     h5open(output_path, "r+") do file
-        write(file, "wavelength", λ_flat)
+        write(file, "wavelength", ustrip.(λ))
+        #write(file, "iwbf", Arr
+        #write(file, "iwbf", iλbb)
     end
 end

@@ -15,18 +15,29 @@ struct LineRadiation
     ε_line::Array{Float64,3}
 end
 
-
 function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates,
-                           lines, lineRadiations,
-                           populations, boundary_criterion, target_packets::Float64)
+                           lines, lineRadiations, populations::Array{<:NumberDensity,4},
+                           boundary_criterion, target_packets::Float64)
+
+    x = atmosphere.x
+    y = atmosphere.y
+    z = atmosphere.z
+    temperature = atmosphere.temperature
+    nz,nx,ny = size(temperature)
+    λ =atom.λ
+    nλ = atom.nλ
 
     α_continuum, ε_continuum = opacity_continuum(atmosphere, atom, rates, populations)
     α_line, ε_line = opacity_line(atom,  lines, lineRadiations)
 
-    α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+    α_abs = α_continuum .* ε_continuum .+ α_line .* ε_line
 
     α = α_continuum .+ α_line
     ε = α_abs ./ α
+
+    boundary = Array{Int32,3}(undef, nλ, nx, ny)
+    packets = Array{Int32,4}(undef, nλ, nz, nx, ny)
+    intensity_per_packet = Array{UnitsIntensity_λ,1}(undef, nλ)
 
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
@@ -37,21 +48,37 @@ function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::Transition
     if cut_off == false
         fill!(boundary, nz)
     elseif criterion == "depth"
-        for l=1:nλ
-            boundary[l,:,:] = optical_depth_boundary(α, z, cut_off)
+        for w=1:nλ
+            boundary[w,:,:] = optical_depth_boundary(α_abs[w,:,:,:], z, cut_off)
         end
     elseif criterion == "destruction"
-        for l=1:nλ
-            boundary[l,:,:] = ε_boundary(ε, cut_off)
+        for w=1:nλ
+            boundary[w,:,:] = ε_boundary(ε[w,:,:,:], cut_off)
         end
     end
 
-    for l=1:nλ
-        packets[l,:,:,:], intensity_per_packet[l] = distribute_packets(λ[l], target_packets, x, y, z,
-                                                                       temperature, α_abs, boundary[l,:,:])
+    for w=1:nλ
+        packets[w,:,:,:], intensity_per_packet[w] = distribute_packets(λ[w], target_packets, x, y, z,
+                                                                       temperature, α_abs[w,:,:,:],  ε[w,:,:,:], boundary[w,:,:])
     end
 
     return α_continuum, ε_continuum, boundary, packets, intensity_per_packet
+end
+
+
+function collect_line_radiation_data(line::Line, rates::TransitionRates, populations::Array{<:NumberDensity,4})
+
+    l = line.l
+    u = line.u
+    lineData = line.lineData
+
+    α_line_constant = line_extinction_constant.(Ref(lineData), populations[:,:,:,l], populations[:,:,:,u])
+
+    Cul = rates.C[u,l,:,:,:]
+    Rul = rates.R[u,l,:,:,:]
+    ε_line = Cul ./ (Rul .+ Cul)
+
+    return α_line_constant, ε_line
 end
 
 
@@ -70,8 +97,8 @@ function opacity_line(atom::Atom, lines, lineRadiations)
     # INITIALISE VARIABLES
     # ==================================================================
     α_line = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
-
     α = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
+    ε = zeros(Float64, nλ, nz, nx, ny)
     α_abs = zeros(Float64, nλ, nz, nx, ny)u"m^-1"
 
     # ==================================================================
@@ -85,23 +112,21 @@ function opacity_line(atom::Atom, lines, lineRadiations)
             line = lines[line_number]
             lineRadiation = lineRadiations[line_number]
             ε_line = lineRadiation.ε_line
-            start, stop = iλbb[line_number,:]
+            start, stop = iλbb[line_number]
 
             for w=start:stop
-
-                α_line = line_extinction.(λ[w], line.lineData.λ0, line.ΔλD, line.damping_constant, lineRadiation.α_line_constant)
-                α[w,:,:,:] .+= α_line
-                α_abs[l,:,:,:] .+= α_line .* ε_line
+                α_line = line_extinction.(λ[w], line.lineData.λ0, line.doppler_width, line.damping_constant, lineRadiation.α_line_constant)
+                α[w,:,:,:] = α_line
+                ε[w,:,:,:] = ε_line
             end
         end
     end
 
-    ε = α_abs ./ α
-
     # ==================================================================
     # CHECK FOR UNVALID VALUES
     # ==================================================================
-    @test all(  Inf .> ustrip.(α_line) .>= 0.0 )
+    @test all(  Inf .> ustrip.(α) .>= 0.0 )
+    @test all(  1.0 .>= ε .>= 0.0 )
 
     return α, ε
 end
@@ -142,26 +167,27 @@ function opacity_continuum(atmosphere::Atmosphere, atom::Atom, rates::Transition
     # EXTINCTION AND DESTRUCTION PROBABILITY FOR BACKGROUND PROCESSES
     # ==================================================================
 
-    for l=1:nλ
-        α_abs = α_cont_abs.(λ[l], temperature, electron_density, hydrogen_neutral_density, proton_density)
-        α_scatt = α_cont_scatt.(λ[l], electron_density, hydrogen_ground_density)
-        α[l,:,:,:] = α_scatt .+ α_abs
-        α_abs[l,:,:,:] = α_abs
+    for w=1:nλ
+        α_absorp = α_cont_abs.(λ[w], temperature, electron_density, hydrogen_neutral_density, proton_density)
+        α_scatt = α_cont_scatt.(λ[w], electron_density, hydrogen_ground_density)
+        α[w,:,:,:] = α_scatt .+ α_absorp
+        α_abs[w,:,:,:] = α_absorp
     end
 
 
     for level=1:n_levels
 
+        n_eff = sqrt(E_∞ / (χ[end] - χ[level])) |> u"J/J"
         ε_bf = C[end,level,:,:,:] ./ (C[end,level,:,:,:] .+ R[end,level,:,:,:])
 
-        start,stop = iλbf[level,:]
-        for l=start:stop
-            α_bf = hydrogenic_bf.(c_0/λ[l], c_0/λ[nλ],
+        start,stop = iλbf[level]
+        for w=start:stop
+            α_bf = hydrogenic_bf.(c_0/λ[w], c_0/λ[nλ],
                                   temperature, populations[:,:,:,level],
-                                  1.0, n_eff(χ[end], χ[level], Z))
+                                  1.0, n_eff)
 
-            α[l,:,:,:] .+= α_bf
-            α_abs[l,:,:,:] .+= α_bf .* ε_bf
+            α[w,:,:,:] .+= α_bf
+            α_abs[w,:,:,:] .+= α_bf .* ε_bf
         end
 
     end
@@ -179,20 +205,7 @@ end
 
 
 
-function collect_line_radiation_data(line::Line, rates::TransitionRates, populations::Array{<:NumberDensity,4})
 
-    l = line.l
-    u = line.u
-    lineData = line.lineData
-
-    α_line_constant = line_extinction_constant.(Ref(lineData), populations[:,:,:,l], populations[:,:,:,u])
-
-    Cul = rates.C[u,l,:,:,:]
-    Rul = rates.R[u,l,:,:,:]
-    ε_line = Cul ./ (Rul .+ Cul)
-
-    return α_line_constant, ε_line
-end
 
 """
     collect_radiation_data(atmosphere::Atmosphere,
@@ -200,7 +213,9 @@ end
                            τ_max::Float64,
                            target_packets::Float64)
 
-Collects radition data for background processes at a single wavelength
+Collects radition data for background processes at a single wavelength.
+This is what is called in the test mode.
+
 Returns data to go into structure.
 """
 function collect_background_radiation(atmosphere::Atmosphere,
@@ -250,7 +265,7 @@ function collect_background_radiation(atmosphere::Atmosphere,
         fill!(boundary, nz)
     else
         if criterion == "depth"
-            boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:], z, cut_off)
+            boundary[1,:,:] = optical_depth_boundary(α[1,:,:,:].*ε[1,:,:,:], z, cut_off)
         elseif criterion == "destruction"
             boundary[1,:,:] = ε_boundary(ε[1,:,:,:], cut_off)
         end
@@ -260,7 +275,7 @@ function collect_background_radiation(atmosphere::Atmosphere,
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
     packets[1,:,:,:], intensity_per_packet[1] = distribute_packets(λ[1], target_packets, x, y, z,
-                                                                   temperature, α_continuum_abs, boundary[1,:,:])
+                                                                   temperature, α_continuum_abs, ε[1,:,:,:], boundary[1,:,:])
 
     # ==================================================================
     # CHECK FOR UNVALID VALUES
@@ -485,8 +500,13 @@ function collect_bb_radiation(atmosphere::Atmosphere,
     else
         if criterion == "depth"
             for l=1:nλ
-                α = α_continuum .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
-                boundary[l,:,:] = optical_depth_boundary(α, z, cut_off)
+                #α = α_continuum .+ line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
+
+                α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant, velocity_z)
+                α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
+                ε = α_abs ./ (α_continuum .+ α_line)
+
+                boundary[l,:,:] = optical_depth_boundary(α_abs, z, cut_off)
 
                 α_line = line_extinction.(λ[l], λ0, ΔλD, damping_constant, α_line_constant)
                 α_abs =  α_continuum .* ε_continuum .+ α_line .* ε_line
@@ -708,6 +728,7 @@ function distribute_packets(λ::Unitful.Length,
                             z::Array{<:Unitful.Length, 1},
                             temperature::Array{<:Unitful.Temperature, 3},
                             α::Array{<:PerLength, 3},
+                            ε::Array{Float64, 3},
                             boundary::Array{Int32,2})
 
     nz, nx, ny = size(α)
@@ -720,6 +741,7 @@ function distribute_packets(λ::Unitful.Length,
     Δx = (x[2:end] .- x[1:end-1])
     Δy = (y[2:end] .- y[1:end-1])
 
+
     for j=1:ny
         for i=1:nx
             for k=1:boundary[i,j]
@@ -730,6 +752,10 @@ function distribute_packets(λ::Unitful.Length,
     end
 
     packets_per_box = Int.(round.( (box_emission/sum(box_emission)) * target_packets ))
+
+    scale = sum(packets_per_box .* ε) / sum(packets_per_box)
+    packets_per_box = Int.(round.( (box_emission/sum(box_emission)) * target_packets * scale))
+
     intensity_per_packet /= sum(packets_per_box)
 
     return packets_per_box, intensity_per_packet

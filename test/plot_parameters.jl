@@ -1,5 +1,6 @@
 using Plots
 using Unitful
+using UnitfulRecipes
 import Statistics
 
 
@@ -190,7 +191,7 @@ function plot_rates(rates::TransitionRates,
     end
 
     Plots.plot(plots..., tickfontsize=6)
-    Plots.png("plots/transition_rates")
+    Plots.png("transition_rates")
 
 end
 
@@ -278,9 +279,9 @@ average column destruction probability, mean boundary depth and average
 number of packets created at each height.
 """
 function plot_radiation(radiation::Radiation,
-                        lineRadiation::LineRadiation,
-                        λ::Array{<:Unitful.Length, 1},
-                        line::Line,
+                        atom::Atom,
+                        lines,
+                        lineRadiations,
                         z::Array{<:Unitful.Length, 1})
 
     # ===========================================================
@@ -288,68 +289,138 @@ function plot_radiation(radiation::Radiation,
     # ===========================================================
     α_continuum = radiation.α_continuum
     ε_continuum = radiation.ε_continuum
-    α_line_constant = lineRadiation.α_line_constant
-    ε_line = lineRadiation.ε_line
-
     boundary = radiation.boundary
     packets = radiation.packets
     nλ, nz, nx, ny = size(packets)
 
-    λ0 = line.lineData.λ0
+    λ = atom.λ
+    iλbf = atom.iλbf
+    iλbb = atom.iλbb
+    n_lines = atom.n_lines
+    n_levels = atom.n_levels
 
     # ===========================================================
     # LOAD ATOM DATA AND GET LINE OPACITY/DESTRUCTION
     # ===========================================================
-    α = Array{PerLength,4}(undef, nλ, nz, nx, ny)
-    ε = Array{Float64,4}(undef, nλ, nz, nx, ny)
 
-    for l=1:nλ
-        α_line = line_extinction.(λ[l], line.lineData.λ0, line.doppler_width, line.damping_constant, α_line_constant)
-        α[l,:,:,:] = α_continuum .+ α_line
-        ε[l,:,:,:] = (ε_continuum.*α_continuum  .+  ε_line.*α_line) ./ α[l,:,:,:]
+    for ln=1:n_lines
+
+        lineRadiation = lineRadiations[ln]
+        line = lines[ln]
+
+        ε_line = lineRadiation.ε_line
+
+        start, stop = iλbb[ln]
+
+        λi = λ[start:stop]
+        nλi = length(λi)
+
+        αci = α_continuum[start:stop,:,:,:]
+        εci = ε_continuum[start:stop,:,:,:]
+        bi = boundary[start:stop,:,:]
+
+        α = Array{PerLength,4}(undef, nλi, nz, nx, ny)
+        ε = Array{Float64,4}(undef, nλi, nz, nx, ny)
+
+
+        for l=1:nλi
+            α_line = line_extinction.(λi[l], line.lineData.λ0, line.doppler_width, line.damping_constant, lineRadiation.α_line_constant)
+            α[l,:,:,:] = αci[l,:,:,:] .+ α_line
+            ε[l,:,:,:] = (εci[l,:,:,:].*αci[l,:,:,:]  .+  ε_line.*α_line) ./ α[l,:,:,:]
+        end
+
+        mean_boundary = Array{Float64, 1}(undef,nλi)
+        max_boundary = Array{Float64, 1}(undef,nλi)
+        min_boundary = Array{Float64, 1}(undef,nλi)
+
+        for l=1:nλi
+            mean_boundary[l] = mean(bi[l,:,:])
+            max_boundary[l] = maximum(bi[l,:,:])
+            min_boundary[l] = minimum(bi[l,:,:])
+        end
+
+        α = ustrip.(α)
+        mean_α = mean(α, dims=(3,4))[:,:,1,1]
+        mean_ε = mean(ε, dims=(3,4))[:,:,1,1]
+        mean_packets = mean(packets, dims=(3,4))[:,:,1,1]
+
+        z = ustrip.(z .|>u"Mm")
+        λi = ustrip.(λi .|>u"nm")
+
+        c = nλi ÷ 2 + 1
+
+        ENV["GKSwstype"]="nul"
+        p1 = Plots.plot(z, [mean_α[1,:], mean_α[c÷2+1,:], mean_α[c,:]],
+                        ylabel = "Extinction (m^-1)", xlabel = "z (Mm)",
+                        yscale=:log10,
+                        label=permutedims(["wing", "mid", "center"]))
+
+        p2 = Plots.plot(z, [mean_ε[1,:], mean_ε[c÷2+1,:], mean_ε[c,:] ],
+                        ylabel = "Destruction", xlabel = "z (Mm)",
+                        yscale=:log10,
+                        label=permutedims(["wing", "mid", "center"]))
+
+        p3 = Plots.plot(z, [mean_packets[1,:], mean_packets[c÷2+1,:], mean_packets[c,:]],
+                        ylabel = "Mean packets", xlabel = "z (Mm)",
+                        label=permutedims(["wing", "mid", "center"]))
+
+        p4 = Plots.plot(λi, [mean_boundary, max_boundary, min_boundary],
+                        xlabel = "wavelength (nm)", yflip = true,
+                        label=permutedims(["mean", "minimum", "maximum"]))
+
+        Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
+        Plots.png("plots/radiation_"*string(line.u)*string(line.l))
     end
 
-    mean_boundary = Array{Float64, 1}(undef,nλ)
-    max_boundary = Array{Float64, 1}(undef,nλ)
-    min_boundary = Array{Float64, 1}(undef,nλ)
+    for ln=1:n_levels
+        start, stop = iλbf[ln]
+        λi = λ[start:stop]
+        nλi = length(λi)
 
-    for l=1:nλ
-        mean_boundary[l] = mean(boundary[l,:,:])
-        max_boundary[l] = maximum(boundary[l,:,:])
-        min_boundary[l] = minimum(boundary[l,:,:])
+        α = α_continuum[start:stop,:,:,:]
+        ε = ε_continuum[start:stop,:,:,:]
+        b = boundary[start:stop,:,:]
+
+        mean_boundary = Array{Float64, 1}(undef,nλi)
+        max_boundary = Array{Float64, 1}(undef,nλi)
+        min_boundary = Array{Float64, 1}(undef,nλi)
+
+        for l=1:nλi
+            mean_boundary[l] = mean(b[l,:,:])
+            max_boundary[l] = maximum(b[l,:,:])
+            min_boundary[l] = minimum(b[l,:,:])
+        end
+
+        α = ustrip.(α)
+        mean_α = mean(α, dims=(3,4))[:,:,1,1]
+        mean_ε = mean(ε, dims=(3,4))[:,:,1,1]
+        mean_packets = mean(packets, dims=(3,4))[:,:,1,1]
+
+        λi = ustrip.(λi .|>u"nm")
+        c = nλi ÷ 2 + 1
+
+        ENV["GKSwstype"]="nul"
+        p1 = Plots.plot(z, [mean_α[1,:], mean_α[c,:], mean_α[end,:]],
+                        ylabel = "Extinction (m^-1)", xlabel = "z (Mm)",
+                        yscale=:log10,
+                        label=permutedims(["tail", "mid", "edge"]))
+
+        p2 = Plots.plot(z, [mean_ε[1,:], mean_ε[c,:], mean_ε[end,:] ],
+                        ylabel = "Destruction", xlabel = "z (Mm)",
+                        yscale=:log10,
+                        label=permutedims(["tail", "mid", "edge"]))
+
+        p3 = Plots.plot(z, [mean_packets[1,:], mean_packets[c,:], mean_packets[end,:]],
+                        ylabel = "Mean packets", xlabel = "z (Mm)",
+                        label=permutedims(["tail", "mid", "edge"]))
+
+        p4 = Plots.plot(λi, [mean_boundary, max_boundary, min_boundary],
+                        xlabel = "wavelength (nm)", yflip = true,
+                        label=permutedims(["mean", "minimum", "maximum"]))
+
+        Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
+        Plots.png("plots/radiation_c"*string(ln))
     end
-
-    α = ustrip.(α)
-    mean_α = mean(α, dims=(3,4))[:,:,1,1]
-    mean_ε = mean(ε, dims=(3,4))[:,:,1,1]
-    mean_packets = mean(packets, dims=(3,4))[:,:,1,1]
-
-    z = ustrip.(z .|>u"Mm")
-    λ = ustrip.(λ .|>u"nm")
-
-    c = nλ ÷ 2 + 1
-
-    ENV["GKSwstype"]="nul"
-    p1 = Plots.plot(z, [mean_α[1,:], mean_α[c÷2+1,:], mean_α[c,:]],
-                    ylabel = "Extinction (m^-1)", xlabel = "z (Mm)",
-                    yscale=:log10,
-                    label=permutedims(["wing", "mid", "center"]))
-
-    p2 = Plots.plot(z, [mean_ε[1,:], mean_ε[c÷2+1,:], mean_ε[c,:] ],
-                    ylabel = "Destruction", xlabel = "z (Mm)",
-                    yscale=:log10,
-                    label=permutedims(["wing", "mid", "center"]))
-
-    p3 = Plots.plot(z, [mean_packets[1,:], mean_packets[c÷2+1,:], mean_packets[c,:]],
-                    ylabel = "Mean packets", xlabel = "z (Mm)",
-                    label=permutedims(["wing", "mid", "center"]))
-
-    p4 = Plots.plot(λ, [mean_boundary, max_boundary, min_boundary],
-                    xlabel = "wavelength (nm)", yflip = true,
-                    label=permutedims(["mean", "minimum", "maximum"]))
-
-    Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
-    Plots.png("plots/radiation_"*string(line.u)*string(line.l))
 end
 
 """

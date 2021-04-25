@@ -64,8 +64,7 @@ function run()
         output_path = get_output_path()
         max_iterations = get_max_iterations()
         max_scatterings = get_max_scatterings()
-        target_packets_bf = get_target_packets_bf()
-        target_packets_bb = get_target_packets_bb()
+        target_packets = get_target_packets()
         cut_off = get_cut_off()
         initial_population_distribution = get_population_distribution()
         write_rates = get_write_rates()
@@ -88,7 +87,7 @@ function run()
         print("--Loading line.............................")
         lines = []
         for l=1:n_levels-1
-            for u=2:n_levels
+            for u=(l+1):n_levels
                 line =  Line(collect_line_data(atmosphere, atom, u, l)...)
                 append!(lines, [line])
             end
@@ -99,7 +98,7 @@ function run()
         # LOAD INITIAL POPULATIONS
         # =============================================================================
         print("--Loading initial populations..............")
-        populations = collect_initial_populations(atmosphere, atom, initial_population_distribution)
+        populations = collect_initial_populations(atmosphere, atom, lines, initial_population_distribution)
         println("Initial ", initial_population_distribution, "-populations loaded.")
 
         # =============================================================================
@@ -116,7 +115,7 @@ function run()
         # =============================================================================
         print("--Initialise output file...................")
         create_output_file(output_path, max_iterations, atom.nλ, n_levels, atmosphere_size, write_rates)
-        write_to_file(atom.λ, output_path)
+        write_to_file(atom.λ, atom.iλbf, atom.iλbb, output_path)
         write_to_file(populations, 0, output_path)
         if write_rates; write_to_file(rates, 0, output_path); end
         println(@sprintf("%.1f GBs of data initialised.", how_much_data(atom.nλ, atmosphere_size, max_iterations, write_rates)))
@@ -132,19 +131,19 @@ function run()
             lineRadiations = []
 
             for l=1:n_levels-1
-                for u=2:n_levels
+                for u=(l+1):n_levels
                     line_number = sum((n_levels-l+1):(n_levels-1)) + (u - l)
                     lineRadiation = LineRadiation(collect_line_radiation_data(lines[line_number], rates, populations)...)
                     append!(lineRadiations, [lineRadiation])
                 end
             end
 
-            radiation_parameters = collect_radiation(atmosphere, atom, rates,  lines, lineRadiations,
-                                                     populations, boundary_criterion, target_packets)
+            radiation_parameters = collect_radiation(atmosphere, atom, rates, lines, lineRadiations,
+                                                     populations, cut_off, target_packets)
 
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation, n, output_path)
-            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(radiation.packets[1,:,:,:])))
+            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(target_packets)))
 
 
             mcrt(atmosphere, radiation, atom,
@@ -155,8 +154,8 @@ function run()
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
             print("\n--Update transition rates..................")
-            Jλ = get_Jλ(output_path, n, atom.λ)
-            rate_parameters = calculate_transition_rates(atmosphere, atom, Jλ)
+            Jλ = get_Jλ(output_path, n, atom.λ) #.+ Bλ  # remove
+            rate_parameters = calculate_transition_rates(atmosphere, atom, lines, Jλ)
             rates = TransitionRates(rate_parameters...)
             if write_rates; write_to_file(rates, n, output_path); end
             println("Transition rates updated.")
