@@ -248,3 +248,23 @@ function collect_atmosphere()
 
     return z, x, y, velocity, velocity_z, temperature, electron_density, hydrogen_populations
 end
+
+
+function box_volume(z, x, y)
+
+    nz = length(z) - 1
+    nx = length(x) - 1
+    ny = length(y) - 1
+
+    volume = Array{Unitful.Volume, 3}(undef, nz, nx, ny)
+
+    for k = 1:nz
+        for i=1:nx
+            for j=1:ny
+                volume[k,i,j] = (z[k] - z[k+1]) * (x[i+1] - x[i]) * (y[i+1] - y[i])
+            end
+        end
+    end
+
+    return volume
+end

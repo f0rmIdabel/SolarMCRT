@@ -38,7 +38,8 @@ end
 """
     get_output_path()
 
-Get the path to the output file.
+Get the path
+ to the output file.
 """
 function get_output_path()
 
@@ -51,8 +52,9 @@ function get_output_path()
 			path *= "eps"
 		elseif distrib == "depth"
 			path *= "depth"
+		elseif distrib == "effective_depth"
+			path *= "effdepth"
 		end
-
 		path*= string(cut_off)
 	end
 
@@ -197,10 +199,10 @@ function get_Jλ(output_path::String, iteration::Int64, λ)
 
     file = h5open(output_path, "r")
     J = read(file, "J")[iteration,:,:,:,:]
-	intensity_per_packet = read(file, "intensity_per_packet")[iteration,:] .*u"kW / m^2 / sr / nm"
+	packets_to_intensity = read(file, "packets_to_intensity")[iteration,:,:,:,:] .*u"kW / m^2 / sr / nm"
     close(file)
 
-    return J .* intensity_per_packet
+    return J .* packets_to_intensity
 end
 
 
@@ -458,15 +460,15 @@ function create_output_file(output_path::String, max_iterations::Int64, nλ::Int
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        write(file, "J", Array{Int32,5}(undef, max_iterations, nλ, nz, nx,ny))
-		write(file, "I0", Array{Int32,5}(undef, max_iterations, nλ, 3, nx,ny))
+        write(file, "J", Array{Float64,5}(undef, max_iterations, nλ, nz, nx,ny))
+		write(file, "I0", Array{Int64,5}(undef, max_iterations, nλ, 3, nx,ny))
         write(file, "total_destroyed", Array{Int64,2}(undef, max_iterations, nλ))
         write(file, "total_scatterings", Array{Int64,2}(undef,max_iterations, nλ))
         write(file, "time", Array{Float64,2}(undef,max_iterations, nλ))
 
-        write(file, "packets", Array{Int32,5}(undef, max_iterations, nλ, nz, nx, ny))
+        write(file, "packets", Array{Float64,5}(undef, max_iterations, nλ, nz, nx, ny))
         write(file, "boundary", Array{Int32,4}(undef,max_iterations, nλ, nx, ny))
-        write(file, "intensity_per_packet", Array{Float64,2}(undef,max_iterations, nλ))
+        write(file, "packets_to_intensity", Array{Float64,5}(undef,max_iterations, nλ,nz, nx, ny))
 
         write(file, "populations", Array{Float64,5}(undef, max_iterations+1, nz, nx, ny, n_levels+1))
 		write(file, "error", Array{Float64,1}(undef, max_iterations))
@@ -488,15 +490,15 @@ function create_output_file(output_path::String, nλ::Int64, atmosphere_size::Tu
     nz, nx, ny = atmosphere_size
 
     h5open(output_path, "w") do file
-        write(file, "J", Array{Int32,5}(undef, 1, nλ, nz, nx,ny))
-        write(file, "I0", Array{Int32,5}(undef, 1, nλ, 3, nx,ny))
+        write(file, "J", Array{Float64,5}(undef, 1, nλ, nz, nx,ny))
+        write(file, "I0", Array{Int64,5}(undef, 1, nλ, 3, nx,ny))
 		write(file, "total_destroyed", Array{Int64,2}(undef,1, nλ))
         write(file, "total_scatterings", Array{Int64,2}(undef,1, nλ))
         write(file, "time", Array{Float64,2}(undef,1, nλ))
 
-        write(file, "packets", Array{Int32,5}(undef,1, nλ, nz, nx, ny))
+        write(file, "packets", Array{Float64,5}(undef,1, nλ, nz, nx, ny))
         write(file, "boundary", Array{Int32,4}(undef, 1,nλ, nx, ny))
-        write(file, "intensity_per_packet", Array{Float64,2}(undef,1, nλ))
+        write(file, "packets_to_intensity", Array{Float64,5}(undef,1, nλ, nz, nx, ny))
     end
 end
 
@@ -515,7 +517,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
         time_new = read(file, "time")[1:final_iteration,:]
         packets_new = read(file, "packets")[1:final_iteration,:,:,:,:]
         boundary_new = read(file, "boundary")[1:final_iteration,:,:,:]
-        intensity_per_packet_new = read(file, "intensity_per_packet")[1:final_iteration,:]
+        intensity_per_packet_new = read(file, "packets_to_intensity")[1:final_iteration,:,:,:,:]
         populations_new = read(file, "populations")[1:final_iteration+1,:,:,:,:]
 
         # Delete
@@ -526,7 +528,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
         delete_object(file, "time")
         delete_object(file, "packets")
         delete_object(file, "boundary")
-        delete_object(file, "intensity_per_packet")
+        delete_object(file, "packets_to_intensity")
         delete_object(file, "populations")
 
         # Write
@@ -537,7 +539,7 @@ function cut_output_file(output_path::String, final_iteration::Int64, write_rate
         write(file, "time", time_new)
         write(file, "packets", packets_new)
         write(file, "boundary", boundary_new)
-        write(file, "intensity_per_packet", intensity_per_packet_new)
+        write(file, "packets_to_intensity", intensity_per_packet_new)
         write(file, "populations", populations_new)
 
         if write_rates
@@ -599,14 +601,15 @@ function how_much_data(nλ::Int64, atmosphere_size::Tuple)
     boxes = nz*nx*ny
     slice = nx*ny
 
-    λ_data = 8*nλ + 8*2
+    λ = 8*nλ
 
     # Iteration data
-    J_data   = 4boxes*nλ
+    J = 8boxes*nλ
+	B = 8boxes*nλ
     sim_data = 4nλ + 2 * 8nλ
     rad_data = 4boxes*nλ + 4slice*nλ + 8nλ
 
-    max_data = ( λ_data +  J_data + sim_data + rad_data ) / 1e9
+    max_data = ( λ +  J + sim_data + rad_data ) / 1e9
 
     return max_data
 end

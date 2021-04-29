@@ -38,7 +38,7 @@ function run()
         print("--Loading radiation data...................")
         radiation_parameters = collect_background_radiation(atmosphere, λ, cut_off, target_packets)
         radiation = Radiation(radiation_parameters...)
-        println(@sprintf("Radiation loaded with %.2e packets.", sum(radiation.packets)))
+        println(@sprintf("Radiation loaded with %.2e packets.", target_packets))
 
         # =============================================================================
         # CREATE OUTPUT FILE
@@ -52,7 +52,7 @@ function run()
         # =============================================================================
         # SIMULATION
         # =============================================================================
-        mcrt_continuum(atmosphere, radiation, λ, max_scatterings, 1, 0, 1, output_path)
+        mcrt_continuum(atmosphere, radiation, λ, max_scatterings, 1, output_path)
 
         # =============================================================================
         # END OF TEST MODE
@@ -138,12 +138,14 @@ function run()
                 end
             end
 
+            test_boundary(atmosphere, atom, rates, lines, lineRadiations,populations)
+
             radiation_parameters = collect_radiation(atmosphere, atom, rates, lines, lineRadiations,
                                                      populations, cut_off, target_packets)
 
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation, n, output_path)
-            println(@sprintf("Radiation loaded with %.2e packets per λ.", sum(target_packets)))
+            println(@sprintf("Radiation loaded with %.2e packets per λ.", target_packets))
 
 
             mcrt(atmosphere, radiation, atom,
@@ -154,7 +156,7 @@ function run()
             # CALCULATE NEW TRANSITION RATES
             # =============================================================================
             print("\n--Update transition rates..................")
-            Jλ = get_Jλ(output_path, n, atom.λ) #.+ Bλ  # remove
+            Jλ = get_Jλ(output_path, n, atom.λ)
             rate_parameters = calculate_transition_rates(atmosphere, atom, lines, Jλ)
             rates = TransitionRates(rate_parameters...)
             if write_rates; write_to_file(rates, n, output_path); end

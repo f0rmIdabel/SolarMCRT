@@ -117,11 +117,20 @@ function plot_radiationBackground(radiation::Radiation,
     packets = radiation.packets[1,:,:,:]
     #intensity_per_packet = radiationBackground.intensity_per_packet
 
+    nz, nx, ny = size(packets)
+
+    for i=1:nx
+        for j=1:ny
+            for k=(boundary[i,j]+1):nz
+                packets[k,i,j] = 0
+            end
+        end
+    end
+
     mean_α = average_column(ustrip.(α_continuum))u"m^-1"
     mean_ε = average_column(ε_continuum)
     mean_packets = average_column(packets)
 
-    nx, ny = size(boundary)
     x = 1:nx
     y = 1:ny
     f(x,y) = ustrip(z[boundary[x,y]])
@@ -220,6 +229,16 @@ function plot_radiation(radiation::Radiation,
 
     nλ, nz, nx, ny = size(packets)
 
+    for l =1:nλ
+        for i=1:nx
+            for j=1:ny
+                for k=(boundary[l,i,j]+1):nz
+                    packets[l,k,i,j] = 0
+                end
+            end
+        end
+    end
+
     # ===========================================================
     # LOAD ATOM DATA AND GET LINE OPACITY/DESTRUCTION
     # ===========================================================
@@ -241,7 +260,6 @@ function plot_radiation(radiation::Radiation,
 
     z = ustrip.(z .|>u"Mm")
     λ = ustrip.(λ .|>u"nm")
-
 
     c = nλ ÷ 2 + 1
 
@@ -293,11 +311,23 @@ function plot_radiation(radiation::Radiation,
     packets = radiation.packets
     nλ, nz, nx, ny = size(packets)
 
+    for l =1:nλ
+        for i=1:nx
+            for j=1:ny
+                for k=(boundary[l,i,j]+1):nz
+                    packets[l,k,i,j] = 0
+                end
+            end
+        end
+    end
+
     λ = atom.λ
     iλbf = atom.iλbf
     iλbb = atom.iλbb
     n_lines = atom.n_lines
     n_levels = atom.n_levels
+
+    println(iλbf, " ", iλbb)
 
     # ===========================================================
     # LOAD ATOM DATA AND GET LINE OPACITY/DESTRUCTION
@@ -366,7 +396,7 @@ function plot_radiation(radiation::Radiation,
 
         p4 = Plots.plot(λi, [mean_boundary, max_boundary, min_boundary],
                         xlabel = "wavelength (nm)", yflip = true,
-                        label=permutedims(["mean", "minimum", "maximum"]))
+                        label=permutedims(["mean", "maximum", "minimum"]))
 
         Plots.plot(p1, p2, p3, p4, tickfontsize=6, legendfontsize=6, layout=(2,2))
         Plots.png("plots/radiation_"*string(line.u)*string(line.l))
@@ -398,6 +428,10 @@ function plot_radiation(radiation::Radiation,
 
         λi = ustrip.(λi .|>u"nm")
         c = nλi ÷ 2 + 1
+
+        println(mean_packets[1,:])
+        println(mean_packets[c,:])
+        println(mean_packets[end,:])
 
         ENV["GKSwstype"]="nul"
         p1 = Plots.plot(z, [mean_α[1,:], mean_α[c,:], mean_α[end,:]],

@@ -55,11 +55,12 @@ function mcrt(atmosphere::Atmosphere,
             Threads.nthreads()))
 
     # Initialise placeholder variable
-    J_λ = Array{Int32,3}(undef, nz, nx, ny)
-    I0_λ = Array{Int32,3}(undef, 3, nx, ny)
+    J_λ = Array{Float64,3}(undef, nz, nx, ny)
+    I0_λ = Array{Int64,3}(undef, 3, nx, ny)
 
     stop = nothing
 
+    # Go through all lines and the bound-free in-between
     for ln=1:n_lines
 
         start,stop = iλbb[ln]
@@ -75,6 +76,7 @@ function mcrt(atmosphere::Atmosphere,
 
             # Pick out wavelength data
             packets_λ = packets[λi,:,:,:]
+            J_λ .= packets_λ
             α_λ = α_continuum[λi,:,:,:]
             boundary_λ = boundary[λi,:,:]
             ε_λ = ε_continuum[λi,:,:,:]
@@ -95,10 +97,10 @@ function mcrt(atmosphere::Atmosphere,
                 Threads.unlock(l)
 
                 for i=1:nx
-                    for k=1:nz
+                    for k=1:boundary_λ[i,j]
 
                         # Packets in box
-                        pcts = packets_λ[k,i,j]
+                        pcts = Int(packets_λ[k,i,j])
 
                         if pcts == 0
                             continue
@@ -140,6 +142,9 @@ function mcrt(atmosphere::Atmosphere,
                             end
                         end
                     end
+                    for k=(boundary_λ[i,j]+1):nz
+                        J_λ[k,i,j] = packets_λ[k,i,j]
+                    end
                 end
             end
 
@@ -177,6 +182,7 @@ function mcrt(atmosphere::Atmosphere,
 
             # Pick out wavelength data
             packets_λ = packets[λi,:,:,:]
+            J_λ .= packets_λ
             boundary_λ = boundary[λi,:,:]
             α_continuum_λ = α_continuum[λi,:,:,:]
             ε_continuum_λ = ε_continuum[λi,:,:,:]
@@ -199,10 +205,10 @@ function mcrt(atmosphere::Atmosphere,
                 Threads.unlock(l)
 
                 for i=1:nx
-                    for k=1:nz
+                    for k=1:boundary_λ[i,j]
 
                         # Packets in box
-                        pcts = packets_λ[k,i,j]
+                        pcts = Int(packets_λ[k,i,j])
 
                         if pcts == 0
                             continue
@@ -255,6 +261,9 @@ function mcrt(atmosphere::Atmosphere,
                             end
                         end
                     end
+                    for k=(boundary_λ[i,j]+1):nz
+                        J_λ[k,i,j] = packets_λ[k,i,j]
+                    end
                 end
             end
 
@@ -273,7 +282,7 @@ function mcrt(atmosphere::Atmosphere,
 
     end
 
-    # Bound-free
+    # Final bound-free transition
     for λi=stop+1:nλ
 
         # Reset counters
@@ -284,6 +293,7 @@ function mcrt(atmosphere::Atmosphere,
 
         # Pick out wavelength data
         packets_λ = packets[λi,:,:,:]
+        J_λ .= packets_λ
         α_λ = α_continuum[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
         ε_λ = ε_continuum[λi,:,:,:]
@@ -304,10 +314,10 @@ function mcrt(atmosphere::Atmosphere,
             Threads.unlock(l)
 
             for i=1:nx
-                for k=1:nz
+                for k=1:boundary_λ[i,j]
 
                     # Packets in box
-                    pcts = packets_λ[k,i,j]
+                    pcts = Int(packets_λ[k,i,j])
 
                     if pcts == 0
                         continue
@@ -348,6 +358,10 @@ function mcrt(atmosphere::Atmosphere,
 
                         end
                     end
+                end
+
+                for k=(boundary_λ[i,j]+1):nz
+                    J_λ[k,i,j] = packets_λ[k,i,j]
                 end
             end
         end
@@ -404,8 +418,8 @@ function scatter_packet_line(x::Array{<:Unitful.Length, 1},
 
                         box_id::Array{Int64,1},
                         r::Array{<:Unitful.Length, 1},
-                        J::Array{Int32, 3},
-                        I0::Array{Int32, 3},
+                        J::Array{Float64, 3},
+                        I0::Array{Int64, 3},
 
                         damping_constant::Array{<:PerArea, 3},
                         ΔλD::Array{<:Unitful.Length, 3},
@@ -566,8 +580,6 @@ function mcrt_continuum(atmosphere::Atmosphere,
                         λ::Array{<:Unitful.Length, 1},
                         max_scatterings::Real,
                         iteration::Int64,
-                        nλ0::Int64,
-                        Nλ::Int64,
                         output_path::String)
 
     # ==================================================================
@@ -591,8 +603,8 @@ function mcrt_continuum(atmosphere::Atmosphere,
     nλ, nz, nx, ny = size(α)
 
     # Initialise placeholder variable
-    J_λ = zeros(Int32, nz, nx, ny)
-    I0_λ = zeros(Int32, 3, nx, ny)
+    J_λ = zeros(Float64, nz, nx, ny)
+    I0_λ = zeros(Int64, 3, nx, ny)
 
     # ===================================================================
     # SIMULATION
@@ -610,11 +622,12 @@ function mcrt_continuum(atmosphere::Atmosphere,
 
         # Pick out wavelength data
         packets_λ = packets[λi,:,:,:]
+        #J_λ .= packets_λ
         α_λ = α[λi,:,:,:]
         boundary_λ = boundary[λi,:,:]
         ε_λ = ε[λi,:,:,:]
 
-        println("\n--[",nλ0 + λi,"/",Nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
+        println("\n--[",λi,"/",nλ, "]        ", @sprintf("λ = %.3f nm", ustrip(λ[λi])))
 
         # Create ProgressMeter working with threads
         p = Progress(ny); update!(p,0)
@@ -630,10 +643,10 @@ function mcrt_continuum(atmosphere::Atmosphere,
             Threads.unlock(l)
 
             for i=1:nx
-                for k=1:nz
+                for k=1:boundary_λ[i,j]
 
                     # Packets in box
-                    pcts = packets_λ[k,i,j]
+                    pcts = Int(packets_λ[k,i,j])
 
                     if pcts == 0
                         continue
@@ -675,6 +688,9 @@ function mcrt_continuum(atmosphere::Atmosphere,
                         end
                     end
                 end
+                for k=(boundary_λ[i,j]+1):nz
+                    J_λ[k,i,j] = packets_λ[k,i,j]
+                end
             end
         end
 
@@ -682,12 +698,12 @@ function mcrt_continuum(atmosphere::Atmosphere,
         # WRITE TO FILE
         # ===================================================================
         h5open(output_path, "r+") do file
-            file["J"][iteration,nλ0 + λi,:,:,:] = J_λ
-            file["I0"][iteration,nλ0 + λi,:,:,:] = I0_λ
-            file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
-            file["total_scatterings"][iteration,nλ0 + λi] = total_scatterings.value
-            file["total_destroyed"][iteration,nλ0 + λi] = total_destroyed.value
-            file["time"][iteration,nλ0 + λi] = et
+            file["J"][iteration,λi,:,:,:] = J_λ
+            file["I0"][iteration,λi,:,:,:] = I0_λ
+            file["total_destroyed"][iteration,λi] = total_destroyed.value
+            file["total_scatterings"][iteration,λi] = total_scatterings.value
+            file["total_destroyed"][iteration,λi] = total_destroyed.value
+            file["time"][iteration,λi] = et
         end
     end
 end
@@ -713,8 +729,8 @@ function scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
                                   boundary::Array{Int32, 2},
                                   box_id::Array{Int64,1},
                                   r::Array{<:Unitful.Length, 1},
-                                  J::Array{Int32, 3},
-                                  I0::Array{Int32, 3})
+                                  J::Array{Float64, 3},
+                                  I0::Array{Int64, 3})
 
     # Keep track of status
     lost = false
@@ -755,6 +771,11 @@ function scatter_packet_continuum(x::Array{<:Unitful.Length, 1},
     # ===================================================================
     # TRAVERSE BOXES UNTIL DEPTH TARGET REACHED
     # ===================================================================
+    # If packet has next interaction in same box
+    """if τ < τ_cum
+        J[box_id...] += 1
+    end"""
+
     while τ > τ_cum
 
         # Switch to new box

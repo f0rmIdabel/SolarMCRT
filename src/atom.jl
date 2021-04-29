@@ -97,7 +97,7 @@ function collect_atom_data(atmosphere::Atmosphere)
 
     bf_bounds = []
     for level=1:n_levels
-        λ_min = λ1c * (level/2.0)^2
+        λ_min = λ1c * (level/2.0)^2 .+ 0.5u"nm"
         λ_bf = sample_λ_boundfree(nλ_bf[level], λ_min, χ[level], χ[end])
         append!(λ, λ_bf)
         nλ += length(λ_bf)
