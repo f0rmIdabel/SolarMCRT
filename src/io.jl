@@ -45,27 +45,19 @@ function get_output_path()
 
 	path = "../out/output_"
 
-	distrib, cut_off = get_cut_off()
+	crit, depth_exp = get_boundary_config()
+	target_packets, pct_exp = get_packet_config()
 
-	if cut_off != false
-		if distrib == "destruction"
-			path *= "eps"
-		elseif distrib == "depth"
-			path *= "depth"
-		elseif distrib == "effective_depth"
-			path *= "effdepth"
-		end
-		path*= string(cut_off)
+	if crit != false
+		path *= string(crit)*"_"*string(depth_exp)
 	end
 
     if background_mode()
-        path *= "_" * string(ustrip.(get_background_λ())) * "nm_" * string(get_target_packets()) * "pcs.h5"
+        path *= "_" * string(ustrip.(get_background_λ())) * "nm_" * string(target_packets) * "pcs.h5"
     else
-
 		pop_distrib = get_population_distribution()
         nλ_bb = get_nλ_bb()
 	    nλ_bf = get_nλ_bf()
-		pcs = get_target_packets()
 
 		for i=1:length(nλ_bf)
 			path *= "_"*string(nλ_bf[i])
@@ -75,7 +67,7 @@ function get_output_path()
 			path *= "_"*string(nλ_bb[i])
 		end
 
-	path *= "_"*string(pcs)
+	path *= "_"*string(target_packets)*"_"*string(pct_exp)
 
         if pop_distrib == "LTE"
             path *= "_LTE.h5"
@@ -146,30 +138,50 @@ end
 
 Get optical depth where the atmosphere will be cut.
 """
-function get_cut_off()
-
-	input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("criterion", input_file)[end] + 1
-    file = input_file[i:end]
-    i = findfirst("\"", file)[end]
-    j = findfirst("\"", file[i+1:end])[end] + i
-    distribution = string(file[i+1:j-1])
+function get_boundary_config()
 
     input_file = open(f->read(f, String), "../run/keywords.input")
-    i = findfirst("cut_off", input_file)[end] + 1
+    i = findfirst("depth_criterion", input_file)[end] + 1
     file = input_file[i:end]
     i = findfirst("=", file)[end] + 1
     j = findfirst("\n", file)[end] - 1
 
-    cut_off = nothing
+    crit = nothing
 
     try
-        cut_off = parse(Float64, file[i:j])
+        crit = parse(Float64, file[i:j])
     catch
-        cut_off = parse(Bool, file[i:j])
+        crit = parse(Bool, file[i:j])
     end
 
-    return distribution, cut_off
+	input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("depth_exponent", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+	de = parse(Float64, file[i:j])
+
+    return crit, de
+end
+
+function get_packet_config()
+
+    input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("target_packets", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+
+    tp = parse(Float64, file[i:j])
+
+	input_file = open(f->read(f, String), "../run/keywords.input")
+    i = findfirst("packet_exponent", input_file)[end] + 1
+    file = input_file[i:end]
+    i = findfirst("=", file)[end] + 1
+    j = findfirst("\n", file)[end] - 1
+	pe = parse(Float64, file[i:j])
+
+    return tp, pe
 end
 
 

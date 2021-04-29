@@ -16,83 +16,10 @@ struct LineRadiation
     ε_line::Array{Float64,3}
 end
 
-function test_boundary(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates,
-                       lines, lineRadiations, populations::Array{<:NumberDensity,4})
-    λ = atom.λ
-    nλ = atom.nλ
-
-    α_continuum, ε_continuum = opacity_continuum(atmosphere, atom, rates, populations)
-    α_line, ε_line = opacity_line(atom,  lines, lineRadiations)
-
-    α_abs = α_continuum .* ε_continuum .+ α_line .* ε_line
-    α = α_continuum .+ α_line
-    α_scat = α .- α_abs
-    ε = α_abs ./ α
-
-    z = atmosphere.z
-    temperature = atmosphere.temperature
-
-    nz,nx,ny=size(temperature)
-    boundary = Array{Int32,3}(undef, nλ, nx, ny)
-    # ==================================================================
-    # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
-    # ==================================================================
-
-    cut_off = [30, 10, 1.0, 0.1, 0.01]
-    cut_off_eff = [50, 20, 10, 1.0, 0.1]
-    cut_off_eps = [0.99, 0.5, 0.1, 0.01, 0.001]
-
-
-    for c=1:5
-        ENV["GKSwstype"]="nul"
-        plot(z[1:end-1],temperature[:,10,10], color="black", alpha=0, grid=false)
-        for w=1:nλ
-            b = τ_boundary(α[w,:,:,:].*ε[w,:,:,:], z, cut_off[c])
-            bmin = minimum(b)
-            bmax = maximum(b)
-            plot!([z[bmin], z[bmax]], seriestype = :vspan, alpha=(nλ+1-w)/nλ, label=string(w), grid=false)
-            png("tau"*string(cut_off[c]))
-        end
-    end
-    for c=1:5
-        ENV["GKSwstype"]="nul"
-        plot(z[1:end-1],temperature[:,10,10], color="black", alpha=0, grid=false)
-        for w=1:nλ
-            b = eff_τ_boundary(α[w,:,:,:], ε[w,:,:,:], z, cut_off_eff[c])
-            bmin = minimum(b)
-            bmax = maximum(b)
-            plot!([z[bmin], z[bmax]], seriestype = :vspan, alpha=(nλ+1-w)/nλ, label=string(w), grid=false)
-            png("tau_eff"*string(cut_off_eff[c]))
-        end
-    end
-    for c=1:5
-        ENV["GKSwstype"]="nul"
-        plot(z[1:end-1],temperature[:,10,10], color="black", alpha=0, grid=false)
-        for w=1:nλ
-            b = ε_boundary(ε[w,:,:,:], cut_off_eps[c])
-            bmin = minimum(b)
-            bmax = maximum(b)
-            plot!([z[bmin], z[bmax]], seriestype = :vspan, alpha=(nλ+1-w)/nλ, label=string(w), grid=false)
-            png("eps"*string(cut_off_eps[c]))
-        end
-    end
-
-
-    """for w=1:nλ
-        boundary[w,:,:] = ε_boundary(ε[w,:,:,:], cut_off)
-    end
-
-    for w=1:nλ
-        boundary[w,:,:] = eff_τ_boundary(α[w,:,:,:], ε[w,:,:,:], z, cut_off)
-    end"""
-
-
-end
-
 
 function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates,
                            lines, lineRadiations, populations::Array{<:NumberDensity,4},
-                           boundary_criterion, target_packets::Float64)
+                           boundary_config, packet_config)
 
     x = atmosphere.x
     y = atmosphere.y
@@ -120,21 +47,11 @@ function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::Transition
     # FIND OPTICAL DEPTH BOUNDARY AND PACKET DISTRIBUTION FOR EACH λ
     # ==================================================================
 
-    criterion, cut_off = boundary_criterion
-
-    if cut_off == false
+    if boundary_config[1] == false
         fill!(boundary, nz)
-    elseif criterion == "depth"
+    else
         for w=1:nλ
-            boundary[w,:,:] = τ_boundary(α[w,:,:,:], z, cut_off)
-        end
-    elseif criterion == "destruction"
-        for w=1:nλ
-            boundary[w,:,:] = ε_boundary(ε[w,:,:,:], cut_off)
-        end
-    elseif criterion == "effective_depth"
-        for w=1:nλ
-            boundary[w,:,:] = eff_τ_boundary(α[w,:,:,:], ε[w,:,:,:], z, cut_off)
+            boundary[w,:,:] = depth_boundary(α[w,:,:,:], ε[w,:,:,:], z, boundary_config)
         end
     end
 
@@ -142,14 +59,8 @@ function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::Transition
     iλbf = atom.iλbf
 
     for w=1:nλ
-        scale =1
-        if iλbb[1][1] <= w <= iλbb[1][2]
-           scale=1 #1e-4
-        elseif w <= iλbf[2][1]
-           scale=1 #1e-2
-        end
-        packets[w,:,:,:], packets_to_intensity[w,:,:,:] = distribute_packets(λ[w], target_packets, x, y, z,
-                                                                             temperature, α_abs[w,:,:,:],  ε[w,:,:,:], boundary[w,:,:],scale)
+        packets[w,:,:,:], packets_to_intensity[w,:,:,:] = distribute_packets(λ[w], x, y, z, temperature, α_abs[w,:,:,:],
+                                                                             ε[w,:,:,:], boundary[w,:,:], packet_config)
     end
 
     return α_continuum, ε_continuum, boundary, packets, packets_to_intensity
@@ -308,8 +219,8 @@ Returns data to go into structure.
 """
 function collect_background_radiation(atmosphere::Atmosphere,
                                       λ::Array{<:Unitful.Length,1},
-                                      boundary_criterion,
-                                      target_packets::Float64)
+                                      boundary_config,
+                                      packet_config)
 
     # ==================================================================
     # GET ATMOSPHERE DATA AND WAVELENGTH
@@ -348,25 +259,17 @@ function collect_background_radiation(atmosphere::Atmosphere,
     # ==================================================================
     # FIND OPTICAL DEPTH BOUNDARY
     # ==================================================================
-    criterion, cut_off = boundary_criterion
-
-    if cut_off == false
+    if boundary_config[1] == false
         fill!(boundary, nz)
     else
-        if criterion == "depth"
-            boundary[1,:,:] = τ_boundary(α[1,:,:,:], z, cut_off)
-        elseif criterion == "destruction"
-            boundary[1,:,:] = ε_boundary(ε[1,:,:,:], cut_off)
-        elseif criterion == "effective_depth"
-            boundary[1,:,:] = eff_τ_boundary(α[1,:,:,:], ε[1,:,:,:], z, cut_off)
-        end
+        boundary[1,:,:] = depth_boundary(α[1,:,:,:], ε[1,:,:,:], z, boundary_config)
     end
 
     # ==================================================================
     # FIND DISTRIBUTION OF PACKETS
     # ==================================================================
-    packets[1,:,:,:], packets_to_intensity[1,:,:,:] = distribute_packets(λ[1], target_packets, x, y, z,
-                                                                   temperature, α_continuum_abs, ε[1,:,:,:], boundary[1,:,:], 1.0)
+    packets[1,:,:,:], packets_to_intensity[1,:,:,:] = distribute_packets(λ[1], x, y, z,temperature, α_continuum_abs,
+                                                                         ε[1,:,:,:], boundary[1,:,:], packet_config)
 
     # ==================================================================
     # CHECK FOR UNVALID VALUES
@@ -490,60 +393,6 @@ function optical_depth(α::Array{<:PerLength, 3},
     return τ
 end
 
-"""
-    optical_depth_boundary(α::Array{<:PerLength, 3},
-                           z::Array{<:Unitful.Length, 1},
-                           τ_max::Real)
-
-Returns 2D array containing the z-indices
-where the optical depth reaches τ_max.
-"""
-function τ_boundary(α::Array{<:PerLength, 3},
-                                z::Array{<:Unitful.Length, 1},
-                                τ_max::Real)
-    nz, nx, ny = size(α)
-    columns = nx*ny
-    boundary = Array{Int32, 2}(undef, nx, ny)
-
-    # Calculate vertical optical depth for each column
-    for col=1:columns
-        j = 1 + (col-1)÷nx
-        i = col - (j-1)*nx
-
-        τ = 0
-        k = 1
-
-        while τ < τ_max && k < nz
-            # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
-            k += 1
-        end
-        boundary[i,j] = k
-    end
-
-    return boundary
-end
-
-function ε_boundary(ε::Array{Float64, 3}, ε_max::Real)
-
-    nz, nx, ny = size(ε)
-    columns = nx*ny
-    boundary = Array{Int32, 2}(undef, nx, ny)
-
-    for col=1:columns
-        j = 1 + (col-1)÷nx
-        i = col - (j-1)*nx
-
-        k = nz
-        while ε[k,i,j] > ε_max
-            k -= 1
-        end
-
-        boundary[i,j] = k
-    end
-
-    return boundary
-end
 
 """
     optical_depth_boundary(α::Array{<:PerLength, 3},
@@ -553,15 +402,16 @@ end
 Returns 2D array containing the z-indices
 where the optical depth reaches τ_max.
 """
-function eff_τ_boundary(α::Array{<:PerLength, 3},
+function depth_boundary(α::Array{<:PerLength, 3},
                         ε::Array{Float64, 3},
                         z::Array{<:Unitful.Length, 1},
-                        τ_max::Real)
+                        boundary_config)
     nz, nx, ny = size(α)
     columns = nx*ny
     boundary = Array{Int32, 2}(undef, nx, ny)
+    criterion, depth_exponent = boundary_config
 
-    α_mod = α .* sqrt.(ε)
+    α = α .* ε.^depth_exponent
 
     # Calculate vertical optical depth for each column
     for col=1:columns
@@ -571,9 +421,9 @@ function eff_τ_boundary(α::Array{<:PerLength, 3},
         τ = 0
         k = 1
 
-        while τ < τ_max && k < nz
+        while τ < criterion && k < nz
             # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (α_mod[k,i,j] + α_mod[k+1,i,j])
+            τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
             k += 1
         end
         boundary[i,j] = k
@@ -598,17 +448,16 @@ generated in each box above the boundary.
 As well as the intensity contained in each packet.
 """
 function distribute_packets(λ::Unitful.Length,
-                            target_packets::Real,
                             x::Array{<:Unitful.Length, 1},
                             y::Array{<:Unitful.Length, 1},
                             z::Array{<:Unitful.Length, 1},
                             temperature::Array{<:Unitful.Temperature, 3},
                             α::Array{<:PerLength, 3},
                             ε::Array{Float64, 3},
-                            boundary::Array{Int32,2}, scale)
+                            boundary::Array{Int32,2},
+                            packet_config)
 
     nz, nx, ny = size(α)
-
     Bλ = blackbody_lambda.(λ, temperature)
     emissivity = Bλ .* α # u"kW / m^3 / sr / nm"
     box_emission = zeros(Float64,nz,nx,ny)u"J / s / sr / nm"
@@ -625,26 +474,15 @@ function distribute_packets(λ::Unitful.Length,
         end
     end
 
+    target_packets, packet_exponent = packet_config
+
     total_emission = sum(box_emission)
     packets_per_box = round.(box_emission ./ total_emission * target_packets)
-
-    scale = sum(packets_per_box .* ε) / sum(packets_per_box)
+    scale = sum(packets_per_box .* ε.^packet_exponent) / sum(packets_per_box)
     packets_per_box = round.(box_emission ./ total_emission * target_packets * scale)
-    # To reduce overestimation of the energy
-    # per packet in cases with few photons
-    created_emission = 0u"J / s / sr / nm"
-    for j=1:ny
-        for i=1:nx
-            for k=1:boundary[i,j]
-                if packets_per_box[k,i,j] > 0
-                    created_emission += box_emission[k,i,j]
-                end
-            end
-        end
-    end
 
     total_packets = sum(packets_per_box)
-    packets_to_intensity = created_emission / total_packets ./ box_surface_scale(Δz, Δx, Δy)
+    packets_to_intensity = total_emission / total_packets ./ box_surface_scale(Δz, Δx, Δy)
 
     # treat sub-boundary separately to get J = B
     for j=1:ny

@@ -21,8 +21,8 @@ function run()
         # =============================================================================
         output_path = get_output_path()
         max_scatterings = get_max_scatterings()
-        target_packets = get_target_packets()
-        cut_off = get_cut_off()
+        boundary_config = get_boundary_config()
+        packet_config = get_packet_config()
 
         # =============================================================================
         # LOAD WAVELENGTH
@@ -36,9 +36,9 @@ function run()
         # LOAD RADIATION DATA
         # =============================================================================
         print("--Loading radiation data...................")
-        radiation_parameters = collect_background_radiation(atmosphere, λ, cut_off, target_packets)
+        radiation_parameters = collect_background_radiation(atmosphere, λ, boundary_config, packet_config)
         radiation = Radiation(radiation_parameters...)
-        println(@sprintf("Radiation loaded with %.2e packets.", target_packets))
+        println(@sprintf("Radiation loaded with %.2e packets.", packet_config[1]))
 
         # =============================================================================
         # CREATE OUTPUT FILE
@@ -64,10 +64,10 @@ function run()
         output_path = get_output_path()
         max_iterations = get_max_iterations()
         max_scatterings = get_max_scatterings()
-        target_packets = get_target_packets()
-        cut_off = get_cut_off()
         initial_population_distribution = get_population_distribution()
         write_rates = get_write_rates()
+        boundary_config = get_boundary_config()
+        packet_config = get_packet_config()
 
         # =============================================================================
         # LOAD ATOM
@@ -138,14 +138,12 @@ function run()
                 end
             end
 
-            test_boundary(atmosphere, atom, rates, lines, lineRadiations,populations)
-
             radiation_parameters = collect_radiation(atmosphere, atom, rates, lines, lineRadiations,
-                                                     populations, cut_off, target_packets)
+                                                     populations, boundary_config, packet_config)
 
             radiation = Radiation(radiation_parameters...)
             write_to_file(radiation, n, output_path)
-            println(@sprintf("Radiation loaded with %.2e packets per λ.", target_packets))
+            println(@sprintf("Radiation loaded with %.2e packets per λ.", packet_config[1]))
 
 
             mcrt(atmosphere, radiation, atom,
