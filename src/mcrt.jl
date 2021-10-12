@@ -119,6 +119,11 @@ function mcrt(atmosphere::Atmosphere,
 
                             # Scatter each packet until destroyed,
                             # escape or reach max_scatterings
+                            box_id_old = box_id
+                            stuck = 0
+
+                            # Scatter each packet until destroyed,
+                            # escape or reach max_scatterings
                             for s=1:Int(max_scatterings)
 
                                 # Scatter packet once
@@ -138,6 +143,17 @@ function mcrt(atmosphere::Atmosphere,
                                 end
 
                                 Threads.atomic_add!(total_scatterings, 1)
+
+                                # Check if stuck in same box
+                                if box_id == box_id_old
+                                    stuck += 1
+                                    if stuck > 1e3
+                                        break
+                                    end
+                                else
+                                    stuck = 0
+                                    box_id_old = box_id
+                                end
 
                             end
                         end
@@ -226,6 +242,12 @@ function mcrt(atmosphere::Atmosphere,
                             # Initial position uniformely drawn from box
                             r = corner .+ (box_dim .* rand(3))
 
+
+                            # Scatter each packet until destroyed,
+                            # escape or reach max_scatterings
+                            box_id_old = box_id
+                            stuck = 0
+
                             # Scatter each packet until destroyed,
                             # escape or reach max_scatterings
                             for s=1:Int(max_scatterings)
@@ -257,6 +279,17 @@ function mcrt(atmosphere::Atmosphere,
                                 end
 
                                 Threads.atomic_add!(total_scatterings, 1)
+
+                                # Check if stuck in same box
+                                if box_id == box_id_old
+                                    stuck += 1
+                                    if stuck > 1e3
+                                        break
+                                    end
+                                else
+                                    stuck = 0
+                                    box_id_old = box_id
+                                end
 
                             end
                         end
@@ -336,6 +369,9 @@ function mcrt(atmosphere::Atmosphere,
 
                         # Scatter each packet until destroyed,
                         # escape or reach max_scatterings
+                        box_id_old = box_id
+                        stuck = 0
+
                         for s=1:Int(max_scatterings)
 
                             # Scatter packet once
@@ -355,6 +391,17 @@ function mcrt(atmosphere::Atmosphere,
                             end
 
                             Threads.atomic_add!(total_scatterings, 1)
+
+                            # Check if stuck in same box
+                            if box_id == box_id_old
+                                stuck += 1
+                                if stuck > 1e3
+                                    break
+                                end
+                            else
+                                stuck = 0
+                                box_id_old = box_id
+                            end
 
                         end
                     end
@@ -378,7 +425,6 @@ function mcrt(atmosphere::Atmosphere,
             file["time"][iteration,λi] = et
         end
     end
-
 end
 
 

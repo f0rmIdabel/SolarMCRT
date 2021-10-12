@@ -57,6 +57,7 @@ function run()
         # =============================================================================
         # END OF TEST MODE
         # =============================================================================
+
     else
         # =============================================================================
         # READ CONFIG FILE
@@ -186,7 +187,7 @@ function run()
                 cut_output_file(output_path, n, write_rates)
                 break
             else
-                println(@sprintf("\n--No convergence. Error = %.1e.\n", error))
+                println(@sprintf("\n--No convergence. Mean error = %.1e.\n", error))
             end
 
             # =============================================================================

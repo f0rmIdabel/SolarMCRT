@@ -7,15 +7,12 @@
 # ======================================================================================= #
 #  Path to atmosphere data                                                                #
 # ======================================================================================= #
-atmosphere_path = "/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
-
-"/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_cb24bih_s385_fullv_reworked.ncdf"
-"/mn/stornext/u3/idarhan/basement/MSc/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
+atmosphere_path = "/home/f0rmidabel/MSc/Atmospheres/bifrost_qs006023_s525_quarter_reworked.hdf5"
 
 # ======================================================================================= #
 #  Path to atom data.                                                                     #
 # ======================================================================================= #
-atom_path = "/mn/stornext/u3/idarhan/basement/MSc/Atoms/H_6lvl.h5"
+atom_path = "/home/f0rmidabel/MSc/Atoms/H_6lvl.h5"
 n_levels = 2
 
 # ======================================================================================= #
@@ -28,8 +25,8 @@ population_distribution = "zero_radiation"
 #  and destruction probability ("destruction") criteria for determining                   #
 #  lower region to exclude. Set the criterion to false for no boundary cut-off.           #
 # ======================================================================================= #
-depth_criterion = 1.0
-depth_exponent = 1.5
+depth_criterion = 0.001
+depth_exponent = 1.0
 
 # ======================================================================================= #
 #  The intended number of packets to be created for each group of wavelengths.            #
@@ -37,8 +34,8 @@ depth_exponent = 1.5
 #  For an N-level atom, you must provide N-1 (comma-seperated) bound-free values and      #
 #  N(N-1)/2 bound-bound values.                                                           #
 # ======================================================================================= #
-target_packets = 1e8
-packet_exponent = 0.9
+target_packets = 1e6
+packet_exponent = 0.0
 
 # ======================================================================================= #
 #  Choose how many wavelengths to sample for the bound-bound and bound-free transitions.  #
@@ -47,18 +44,18 @@ packet_exponent = 0.9
 #  by default. For an N-level atom, you must provide N (comma-seperated) bound-free       #
 #  values and N(N-1)/2 bound-bound values.                                                #
 # ======================================================================================= #
-nλ_bf = 3, 3
-nλ_bb = 5
+nλ_bf = 5, 5
+nλ_bb = 9
 
 # ======================================================================================= #
 #  Maximum number of scatterings before quitting.                                         #
 # ======================================================================================= #
-max_scatterings = 1e5
+max_scatterings = 1e6
 
 # ======================================================================================= #
 #  Maximum number of population iterations before quitting.                               #
 # ======================================================================================= #
-max_iterations = 10
+max_iterations = 1
 
 # ======================================================================================= #
 # Option to cut and slice the atmosphere data in all dimensions [nz, nx, ny].             #

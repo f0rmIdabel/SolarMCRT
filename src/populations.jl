@@ -1,5 +1,6 @@
 include("rates.jl")
 
+
 """
     collect_initial_populations(atom::Atom,
                                 temperature::Array{<:Unitful.Temperature, 3},
@@ -94,15 +95,15 @@ the convergence criterion. Return convergence status and error.
 function check_population_convergence(populations::Array{<:NumberDensity, 4},
                                       new_populations::Array{<:NumberDensity, 4},
                                       criterion::Real = 1e-3)
-    N = length(populations)
-    error = sum( abs.(populations .- new_populations) ./populations ) ./N
+    error = abs.(populations .- new_populations) ./populations
+    mean_error = sum(error) / length(error)
 
     converged = false
-    if error < criterion
+    if maximum(error) < criterion
         converged = true
     end
 
-    return converged, error
+    return converged, mean_error
 end
 
 

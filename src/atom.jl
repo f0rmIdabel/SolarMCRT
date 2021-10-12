@@ -46,6 +46,23 @@ function collect_atom_data(atmosphere::Atmosphere)
     qcore = read(atom, "qcore")
     close(atom)
 
+    dz, dx, dy = get_step()
+
+    # Only keep every dz-th box in z-direction
+    if dz > 1
+        density = density[1:dz:end,:,:]
+    end
+
+    # Only keep every dx-th box in x-direction
+    if dx > 1
+        density = density[:,1:dx:end,:]
+    end
+
+    # Only keep every dy-th box in y-direction
+    if dy > 1
+        density = density[:,:,1:dy:end]
+    end
+
     # ==================================================================
     # CUT ACCORDING TO LEVEL NUMBER
     # ==================================================================
@@ -97,7 +114,7 @@ function collect_atom_data(atmosphere::Atmosphere)
 
     bf_bounds = []
     for level=1:n_levels
-        λ_min = λ1c * (level/2.0)^2 .+ 0.5u"nm"
+        λ_min = λ1c * (level/2.0)^2 .+ 0.001u"nm"
         λ_bf = sample_λ_boundfree(nλ_bf[level], λ_min, χ[level], χ[end])
         append!(λ, λ_bf)
         nλ += length(λ_bf)
@@ -129,6 +146,8 @@ function collect_atom_data(atmosphere::Atmosphere)
         append!(iλbb, [[argmin(abs.(bb_bounds[line][1] .- λ)),
                         argmin(abs.(bb_bounds[line][2] .- λ))]])
     end
+
+
 
     # ===========================================================
     # NO NEGAITVE OR INFINITE VALUES
@@ -306,6 +325,7 @@ function sample_λ_boundfree(nλ::Int64,
     return λ
 end
 
+
 """
     transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
 
@@ -315,6 +335,7 @@ the energy difference between two levels.
 function transition_λ(χ1::Unitful.Energy, χ2::Unitful.Energy)
     ((h * c_0) / (χ2-χ1)) |> u"nm"
 end
+
 
 """
     damping_constant(γ::Unitful.Frequency,
@@ -344,6 +365,7 @@ function write_to_file(λ::Array{<:Unitful.Length,1}, output_path::String)
         write(file, "wavelength", ustrip(λ))
     end
 end
+
 
 """
     write_to_file(atom::Atom, output_path::String)

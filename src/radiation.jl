@@ -1,8 +1,8 @@
 include("atmosphere.jl")
 include("rates.jl")
 include("atom.jl")
-using Plots
-using UnitfulRecipes
+
+
 struct Radiation
     α_continuum::Array{<:PerLength, 4}                     # (nλ, nz, nx, ny)
     ε_continuum::Array{Float64,4}                          # (nλ, nz, nx, ny)
@@ -16,11 +16,9 @@ struct LineRadiation
     ε_line::Array{Float64,3}
 end
 
-
 function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates,
                            lines, lineRadiations, populations::Array{<:NumberDensity,4},
                            boundary_config, packet_config)
-
     x = atmosphere.x
     y = atmosphere.y
     z = atmosphere.z
@@ -39,6 +37,7 @@ function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::Transition
     α_scat = α .- α_abs
     ε = α_abs ./ α
 
+
     boundary = Array{Int32,3}(undef, nλ, nx, ny)
     packets = Array{Float64,4}(undef, nλ, nz, nx, ny)
     packets_to_intensity = Array{UnitsIntensity_λ,4}(undef, nλ, nz, nx, ny)
@@ -54,9 +53,6 @@ function collect_radiation(atmosphere::Atmosphere, atom::Atom, rates::Transition
             boundary[w,:,:] = depth_boundary(α[w,:,:,:], ε[w,:,:,:], z, boundary_config)
         end
     end
-
-    iλbb = atom.iλbb
-    iλbf = atom.iλbf
 
     for w=1:nλ
         packets[w,:,:,:], packets_to_intensity[w,:,:,:] = distribute_packets(λ[w], x, y, z, temperature, α_abs[w,:,:,:],
@@ -81,7 +77,6 @@ function collect_line_radiation_data(line::Line, rates::TransitionRates, populat
 
     return α_line_constant, ε_line
 end
-
 
 function opacity_line(atom::Atom, lines, lineRadiations)
     # ==================================================================
@@ -129,7 +124,6 @@ function opacity_line(atom::Atom, lines, lineRadiations)
 
     return α, ε
 end
-
 
 function opacity_continuum(atmosphere::Atmosphere, atom::Atom, rates::TransitionRates, populations::Array{<:NumberDensity,4})
     # ==================================================================
@@ -190,7 +184,6 @@ function opacity_continuum(atmosphere::Atmosphere, atom::Atom, rates::Transition
             α[w,:,:,:] .+= α_bf
             α_abs[w,:,:,:] .+= α_bf .* ε_bf
         end
-
     end
 
     ε = α_abs ./ α
@@ -203,7 +196,6 @@ function opacity_continuum(atmosphere::Atmosphere, atom::Atom, rates::Transition
 
     return α, ε
 end
-
 
 
 """
@@ -405,28 +397,43 @@ where the optical depth reaches τ_max.
 function depth_boundary(α::Array{<:PerLength, 3},
                         ε::Array{Float64, 3},
                         z::Array{<:Unitful.Length, 1},
-                        boundary_config)
+                        boundary_config,
+                        depth_condition=false)
     nz, nx, ny = size(α)
     columns = nx*ny
     boundary = Array{Int32, 2}(undef, nx, ny)
     criterion, depth_exponent = boundary_config
 
-    α = α .* ε.^depth_exponent
+    Δz = (z[1:end-1] .- z[2:end])*0.5
 
     # Calculate vertical optical depth for each column
     for col=1:columns
         j = 1 + (col-1)÷nx
         i = col - (j-1)*nx
 
-        τ = 0
-        k = 1
+        if depth_condition
+            τ = 0
+            k = 1
 
-        while τ < criterion && k < nz
-            # Trapezoidal rule
-            τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
-            k += 1
+            α = α .* ε.^depth_exponent
+            while τ < criterion && k < nz
+                # Trapezoidal rule
+                τ += 0.5(z[k] - z[k+1]) * (α[k,i,j] + α[k+1,i,j])
+                k += 1
+            end
+
+            boundary[i,j] = k
+        else
+            c = 0
+            k = nz
+
+            while c < criterion && k > 1
+                c = (1.0 .- ε[k,i,j]).^(Δz[k]*α[k,i,j]).^2
+                k -= 1
+            end
+
+            boundary[i,j] = k
         end
-        boundary[i,j] = k
     end
 
     return boundary
@@ -557,7 +564,7 @@ function box_surface_scale(Δz, Δx, Δy)
     for k = 1:nz
         for i=1:nx
             for j=1:ny
-                surface_scale[k,i,j] = Δx[i] * sqrt( Δy[i]^2 +  Δz[i]^2)
+                surface_scale[k,i,j] = Δz[k] * sqrt( Δy[j]^2 +  Δx[i]^2) * sqrt(Δz[i]/Δx[i])
             end
         end
     end

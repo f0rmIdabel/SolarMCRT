@@ -105,7 +105,7 @@ function Rij(J::Array{<:UnitsIntensity_λ, 4},
 
     for l=1:(nλ-1)
         R += 2π/hc * (( λ[l]   * σij[l,:,:,:]   .* J[l,:,:,:] .+
-                        λ[l+1] * σij[l+1,:,:,:] .* J[l+1,:,:,:]) .* (λ[l+1] - λ[l]))
+                        λ[l+1] * σij[l+1,:,:,:] .* J[l+1,:,:,:]) .* (λ[l+1] - λ[l])) ./1000
     end
 
     return R
@@ -128,7 +128,7 @@ function Rij(J::Array{<:UnitsIntensity_λ, 4},
 
     for l=1:(nλ-1)
         R +=  2π/hc * ( λ[l]   * σij[l]   .* J[l,:,:,:]   .+
-                        λ[l+1] * σij[l+1] .* J[l+1,:,:,:]  ) .* (λ[l+1] - λ[l])
+                        λ[l+1] * σij[l+1] .* J[l+1,:,:,:]  ) .* (λ[l+1] - λ[l]) ./1000
     end
 
     return R
